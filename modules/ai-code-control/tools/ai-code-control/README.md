@@ -13,6 +13,7 @@ dotnet run --project src/AiCodeControl.Cli -- run-validation
 dotnet run --project src/AiCodeControl.Cli -- index-python --path .
 dotnet run --project src/AiCodeControl.Cli -- index-rust --path .
 dotnet run --project src/AiCodeControl.Cli -- index-code --path . [--full]
+dotnet run --project src/AiCodeControl.Cli -- obsidian-export [--path <scope>] [--out <vault>] [--include-symbols] [--max-symbols <n>]
 dotnet run --project src/AiCodeControl.Cli -- find-symbol <query>
 dotnet run --project src/AiCodeControl.Cli -- impact-analysis <symbol> [--depth 5]
 dotnet run --project src/AiCodeControl.Cli -- verify-changed-files --plan .ai-code-control/reports/refactor/current-plan.json

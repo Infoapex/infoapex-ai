@@ -27,6 +27,7 @@ All commands print a single JSON object to stdout, except `memory-brief` which p
 | `run-validation` | `status` pass/fail, `results[]` per toolchain command (`name`, `status`, `exitCode`, `durationMs`, `error`, `output` on failure) |
 | `index-python --path <p>` / `index-rust --path <p>` | counts of files/symbols/references indexed |
 | `index-code [--path <p>] [--full]` | incremental C#/TypeScript/JavaScript/SQL indexing; full rebuild when requested |
+| `obsidian-export [--path <p>] [--out <vault>] [--include-symbols] [--max-symbols <n>]` | generates an Obsidian-compatible Markdown/Canvas projection from the SQLite code graph; does not modify source code |
 | `find-symbol <query>` | `symbols[]` with `fullName`, `kind`, `file`, `line` |
 | `impact-analysis <full.name> [--depth <n>]` | direct/transitive callers, ambiguity, affected files, `riskLevel` |
 | `verify-changed-files [--plan <p>]` | scope, branch and parallel-task conflicts |

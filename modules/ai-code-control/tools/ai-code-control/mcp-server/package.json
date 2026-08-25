@@ -1,6 +1,6 @@
 {
   "name": "ai-code-control-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "MCP server exposing AI Code Control tools to Claude and compatible clients",
   "type": "module",
   "main": "dist/server.js",

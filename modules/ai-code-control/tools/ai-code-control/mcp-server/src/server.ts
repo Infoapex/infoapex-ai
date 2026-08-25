@@ -89,6 +89,20 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "obsidian_export",
+    description:
+      "Export the SQLite code graph as an Obsidian-compatible Markdown and Canvas projection. The export is read-only over source code and does not include raw conversations or secrets.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Scope relative to repository root (default: .)" },
+        out: { type: "string", description: "Output vault path (default: docs/code-map/generated)" },
+        includeSymbols: { type: "boolean", description: "Generate selected symbol notes" },
+        maxSymbols: { type: "number", description: "Maximum symbol notes (default: 250)" },
+      },
+    },
+  },
+  {
     name: "find_symbol",
     description: "Find a symbol (function, class, method) in the codebase by name.",
     inputSchema: {
@@ -312,6 +326,14 @@ async function dispatch(name: string, args: Record<string, unknown>): Promise<Cl
       return runCli(cliArgs);
     }
 
+    case "obsidian_export": {
+      const cliArgs = ["obsidian-export", "--path", String(args.path ?? ".")];
+      if (args.out) cliArgs.push("--out", String(args.out));
+      if (args.includeSymbols === true) cliArgs.push("--include-symbols");
+      if (args.maxSymbols) cliArgs.push("--max-symbols", String(args.maxSymbols));
+      return runCli(cliArgs);
+    }
+
     case "refresh_context": {
       const cliArgs = ["refresh", "--path", String(args.path ?? ".")];
       if (args.full === true) cliArgs.push("--full");
@@ -362,7 +384,7 @@ async function dispatch(name: string, args: Record<string, unknown>): Promise<Cl
 }
 
 const server = new Server(
-  { name: "ai-code-control", version: "1.1.0" },
+  { name: "ai-code-control", version: "1.2.0" },
   { capabilities: { tools: {} } }
 );
 

@@ -115,6 +115,41 @@ Worker-ul păstrează starea în afara repository-ului țintă, produce evenimen
 - analiză de simboluri și impact tranzitiv pentru C#, TypeScript/JavaScript și SQL;
 - motor `fake` pentru teste deterministe fără consum de provider.
 
+## Code map pentru Obsidian
+
+`ai-code-control` poate proiecta graful SQLite într-un vault Markdown compatibil cu Obsidian. Exportul este opțional și read-only față de cod: indexul SQLite rămâne reconstruibil, iar sursa de adevăr rămâne codul și documentația versionată.
+
+```bash
+dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- refresh --full
+dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- obsidian-export
+```
+
+Output-ul implicit este `docs/code-map/generated/` și este ignorat de Git. Pentru un scope sau vault extern:
+
+```bash
+dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- obsidian-export \
+  --path modules/ai-code-worker \
+  --out C:/vaults/infoapex-code-map \
+  --include-symbols \
+  --max-symbols 250
+```
+
+Exporterul produce `index.md`, note de module/fișier, note de simbol selectabile și `canvases/code-map.canvas`. Proprietățile YAML păstrează commitul indexat, branch-ul, hash-ul sursei și momentul generării. Ghidul complet este în [docs/OBSIDIAN-CODE-MAP.md](docs/OBSIDIAN-CODE-MAP.md).
+
+Fluxul exportului este o proiectie unidirectionala din cod si indexul SQLite spre vault-ul Obsidian; modificarile din Obsidian nu sunt aplicate automat in cod:
+
+```mermaid
+flowchart LR
+    CODE[Cod sursa] --> REFRESH[refresh / index-code]
+    REFRESH --> DB[(codegraph.sqlite)]
+    DB --> EXPORT[obsidian-export]
+    EXPORT --> MD[index.md + note Markdown]
+    EXPORT --> CANVAS[code-map.canvas]
+    MD --> GRAPH[Obsidian Graph View]
+    CANVAS --> OBS[Obsidian]
+    GRAPH --> OBS
+```
+
 ## Moduri de integrare
 
 ```text

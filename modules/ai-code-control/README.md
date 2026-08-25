@@ -57,6 +57,29 @@ Memoria nu este tratată niciodată drept adevăr despre cod (vezi ADR-0004). Ma
 este canonic; indexul SQLite este derivat și poate fi oricând reconstruit cu
 `memory-ingest` (ADR-0006).
 
+## Code map pentru Obsidian
+
+`ai-code-control` poate exporta o proiecție Markdown a grafului SQLite pentru navigare în Obsidian. Exportul este opțional și read-only față de cod: sursa de adevăr rămâne codul, contractele și indexul reconstruibil.
+
+```bash
+dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- refresh --full
+dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- obsidian-export
+```
+
+Output-ul implicit este `docs/code-map/generated/` și este ignorat de Git. Pentru un vault extern sau pentru un snapshot limitat:
+
+```bash
+dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- obsidian-export \
+  --path modules/ai-code-worker \
+  --out C:/vaults/infoapex-code-map \
+  --include-symbols \
+  --max-symbols 250
+```
+
+Exporterul produce `index.md`, note de module și fișier, simboluri doar când sunt cerute și `canvases/code-map.canvas`. Proprietățile YAML păstrează branch-ul, commitul indexat, hash-ul fișierului și momentul generării. Nu se exportă transcripturi brute, secrete sau baza SQLite.
+
+Detaliile și politica de utilizare sunt în [docs/OBSIDIAN-CODE-MAP.md](../../docs/OBSIDIAN-CODE-MAP.md).
+
 ## Workflow-ul agentului per task
 
 ```

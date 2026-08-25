@@ -5,3 +5,6 @@ dist/
 **/db/
 .logs/
 .env
+
+# Generated Obsidian code-map projection; source code and SQLite remain canonical.
+docs/code-map/generated/

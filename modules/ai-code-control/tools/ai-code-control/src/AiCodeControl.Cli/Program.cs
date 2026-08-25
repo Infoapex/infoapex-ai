@@ -103,6 +103,26 @@ async Task<int> RunCommandAsync()
                 WriteJson(new { status = "ok", result });
                 return 0;
             }
+        case "obsidian-export":
+            {
+                var databasePath = EnsureCodegraphDb(configLoader);
+                var outputPath = GetOptionValue(args, "--out") ?? "docs/code-map/generated";
+                var scopePath = GetOptionValue(args, "--path") ?? ".";
+                var maxSymbols = int.TryParse(GetOptionValue(args, "--max-symbols"), out var parsedMaxSymbols)
+                    ? parsedMaxSymbols
+                    : 250;
+                var result = new ObsidianExportService().Export(new ObsidianExportOptions
+                {
+                    RepositoryRoot = repoRoot,
+                    DatabasePath = databasePath,
+                    ScopePath = scopePath,
+                    OutputPath = outputPath,
+                    IncludeSymbols = args.Contains("--include-symbols", StringComparer.OrdinalIgnoreCase),
+                    MaxSymbols = maxSymbols
+                });
+                WriteJson(result);
+                return 0;
+            }
         case "find-symbol":
             {
                 var dbPath = EnsureCodegraphDb(configLoader);
@@ -403,6 +423,7 @@ static void PrintHelp()
     Console.WriteLine("  index-python --path <path>");
     Console.WriteLine("  index-rust --path <path>");
     Console.WriteLine("  index-code [--path <path>] [--full]  # C#, TypeScript/JS and SQL");
+    Console.WriteLine("  obsidian-export [--path <scope>] [--out <vault>] [--include-symbols] [--max-symbols <n>]");
     Console.WriteLine("  find-symbol <query>");
     Console.WriteLine("  impact-analysis <symbol> [--depth <1-20>]");
     Console.WriteLine("  verify-changed-files --plan <path>");
