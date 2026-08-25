@@ -40,3 +40,19 @@ the disposable live gate can receive the worker permission mode through+`APEX_C
 The internal counterpart is `npm run value-gate:internal`; it is the required CI
 gate and consumes no provider usage. It proves the same planner-to-worker
 contract with deterministic provider fixtures.
+
+## Codex live result
+
+On 2026-08-25, the installed `codex-cli 0.147.0` passed `doctor --engine codex`,
+including the behavioral smoke test. A disposable real worker task was then
+executed through `ai-code-worker` with `--codex-sandbox danger-full-access`:
+
+- task: `CODEX-LIVE-01`;
+- result: `DONE`;
+- worker-owned task commit: `0ec9a0db3a29a1934b6a80745978b8f7b281e26e`;
+- quality gate: `pass-gate`, exit code `0`.
+
+The same task with the default `workspace-write` mode was blocked by the local
+Codex CLI's read-only sandbox and approval settings. The worker already exposes
+the explicit sandbox override; use `danger-full-access` only for a controlled
+target repository when the worker's path and commit guardrails are active.

@@ -29,3 +29,10 @@ blocked on external CLI execution, with evidence in
 real quota-consuming task: provider outcomes are injected deterministically.
 The repository-agnostic internal three-plan gate now passes 3/3 through planner
 and worker fake execution; only the usage-consuming live variant remains open.
+
+Codex live update 2026-08-25: `codex-cli 0.147.0` passed doctor and a disposable
+real worker task completed with `DONE`, a worker-owned commit and a passing gate
+when invoked with explicit `--codex-sandbox danger-full-access`. The default
+`workspace-write` invocation was blocked by the local CLI approval policy. The
+remaining external validation is Claude's usage-consuming planner/value gate and
+its real quota signal.
