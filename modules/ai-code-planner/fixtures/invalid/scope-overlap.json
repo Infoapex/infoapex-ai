@@ -1,0 +1,37 @@
+{
+  "goal": "Fixture for SCOPE_OVERLAP linter rule (SCOPE_NO_UNCONTROLLED_OVERLAP check).",
+  "tasks": [
+    {
+      "id": "TASK-A",
+      "goal": "Task A runs in the same wave as Task B and shares an allowedPaths entry with it.",
+      "acceptanceCriteria": [
+        { "criterionId": "AC-001", "text": "Output file exists." }
+      ],
+      "gates": [
+        { "gateId": "G-001", "command": "verify-a", "evidenceContract": "Exit code 0." }
+      ],
+      "dependsOn": [],
+      "scope": {
+        "allowedPaths": ["src/shared/**", "src/a/**"],
+        "forbiddenPaths": []
+      },
+      "requiredInputs": []
+    },
+    {
+      "id": "TASK-B",
+      "goal": "Task B runs in the same wave as Task A and shares src/shared/** with it.",
+      "acceptanceCriteria": [
+        { "criterionId": "AC-001", "text": "Output file exists." }
+      ],
+      "gates": [
+        { "gateId": "G-001", "command": "verify-b", "evidenceContract": "Exit code 0." }
+      ],
+      "dependsOn": [],
+      "scope": {
+        "allowedPaths": ["src/shared/**", "src/b/**"],
+        "forbiddenPaths": []
+      },
+      "requiredInputs": []
+    }
+  ]
+}

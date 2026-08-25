@@ -1,0 +1,62 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { describe, it } from "node:test";
+import { FakeExecutionEnvironment, LocalIsolatedExecutionEnvironment } from "../../src/execution/environment.js";
+import { canonicalJson, sha256 } from "../../src/manifest/normalize.js";
+import type { JsonValue } from "../../src/schema/json-schema.js";
+
+describe("fake execution environment", () => {
+  it("reports isolated profile capabilities and profile digest", () => {
+    const profile = readJson("templates/project/.ai-code-worker/execution-environment.example.json");
+    const report = new FakeExecutionEnvironment().doctor(profile);
+
+    assert.equal(report.backend, "fake-isolated");
+    assert.equal(report.supported, true);
+    assert.equal(report.kind, "isolated");
+    assert.equal(report.profileSha256, sha256(canonicalJson(profile as JsonValue)));
+    assert.equal(report.missingCapabilities.length, 0);
+    assert.ok(report.capabilities.includes("network-deny-repository-processes"));
+  });
+
+  it("fails closed when isolated filesystem restrictions are missing", () => {
+    const profile = readJson("templates/project/.ai-code-worker/execution-environment.example.json") as Record<string, unknown>;
+    const filesystem = profile.filesystem as Record<string, unknown>;
+    const unsafeProfile = {
+      ...profile,
+      filesystem: {
+        ...filesystem,
+        hostReadDefault: "allow"
+      }
+    };
+    const report = new FakeExecutionEnvironment().doctor(unsafeProfile);
+
+    assert.equal(report.supported, false);
+    assert.ok(report.missingCapabilities.includes("filesystem-restricted"));
+  });
+
+  it("runs commands through the local isolated backend with a scrubbed environment", async () => {
+    const profile = readJson("templates/project/.ai-code-worker/execution-environment.example.json");
+    const environment = new LocalIsolatedExecutionEnvironment();
+    const report = environment.doctor(profile);
+
+    assert.equal(report.backend, "local-isolated");
+    assert.equal(report.supported, true);
+    assert.equal(report.missingCapabilities.length, 0);
+
+    const result = await environment.run({
+      executable: process.execPath,
+      args: ["-e", "process.stdout.write(process.env.SECRET_TOKEN ? 'leaked' : 'clean')"],
+      cwd: process.cwd(),
+      timeoutMs: 5000,
+      maximumOutputBytes: 1024,
+      env: {}
+    });
+
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, "clean");
+  });
+});
+
+function readJson(path: string): unknown {
+  return JSON.parse(readFileSync(path, "utf8"));
+}

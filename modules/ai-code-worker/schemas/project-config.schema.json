@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:project-config.schema.json",
+  "title": "ai-code-worker project config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contextProvider",
+    "maximumParallelWriters",
+    "stateRoot",
+    "syncRootPolicy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "defaultEngine": {
+      "description": "Aspirational: IMPLEMENTATION-PLAN.md §6 documents this field, but no runtime code reads it from config.json today - `cli.ts`'s `run`/`doctor` commands resolve the engine only from the `--engine` CLI flag (default \"fake\"). Kept as an optional property so early adopters of the documented shape do not fail schema validation, but it currently has no effect. See src/config/init.ts's defaultProjectConfigTemplate() comment.",
+      "enum": ["codex", "claude"]
+    },
+    "contextProvider": {
+      "enum": ["none", "ai-code-control"]
+    },
+    "baseBranch": {
+      "description": "Aspirational, not read from config.json today - see the defaultEngine property description.",
+      "type": "string",
+      "minLength": 1
+    },
+    "integrationBranchPrefix": {
+      "description": "Aspirational, not read from config.json today - see the defaultEngine property description.",
+      "type": "string",
+      "minLength": 1
+    },
+    "taskBranchPrefix": {
+      "description": "Aspirational, not read from config.json today - see the defaultEngine property description.",
+      "type": "string",
+      "minLength": 1
+    },
+    "maximumParallelWriters": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "maximumRepairCycles": {
+      "description": "Aspirational as a project-config field: the value that actually governs a run comes from the frozen manifest's budgets.maximumRepairCycles (see manifest.schema.json), read directly in src/run/{fake,claude,codex}-run.ts. This top-level config.json field is not read from anywhere today.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "maximumRunMinutes": {
+      "description": "Aspirational as a project-config field: the value that actually governs a run comes from the frozen manifest's budgets.maximumRunMinutes (see manifest.schema.json), read directly in src/run/{fake,claude,codex}-run.ts. This top-level config.json field is not read from anywhere today.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "executionEnvironment": {
+      "description": "Aspirational, not read from config.json today - doctor resolves the execution profile from .ai-code-worker/execution-environment.example.json (or the packaged template), not from this config.json field. See the defaultEngine property description.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaultProfile", "allowTrustedLocal"],
+      "properties": {
+        "defaultProfile": {
+          "enum": ["isolated", "trusted-local"]
+        },
+        "allowTrustedLocal": {
+          "type": "boolean"
+        }
+      }
+    },
+    "stateRoot": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "syncRootPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequentialWriter", "parallelWriters"],
+      "properties": {
+        "sequentialWriter": {
+          "enum": ["warn", "block"]
+        },
+        "parallelWriters": {
+          "enum": ["warn", "block"]
+        }
+      }
+    },
+    "adapters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "codex": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "executable": {
+              "type": "string",
+              "minLength": 1
+            },
+            "model": {
+              "type": ["string", "null"],
+              "minLength": 1
+            },
+            "sandboxMode": {
+              "enum": ["workspace-write", "danger-full-access"]
+            },
+            "timeoutSeconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maximumOutputBytes": {
+              "type": "integer",
+              "minimum": 1024
+            },
+            "testedVersionRanges": {
+              "description": "Project-level override for the codex adapter's version allowlist (src/doctor/doctor.ts's defaultCodexConfig()). Read by loadProjectConfig() and merged in codexAdapterConfigFromProject(); use this instead of editing the source default when a newer CLI version hasn't had its behavior verified yet.",
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1
+            }
+          }
+        },
+        "claude": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "executable": {
+              "type": "string",
+              "minLength": 1
+            },
+            "model": {
+              "type": ["string", "null"],
+              "minLength": 1
+            },
+            "permissionMode": {
+              "enum": ["default", "auto", "plan", "acceptEdits", "bypassPermissions", "dontAsk"]
+            },
+            "allowedTools": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "bareMode": {
+              "type": "boolean"
+            },
+            "dangerouslySkipPermissions": {
+              "description": "Explicit opt-in to Claude Code's --dangerously-skip-permissions. Use only when the worker process is already externally sandboxed and the disposable/task worktree is the intended write boundary.",
+              "type": "boolean"
+            },
+            "timeoutSeconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maximumOutputBytes": {
+              "type": "integer",
+              "minimum": 1024
+            },
+            "testedVersionRanges": {
+              "description": "Project-level override for the claude adapter's version allowlist (src/doctor/doctor.ts's defaultClaudeConfig()). Read by loadProjectConfig() and merged in claudeAdapterConfigFromProject().",
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

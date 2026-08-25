@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "review-fixture-run",
+  "reviewId": "review-fixture-001",
+  "baseCommit": "HEAD~1",
+  "headCommit": "HEAD",
+  "graphVersion": 1,
+  "criteria": [
+    {
+      "id": "CRIT-001",
+      "description": "The change preserves the documented behavior.",
+      "verify": ["npm test"]
+    }
+  ]
+}

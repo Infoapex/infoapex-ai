@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "id": "REPAIR-001-attempt-1",
+  "repairTaskId": "REPAIR-001",
+  "runId": "20260801-example-a1b2",
+  "cycle": 1,
+  "startedAt": "2026-08-01T12:06:00Z",
+  "finishedAt": "2026-08-01T12:11:00Z",
+  "outcome": "FAILED",
+  "commit": null,
+  "failureSignatureId": "sig-repair-001-0001",
+  "evidenceRef": "repairs/REPAIR-001/attempt-1/evidence.json"
+}

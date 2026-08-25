@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AiCodeControl.Core\AiCodeControl.Core.csproj" />
+    <ProjectReference Include="..\AiCodeControl.CodeIndexer\AiCodeControl.CodeIndexer.csproj" />
+    <ProjectReference Include="..\AiCodeControl.PythonIndexer\AiCodeControl.PythonIndexer.csproj" />
+    <ProjectReference Include="..\AiCodeControl.RustIndexer\AiCodeControl.RustIndexer.csproj" />
+    <ProjectReference Include="..\AiCodeControl.RefactorGuard\AiCodeControl.RefactorGuard.csproj" />
+    <ProjectReference Include="..\AiCodeControl.Memory\AiCodeControl.Memory.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

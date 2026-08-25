@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-planner:schemas:plan.schema.json",
+  "title": "Plan",
+  "description": "Planner-internal rich plan schema produced by ai-code-planner. This is NOT the format ai-code-worker consumes — worker consumes the projected subset described in docs/LINTER-CONTRACT.md. Information loss at projection time is reported by the linter.",
+  "type": "object",
+  "required": ["goal", "tasks"],
+  "additionalProperties": false,
+  "properties": {
+    "goal": {
+      "type": "string",
+      "description": "High-level goal this plan addresses.",
+      "minLength": 1
+    },
+    "nonGoals": {
+      "type": "array",
+      "description": "Explicit list of what this plan does not address.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "ambiguities": {
+      "type": "array",
+      "description": "Open questions or ambiguities that were not resolved before planning.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "risk": {
+      "type": "string",
+      "description": "Overall risk level of this plan.",
+      "enum": ["low", "medium", "high"]
+    },
+    "planningProvenance": {
+      "type": "object",
+      "description": "Who planned this, with what topology, how many rounds, and at what cost. This field will be tightened to a $ref to ./planning-provenance.schema.json once schemas/planning-provenance.schema.json exists in the same directory.",
+      "additionalProperties": true
+    },
+    "tasks": {
+      "type": "array",
+      "description": "Ordered list of tasks in the plan DAG.",
+      "items": { "$ref": "#/$defs/Task" }
+    }
+  },
+  "$defs": {
+    "Task": {
+      "type": "object",
+      "description": "A single task in the plan DAG.",
+      "required": ["id", "goal", "acceptanceCriteria", "gates", "dependsOn", "scope", "requiredInputs"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable, unique task identifier within this plan and the worker manifest. It starts with an uppercase letter or digit and uses only uppercase letters, digits, dot, underscore, or hyphen.",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]*$"
+        },
+        "goal": {
+          "type": "string",
+          "description": "What this task must accomplish.",
+          "minLength": 1
+        },
+        "acceptanceCriteria": {
+          "type": "array",
+          "description": "Structured acceptance criteria. Each entry has a stable criterionId and human-readable text — not bare strings.",
+          "items": {
+            "type": "object",
+            "required": ["criterionId", "text"],
+            "additionalProperties": false,
+            "properties": {
+              "criterionId": {
+                "type": "string",
+                "description": "Stable identifier for this criterion.",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string",
+                "description": "Human-readable description of the criterion.",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "gates": {
+          "type": "array",
+          "description": "Verification gates that must pass before this task is considered complete.",
+          "items": {
+            "type": "object",
+            "required": ["gateId", "command", "evidenceContract"],
+            "additionalProperties": false,
+            "properties": {
+              "gateId": {
+                "type": "string",
+                "description": "Stable identifier for this gate.",
+                "minLength": 1
+              },
+              "command": {
+                "type": "string",
+                "description": "The command or check to run.",
+                "minLength": 1
+              },
+              "evidenceContract": {
+                "type": "string",
+                "description": "Human-readable description of what constitutes passing evidence for this gate.",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "dependsOn": {
+          "type": "array",
+          "description": "IDs of tasks that must complete before this task can start.",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "scope": {
+          "type": "object",
+          "description": "File scope for this task.",
+          "required": ["allowedPaths", "forbiddenPaths"],
+          "additionalProperties": false,
+          "properties": {
+            "allowedPaths": {
+              "type": "array",
+              "description": "Paths this task may read or write.",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "forbiddenPaths": {
+              "type": "array",
+              "description": "Paths this task must not touch.",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "requiredInputs": {
+          "type": "array",
+          "description": "Typed pointers to inputs this task depends on. Pointers are frozen; content is resolved at execution time. Not bare path strings — each entry carries a kind discriminant.",
+          "items": {
+            "type": "object",
+            "required": ["kind", "ref"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "description": "The type of input pointer.",
+                "enum": ["file", "symbol", "external"]
+              },
+              "ref": {
+                "type": "string",
+                "description": "The pointer reference: file path, fully-qualified symbol name, or external URL/identifier.",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "risk": {
+          "type": "string",
+          "description": "Risk level for this task.",
+          "enum": ["low", "medium", "high"]
+        },
+        "executionProfile": {
+          "type": "string",
+          "description": "Logical execution profile name from ADR-0001 (e.g. 'backend-balanced-v1') that advises model and capability selection for this task.",
+          "minLength": 1
+        },
+        "relevantSymbols": {
+          "type": "array",
+          "description": "Fully-qualified symbols relevant to this task, used for context loading.",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

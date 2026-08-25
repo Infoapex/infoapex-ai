@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "id": "REPAIR-BAD-001",
+  "runId": "20260801-example-a1b2",
+  "graphVersion": 2,
+  "sourceFindingIds": ["REV-001"],
+  "forbiddenPaths": [],
+  "verify": ["backend-tests"],
+  "dependsOn": [],
+  "maximumAttempts": 3,
+  "status": "PENDING",
+  "createdAt": "2026-08-01T12:05:00Z"
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "docs-example-001",
+  "docsId": "DOCS-EXAMPLE-001",
+  "baseCommit": "BASE",
+  "headCommit": "HEAD",
+  "prompt": "Generate implementation documentation from the accepted plan and verified code context.",
+  "criteria": [
+    { "id": "AC-01", "description": "Every requested output document is generated from verified repository evidence." }
+  ],
+  "outputPaths": ["docs/generated/"],
+  "symbols": []
+}

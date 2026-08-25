@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:task-input-snapshot.schema.json",
+  "title": "ai-code-worker task input snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "taskId",
+    "graphVersion",
+    "rootBaseCommit",
+    "directDependencies",
+    "transitiveDependencies",
+    "inputCommit",
+    "inputTree",
+    "compositionAlgorithm",
+    "snapshotMetadataSha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "graphVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "rootBaseCommit": {
+      "$ref": "#/$defs/gitOid"
+    },
+    "directDependencies": {
+      "$ref": "#/$defs/dependencyList"
+    },
+    "transitiveDependencies": {
+      "$ref": "#/$defs/dependencyList"
+    },
+    "inputCommit": {
+      "$ref": "#/$defs/gitOid"
+    },
+    "inputTree": {
+      "$ref": "#/$defs/gitOid"
+    },
+    "compositionAlgorithm": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshotMetadataSha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    }
+  },
+  "$defs": {
+    "gitOid": {
+      "type": "string",
+      "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"
+    },
+    "dependencyList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["taskId", "commit"],
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "commit": {
+            "$ref": "#/$defs/gitOid"
+          }
+        }
+      }
+    }
+  }
+}

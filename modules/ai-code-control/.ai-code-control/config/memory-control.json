@@ -1,0 +1,34 @@
+{
+  "memory": {
+    "enabled": true,
+    "store": ".ai-code-control/db/memory.sqlite",
+    "root": ".ai-code-control/memory",
+    "include": [
+      ".ai-code-control/memory/**/*.md",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "REFACTOR_POLICY.md",
+      "PLAN-IMPLEMENTARE-AI-CODE-CONTROL.md",
+      ".ai-code-control/reports/refactor/**/*.json",
+      ".ai-code-control/reports/validation/**/*.md"
+    ],
+    "exclude": [
+      "**/secrets/**",
+      "**/.env",
+      "**/.env.*",
+      "**/*.pem",
+      "**/*.pfx",
+      "**/*password*",
+      "**/*secret*",
+      "**/*token*",
+      "**/appsettings.Production.json"
+    ],
+    "maxRecallItems": 8,
+    "maxBriefingTokens": 3000,
+    "briefCommands": null,
+    "rawConversationStorage": {
+      "enabled": false,
+      "reason": "Raw conversations are noisy and may contain sensitive data. Store summaries instead. (A redacted, searchable conversation archive is planned as a separate store.)"
+    }
+  }
+}

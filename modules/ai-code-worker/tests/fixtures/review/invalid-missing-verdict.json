@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run-review-ingest",
+  "reviewId": "review-fixture-invalid",
+  "reviewer": "fake-reviewer",
+  "graphVersion": 1,
+  "createdAt": "2026-08-14T10:20:00Z",
+  "criterionCoverage": [],
+  "findings": []
+}

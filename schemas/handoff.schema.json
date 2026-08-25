@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-apex:schemas:handoff.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "handoffId", "direction", "createdAt", "runId", "payload"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "handoffId": { "type": "string", "minLength": 1 },
+    "direction": { "enum": ["planner-to-worker", "worker-to-planner"] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "runId": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "payload": { "type": "object" }
+  }
+}

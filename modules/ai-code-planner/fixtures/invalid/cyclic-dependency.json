@@ -1,0 +1,37 @@
+{
+  "goal": "Fixture for CYCLIC_DEPENDENCY linter rule (DAG_ACYCLIC check).",
+  "tasks": [
+    {
+      "id": "TASK-A",
+      "goal": "Task A depends on Task B, creating a cycle.",
+      "acceptanceCriteria": [
+        { "criterionId": "AC-001", "text": "Output file exists." }
+      ],
+      "gates": [
+        { "gateId": "G-001", "command": "verify-a", "evidenceContract": "Exit code 0." }
+      ],
+      "dependsOn": ["TASK-B"],
+      "scope": {
+        "allowedPaths": ["src/a/**"],
+        "forbiddenPaths": ["src/b/**"]
+      },
+      "requiredInputs": []
+    },
+    {
+      "id": "TASK-B",
+      "goal": "Task B depends on Task A, completing the cycle.",
+      "acceptanceCriteria": [
+        { "criterionId": "AC-001", "text": "Output file exists." }
+      ],
+      "gates": [
+        { "gateId": "G-001", "command": "verify-b", "evidenceContract": "Exit code 0." }
+      ],
+      "dependsOn": ["TASK-A"],
+      "scope": {
+        "allowedPaths": ["src/b/**"],
+        "forbiddenPaths": ["src/a/**"]
+      },
+      "requiredInputs": []
+    }
+  ]
+}

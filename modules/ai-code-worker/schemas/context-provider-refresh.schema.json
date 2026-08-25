@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:context-provider-refresh.schema.json",
+  "title": "ai-code-control provider refresh response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "error", "refreshed", "detail"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "status": { "enum": ["ok", "error"] },
+    "error": { "type": ["string", "null"] },
+    "refreshed": { "type": ["boolean", "null"] },
+    "detail": { "type": ["string", "null"] }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:repair-attempt.schema.json",
+  "title": "ai-code-worker repair attempt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "repairTaskId",
+    "runId",
+    "cycle",
+    "startedAt",
+    "finishedAt",
+    "outcome",
+    "commit",
+    "failureSignatureId",
+    "evidenceRef"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "repairTaskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cycle": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finishedAt": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "outcome": {
+      "enum": ["PASSED", "FAILED", "BLOCKED", null]
+    },
+    "commit": {
+      "type": ["string", "null"],
+      "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"
+    },
+    "failureSignatureId": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "evidenceRef": {
+      "type": ["string", "null"],
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-planner:schemas:execution-profile.schema.json",
+  "title": "ExecutionProfile",
+  "description": "Two independently referenceable shapes for the execution profile: the logical profile reference as it appears in a plan, and the resolved snapshot produced by the worker after compiling the plan.",
+  "$defs": {
+    "ExecutionProfileRef": {
+      "$anchor": "ExecutionProfileRef",
+      "title": "ExecutionProfileRef",
+      "description": "The logical profile as it appears in a plan. A single required string field identifies the versioned policy to apply. Note: in a plan the enclosing task field may carry this as a bare string value (e.g. \"executionProfile\": \"backend-balanced-v1\") rather than as a wrapped object; both representations are semantically equivalent.",
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Logical profile name, e.g. 'backend-balanced-v1'. Must be a versioned policy identifier resolvable by the worker at compile time.",
+          "minLength": 1
+        }
+      }
+    },
+    "ExecutionProfileSnapshot": {
+      "$anchor": "ExecutionProfileSnapshot",
+      "title": "ExecutionProfileSnapshot",
+      "description": "The resolved snapshot produced by the worker when it compiles a plan. Freezes all routing decisions so the execution record is self-contained and auditable.",
+      "type": "object",
+      "required": ["engine", "resolvedModel", "fallbacks", "reason", "confidence", "policyVersion"],
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "type": "string",
+          "description": "The engine selected for this task. Matches one of the engines ai-code-worker's 'doctor' command supports (today: 'claude', 'codex'). An open string rather than a closed enum so that adding a new engine to worker does not require a schema version bump.",
+          "minLength": 1
+        },
+        "resolvedModel": {
+          "type": "string",
+          "description": "The effective model identifier for this task — never an alias such as 'claude' or 'codex' alone. Must be the full, versioned model ID (e.g. 'claude-sonnet-4-6', 'gpt-4o-2024-08-06'). This rule matches planningProvenance's panelMembers[].resolvedModel: comparable routing-outcome data requires snapshots to carry the concrete identifier, not a shorthand that resolves differently across time.",
+          "minLength": 1
+        },
+        "fallbacks": {
+          "type": "array",
+          "description": "Ordered list of fallback engine identifiers. Each entry must be resolvable by the worker's doctor at the time the plan is compiled.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable explanation of why this engine and model were selected.",
+          "minLength": 1
+        },
+        "confidence": {
+          "type": "number",
+          "description": "Confidence score for this routing decision, in the range [0, 1] inclusive.",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "policyVersion": {
+          "type": "string",
+          "description": "Identifier of the routing policy version used to resolve this profile.",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

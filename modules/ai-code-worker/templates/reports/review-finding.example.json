@@ -1,0 +1,9 @@
+{
+  "id": "REV-001",
+  "severity": "blocking",
+  "category": "correctness",
+  "criterionIds": ["AC-03"],
+  "files": ["backend/Auth/RefreshTokenService.cs"],
+  "evidence": "Concurrent refresh accepts the same token twice.",
+  "recommendedScope": ["backend/Auth/**", "backend.tests/Auth/**"]
+}

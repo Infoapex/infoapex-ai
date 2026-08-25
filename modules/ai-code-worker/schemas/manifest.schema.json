@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:manifest.schema.json",
+  "title": "ai-code-worker executable manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "graphVersion", "plan", "base", "goal", "tasks", "globalGates", "budgets"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "graphVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "status"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "status": {
+          "enum": ["accepted"]
+        }
+      }
+    },
+    "base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "commit"],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"
+        }
+      }
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "role",
+          "dependsOn",
+          "requiredInputs",
+          "allowedPaths",
+          "forbiddenPaths",
+          "expectedArtifacts",
+          "acceptanceCriteria",
+          "verify",
+          "concurrencyKeys",
+          "risk"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9][A-Z0-9._-]*$"
+          },
+          "kind": {
+            "enum": ["contract", "backend", "frontend", "database", "docs", "test", "review", "repair", "other"]
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiredInputs": {
+            "$ref": "#/$defs/pathList"
+          },
+          "allowedPaths": {
+            "$ref": "#/$defs/pathList"
+          },
+          "forbiddenPaths": {
+            "$ref": "#/$defs/pathList"
+          },
+          "expectedArtifacts": {
+            "$ref": "#/$defs/pathList"
+          },
+          "acceptanceCriteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "verify": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "concurrencyKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "risk": {
+            "enum": ["low", "medium", "high"]
+          },
+          "relevantSymbols": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "executionProfile": {
+            "type": "string",
+            "minLength": 1
+          },
+          "routing": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["profile", "candidates", "reason", "confidence", "policyVersion"],
+            "properties": {
+              "profile": { "type": "string", "minLength": 1 },
+              "candidates": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["engine", "model"],
+                  "properties": {
+                    "engine": { "enum": ["codex", "claude"] },
+                    "model": { "type": ["string", "null"], "minLength": 1 }
+                  }
+                }
+              },
+              "reason": { "type": "string", "minLength": 1 },
+              "confidence": { "enum": ["low", "medium", "high"] },
+              "policyVersion": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "globalGates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximumParallelWriters",
+        "maximumRepairCycles",
+        "maximumTaskMinutes",
+        "maximumRunMinutes",
+        "maximumAgentInvocations",
+        "maximumRunInputUncachedTokens",
+        "maximumRunCacheReadTokens",
+        "maximumRunCacheWriteTokens",
+        "maximumRunOutputTokens",
+        "maximumRunCostUsd",
+        "onUnknownUsage"
+      ],
+      "properties": {
+        "maximumParallelWriters": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumRepairCycles": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximumTaskMinutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumRunMinutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumAgentInvocations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumRunInputUncachedTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximumRunCacheReadTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximumRunCacheWriteTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximumRunOutputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximumRunCostUsd": {
+          "type": ["number", "null"],
+          "minimum": 0
+        },
+        "onUnknownUsage": {
+          "enum": ["allow", "warn", "block", "block-if-cost-required"]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pathList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

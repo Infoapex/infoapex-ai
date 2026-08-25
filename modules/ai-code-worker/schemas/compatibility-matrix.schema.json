@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:compatibility-matrix.schema.json",
+  "title": "Codex/Claude engine compatibility matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "engines"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "engines": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "engine",
+          "requiredCapabilities",
+          "usageFields",
+          "streaming",
+          "lastVerified",
+          "notes"
+        ],
+        "properties": {
+          "engine": { "enum": ["codex", "claude"] },
+          "testedVersionRanges": {
+            "description": "Optional historical override. Runtime compatibility is dynamic by default and is gated by behavioral smoke tests.",
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "requiredCapabilities": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "usageFields": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "streaming": { "type": "boolean" },
+          "lastVerified": { "type": "string", "format": "date" },
+          "notes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "eventId": "event-example-0001",
+  "runId": "20260801-example-a1b2",
+  "sequence": 0,
+  "type": "run.created",
+  "createdAt": "2026-08-01T10:00:00Z",
+  "payload": {
+    "baseCommit": "dddddddddddddddddddddddddddddddddddddddd"
+  }
+}

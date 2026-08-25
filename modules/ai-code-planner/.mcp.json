@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "ai-code-control": {
+      "command": "node",
+      "args": ["ai-code-control/tools/ai-code-control/mcp-server/dist/server.js"],
+      "env": {
+        "REPO_ROOT": ".",
+        "ACC_TOOL_ROOT": "ai-code-control",
+        "ACC_TOOL_TIMEOUT_MS": "600000"
+      }
+    }
+  }
+}

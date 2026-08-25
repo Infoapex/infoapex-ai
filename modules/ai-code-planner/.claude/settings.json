@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- memory-brief"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- refresh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AiCodeControl.Core\AiCodeControl.Core.csproj" />
+    <ProjectReference Include="..\..\src\AiCodeControl.CodeIndexer\AiCodeControl.CodeIndexer.csproj" />
+    <ProjectReference Include="..\..\src\AiCodeControl.Memory\AiCodeControl.Memory.csproj" />
+    <ProjectReference Include="..\..\src\AiCodeControl.RefactorGuard\AiCodeControl.RefactorGuard.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>

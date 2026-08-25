@@ -1,0 +1,11 @@
+[mcp_servers.ai-code-control]
+command = "node"
+args = ["tools/ai-code-control/mcp-server/dist/server.js"]
+cwd = "."
+startup_timeout_sec = 30
+tool_timeout_sec = 600
+required = false
+
+[mcp_servers.ai-code-control.env]
+REPO_ROOT = "."
+ACC_TOOL_ROOT = "."

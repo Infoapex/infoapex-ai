@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:run-intent.schema.json",
+  "title": "ai-code-worker explicit run intent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "intentId",
+    "runId",
+    "planPath",
+    "planSha256",
+    "baseRef",
+    "baseCommit",
+    "repositoryFingerprint",
+    "requestedCapabilities",
+    "forbiddenCapabilities",
+    "approvalMode",
+    "executionEnvironmentKind",
+    "limits",
+    "createdAt",
+    "expiresAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "intentId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "planPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "baseRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseCommit": {
+      "$ref": "#/$defs/gitOid"
+    },
+    "repositoryFingerprint": {
+      "$ref": "#/$defs/sha256"
+    },
+    "requestedCapabilities": {
+      "$ref": "#/$defs/capabilityList"
+    },
+    "forbiddenCapabilities": {
+      "$ref": "#/$defs/capabilityList"
+    },
+    "approvalMode": {
+      "enum": ["never", "on-risk", "always"]
+    },
+    "executionEnvironmentKind": {
+      "enum": ["isolated", "trusted-local"]
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximumRunMinutes",
+        "maximumAgentInvocations",
+        "maximumInputUncachedTokens",
+        "maximumCacheReadTokens",
+        "maximumCacheWriteTokens",
+        "maximumOutputTokens",
+        "maximumCostUsd"
+      ],
+      "properties": {
+        "maximumRunMinutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumAgentInvocations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumInputUncachedTokens": {
+          "$ref": "#/$defs/nullableCount"
+        },
+        "maximumCacheReadTokens": {
+          "$ref": "#/$defs/nullableCount"
+        },
+        "maximumCacheWriteTokens": {
+          "$ref": "#/$defs/nullableCount"
+        },
+        "maximumOutputTokens": {
+          "$ref": "#/$defs/nullableCount"
+        },
+        "maximumCostUsd": {
+          "type": ["number", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "gitOid": {
+      "type": "string",
+      "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"
+    },
+    "capabilityList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    },
+    "nullableCount": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    }
+  }
+}

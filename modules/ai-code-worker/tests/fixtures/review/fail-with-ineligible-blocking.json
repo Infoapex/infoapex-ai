@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run-review-ingest",
+  "reviewId": "review-fixture-ineligible",
+  "reviewer": "fake-reviewer",
+  "graphVersion": 1,
+  "createdAt": "2026-08-14T10:15:00Z",
+  "verdict": "fail",
+  "criterionCoverage": [
+    {
+      "criterionId": "AC-04",
+      "verdict": "missing",
+      "tests": [],
+      "commands": [],
+      "evidence": "Reviewer suspects a defect but could not reproduce it against a specific file or criterion."
+    }
+  ],
+  "findings": [
+    {
+      "id": "REV-003",
+      "severity": "blocking",
+      "category": "correctness",
+      "criterionIds": [],
+      "files": [],
+      "evidence": "General concern about error handling, no reproducible file or criterion identified."
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "toolchains": [
+    {
+      "name": "dotnet",
+      "enabled": true,
+      "path": "tools/ai-code-control",
+      "commands": [
+        { "name": "build", "run": "dotnet build AiCodeControl.sln --nologo", "timeoutSeconds": 300 },
+        { "name": "test", "run": "dotnet test AiCodeControl.sln --nologo --no-build", "timeoutSeconds": 600 }
+      ]
+    },
+    {
+      "name": "node",
+      "enabled": true,
+      "path": "tools/ai-code-control/mcp-server",
+      "commands": [
+        { "name": "install", "run": "npm ci --no-audit --no-fund", "timeoutSeconds": 300 },
+        { "name": "build", "run": "npm run build", "timeoutSeconds": 300 }
+      ]
+    }
+  ],
+  "git": {
+    "protectedBranches": ["main", "master", "develop", "release"],
+    "forbiddenPaths": [
+      "node_modules/",
+      "dist/",
+      "bin/",
+      "obj/",
+      ".next/",
+      "coverage/",
+      ".turbo/",
+      "__pycache__/",
+      ".venv/",
+      "venv/",
+      "target/",
+      "build/",
+      "generated/"
+    ]
+  },
+  "indexing": {
+    "database": ".ai-code-control/db/codegraph.sqlite",
+    "exclude": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/bin/**",
+      "**/obj/**",
+      "**/.git/**",
+      "**/coverage/**",
+      "**/target/**",
+      "**/__pycache__/**",
+      "**/.venv/**"
+    ]
+  },
+  "logging": {
+    "level": "info",
+    "file": ".ai-code-control/reports/tool.log",
+    "maxFileSizeMb": 10
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "goal": "Add a small worker integration fixture",
+  "tasks": [
+    {
+      "id": "E2E-01",
+      "goal": "Add an integration fixture test",
+      "acceptanceCriteria": [
+        {
+          "criterionId": "AC-E2E-01",
+          "text": "The integration fixture is represented in the accepted worker plan."
+        }
+      ],
+      "gates": [
+        {
+          "gateId": "G-E2E-01",
+          "command": "node --version",
+          "evidenceContract": "Node exits successfully."
+        }
+      ],
+      "dependsOn": [],
+      "scope": {
+        "allowedPaths": ["fixtures/**"],
+        "forbiddenPaths": ["src/**"]
+      },
+      "requiredInputs": [],
+      "risk": "low"
+    }
+  ]
+}

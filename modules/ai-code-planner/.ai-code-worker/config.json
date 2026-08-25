@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "defaultEngine": "codex",
+  "contextProvider": "none",
+  "baseBranch": "main",
+  "integrationBranchPrefix": "aiw/integration/",
+  "taskBranchPrefix": "aiw/task/",
+  "maximumParallelWriters": 2,
+  "maximumRepairCycles": 3,
+  "maximumRunMinutes": 180,
+  "executionEnvironment": {
+    "defaultProfile": "isolated",
+    "allowTrustedLocal": false
+  },
+  "stateRoot": null,
+  "syncRootPolicy": {
+    "sequentialWriter": "warn",
+    "parallelWriters": "block"
+  },
+  "adapters": {
+    "codex": {
+      "model": null,
+      "sandboxMode": "workspace-write",
+      "timeoutSeconds": 3600,
+      "maximumOutputBytes": 20971520,
+      "testedVersionRanges": ["0.146.0-alpha.3.1", "0.136.0-alpha.2", "0.147.0"]
+    },
+    "claude": {
+      "model": null,
+      "permissionMode": "dontAsk",
+      "allowedTools": ["Read", "Edit", "Write", "Grep", "Glob"],
+      "bareMode": false,
+      "timeoutSeconds": 3600,
+      "maximumOutputBytes": 20971520
+    }
+  }
+}

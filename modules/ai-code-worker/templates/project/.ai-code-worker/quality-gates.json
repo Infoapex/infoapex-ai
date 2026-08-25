@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "gates": [
+    {
+      "id": "docs-json-parse",
+      "description": "Parse ai-code-worker JSON files.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["ai-code-worker/scripts/validate-json.mjs"],
+      "timeoutSeconds": 60,
+      "allowedEnvironmentVariables": []
+    }
+  ]
+}

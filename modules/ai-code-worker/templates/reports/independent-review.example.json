@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "20260801-example-a1b2",
+  "reviewId": "review-20260801-0001",
+  "reviewer": "independent-reviewer",
+  "graphVersion": 1,
+  "createdAt": "2026-08-01T12:00:00Z",
+  "verdict": "fail",
+  "criterionCoverage": [
+    {
+      "criterionId": "AC-03",
+      "verdict": "contradicted",
+      "tests": ["RefreshTokenTests.RotateOnce"],
+      "commands": ["backend-tests"],
+      "evidence": "Testul trece secvențial, dar nu acoperă două refresh-uri concurente."
+    }
+  ],
+  "findings": [
+    {
+      "id": "REV-001",
+      "severity": "blocking",
+      "category": "correctness",
+      "criterionIds": ["AC-03"],
+      "files": ["backend/Auth/RefreshTokenService.cs"],
+      "evidence": "Concurrent refresh accepts the same token twice.",
+      "recommendedScope": ["backend/Auth/**", "backend.tests/Auth/**"]
+    }
+  ]
+}

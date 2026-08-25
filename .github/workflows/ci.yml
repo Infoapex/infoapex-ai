@@ -1,0 +1,70 @@
+name: ai-code-apex CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  clean-clone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Infoapex AI bundle
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.x
+
+      - name: Install Apex dependencies
+        run: npm ci
+
+      - name: Install bundled module dependencies
+        run: |
+          npm ci --prefix modules/ai-code-planner
+          npm ci --prefix modules/ai-code-worker
+          npm ci --prefix modules/ai-code-review
+          npm ci --prefix modules/ai-code-docs
+
+      - name: Install control MCP dependencies
+        run: npm ci --prefix modules/ai-code-control/tools/ai-code-control/mcp-server
+
+      - name: Validate Apex boundary and installer
+        run: |
+          npm run check:generic-boundary
+          npm test
+
+      - name: Run planner tests and JSON validation
+        run: npm test --prefix modules/ai-code-planner
+
+      - name: Run worker tests and JSON validation
+        run: npm test --prefix modules/ai-code-worker
+
+      - name: Run review tests and JSON validation
+        run: npm test --prefix modules/ai-code-review
+
+      - name: Run docs tests and JSON validation
+        run: npm test --prefix modules/ai-code-docs
+
+      - name: Run internal review gate
+        run: npm run review-gate:internal
+
+      - name: Run internal docs gate
+        run: npm run docs-gate:internal
+
+      - name: Run internal three-plan value gate
+        run: npm run value-gate:internal
+
+      - name: Build and test control
+        run: |
+          dotnet test modules/ai-code-control/tools/ai-code-control/AiCodeControl.sln --nologo
+          npm run build --prefix modules/ai-code-control/tools/ai-code-control/mcp-server

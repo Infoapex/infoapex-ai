@@ -1,0 +1,16 @@
+# ai-code-worker Codex agent shim (IMPLEMENTATION-PLAN.md §12.1: ".codex/agents/*.toml
+# ... sunt generate ca shims versionate. Ele invocă worker-ul sau descriu rolurile; nu
+# țin starea rulării.")
+#
+# Best-effort: this file's exact TOML shape has not been verified live against a
+# running Codex CLI custom-agent invocation (unlike the doctor/adapter contract
+# tests elsewhere in this repo, which only assert behavior confirmed against a real
+# CLI). Treat this as a documented starting point, not a verified capability - see
+# docs/compatibility-matrix.json for what has actually been verified live.
+
+name = "ai-code-worker"
+description = "Runs an accepted ai-code-worker plan through the worker CLI. Does not implement anything itself - it shells out to the worker, which owns scope, gates, and commits."
+
+[invoke]
+command = "node"
+args = ["ai-code-worker/dist/src/cli.js", "run", "--engine", "codex"]

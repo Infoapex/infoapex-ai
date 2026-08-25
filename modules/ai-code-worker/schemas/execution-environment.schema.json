@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:execution-environment.schema.json",
+  "title": "ai-code-worker execution environment profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "profileId",
+    "kind",
+    "filesystem",
+    "network",
+    "environment",
+    "limits"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "profileId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "kind": {
+      "enum": ["isolated", "trusted-local"]
+    },
+    "filesystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostReadDefault", "hostWriteDefault", "mounts"],
+      "properties": {
+        "hostReadDefault": {
+          "enum": ["deny", "allow"]
+        },
+        "hostWriteDefault": {
+          "enum": ["deny", "allow"]
+        },
+        "mounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["purpose", "access"],
+            "properties": {
+              "purpose": {
+                "enum": ["worktree", "state", "evidence", "cache", "service-data", "other"]
+              },
+              "access": {
+                "enum": ["read-only", "read-write"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repositoryProcesses", "adapterControlPlane"],
+      "properties": {
+        "repositoryProcesses": {
+          "enum": ["deny", "allowlist"]
+        },
+        "adapterControlPlane": {
+          "enum": ["provider-only", "allowlist", "deny"]
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inheritByDefault", "allowedVariables"],
+      "properties": {
+        "inheritByDefault": {
+          "const": false
+        },
+        "allowedVariables": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maximumDurationSeconds", "maximumOutputBytes", "maximumProcesses"],
+      "properties": {
+        "maximumDurationSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumOutputBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumProcesses": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumMemoryBytes": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "maximumCpuUnits": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}

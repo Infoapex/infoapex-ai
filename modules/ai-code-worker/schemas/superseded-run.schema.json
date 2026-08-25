@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:superseded-run.schema.json",
+  "title": "ai-code-worker superseded run marker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "supersededByRunId", "supersededByGraphVersion", "reason", "supersededAt"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supersededByRunId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supersededByGraphVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supersededAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

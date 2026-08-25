@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "engines": [
+    {
+      "engine": "codex",
+      "requiredCapabilities": ["--json", "--cd", "--sandbox"],
+      "usageFields": ["inputUncachedTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "costUsd"],
+      "streaming": true,
+      "lastVerified": "2026-08-10",
+      "notes": [
+        "0.136.0-alpha.2 verified live 2026-08-10 against a real ChatGPT-subscription (auth_mode: chatgpt) install: --ignore-user-config/--ignore-rules do not break subscription auth, --output-schema is honored correctly.",
+        "--sandbox workspace-write reports read-only on Windows for both tested versions (pre-existing upstream issue, see docs/PHASE-1.md) - danger-full-access is the correct default until that is fixed upstream.",
+        "The codex binary is not always a global PATH install - on at least one verified machine it ships bundled inside the VS Code openai.chatgpt extension.",
+        "Usage is read from the token_count event's total_token_usage in the --json JSONL stream (cumulative, not per-turn) - see src/engines/codex-cli.ts parseCodexUsage()."
+      ]
+    },
+    {
+      "engine": "claude",
+      "requiredCapabilities": [
+        "--output-format",
+        "stream-json",
+        "--tools",
+        "--allowedTools",
+        "--permission-mode",
+        "--session-id",
+        "--no-session-persistence",
+        "--input-format"
+      ],
+      "usageFields": ["inputUncachedTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "costUsd"],
+      "streaming": true,
+      "lastVerified": "2026-08-15",
+      "notes": [
+        "2.1.177 verified live: doctor PASS, a real isolated single-task run committed and gated successfully.",
+        "--bare mode is opt-in only (bareMode: false by default) - it skips OAuth/keychain auth and requires ANTHROPIC_API_KEY, the wrong default for a worker meant to authenticate the same way an interactive session on the machine already does.",
+        "--json-schema is advertised by `claude -p --help` but hangs indefinitely at runtime regardless of auth state or --output-format (verified live) - not required or used; structured output is enforced by prompt instruction plus client-side schema validation instead.",
+        "Usage is read from the top-level usage object (input_tokens/cache_creation_input_tokens/cache_read_input_tokens/output_tokens) plus total_cost_usd in the --output-format json envelope - see src/engines/claude-cli.ts parseClaudeUsage().",
+        "No account-level %5h/%weekly usage percentage is available from any local CLI output or transcript - confirmed live (`claude -p \"/usage\"` does not intercept the slash command)."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:repeated-failure-signature.schema.json",
+  "title": "ai-code-worker repeated repair failure signature",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "runId",
+    "sourceType",
+    "sourceId",
+    "signatureHash",
+    "occurrenceCount",
+    "firstSeenAt",
+    "lastSeenAt",
+    "progressDetected"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceType": {
+      "enum": ["gate", "finding"]
+    },
+    "sourceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signatureHash": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "occurrenceCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "firstSeenAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lastSeenAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "progressDetected": {
+      "type": "boolean"
+    }
+  }
+}

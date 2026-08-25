@@ -1,0 +1,18 @@
+{
+  "task": "none",
+  "language": "csharp",
+  "affectedSymbol": "",
+  "allowedFiles": [],
+  "forbiddenPaths": [
+    ".ai-code-control/db/",
+    "tools/ai-code-control/mcp-server/node_modules/",
+    "tools/ai-code-control/mcp-server/dist/"
+  ],
+  "allowedUntrackedPatterns": [
+    ".ai-code-control/memory/"
+  ],
+  "requiredValidation": [
+    "run-validation"
+  ],
+  "riskLevel": "low"
+}

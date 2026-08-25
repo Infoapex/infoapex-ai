@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:context-provider-find-symbol.schema.json",
+  "title": "ai-code-control provider find-symbol response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "error", "matches"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "status": { "enum": ["ok", "error"] },
+    "error": { "type": ["string", "null"] },
+    "matches": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["symbol", "file", "line"],
+        "properties": {
+          "symbol": { "type": "string" },
+          "file": { "type": "string" },
+          "line": { "type": ["integer", "null"] }
+        }
+      }
+    }
+  }
+}

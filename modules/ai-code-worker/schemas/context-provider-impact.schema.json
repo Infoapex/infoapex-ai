@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:context-provider-impact.schema.json",
+  "title": "ai-code-control provider impact-analysis response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "error", "symbol", "affectedFiles", "riskNotes"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "status": { "enum": ["ok", "error"] },
+    "error": { "type": ["string", "null"] },
+    "symbol": { "type": ["string", "null"] },
+    "affectedFiles": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    },
+    "riskNotes": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    }
+  }
+}

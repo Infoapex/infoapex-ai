@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ai-code-control": {
+      "command": "node",
+      "args": ["tools/ai-code-control/mcp-server/dist/server.js"],
+      "env": { "REPO_ROOT": "." }
+    }
+  }
+}

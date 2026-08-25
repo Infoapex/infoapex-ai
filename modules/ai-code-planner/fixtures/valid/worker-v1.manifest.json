@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run-fixture-example-001",
+  "graphVersion": 1,
+  "plan": {
+    "path": "Plan/schema-fixtures.plan.json",
+    "sha256": "a3f5e7b9c1d2e4f6a8b0c2d4e6f8a0b2c4d6e8f0a2b4c6d8e0f2a4b6c8d0e2f4",
+    "status": "accepted"
+  },
+  "base": {
+    "ref": "main",
+    "commit": "d23d5a0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e"
+  },
+  "goal": "Add public JSON schemas for ai-code-planner plan, finding, planning-provenance, and execution-profile, plus linter fixtures.",
+  "tasks": [
+    {
+      "id": "SCHEMA-DRAFT",
+      "kind": "contract",
+      "role": "Author three JSON Schema files for plan, finding, and planning-provenance.",
+      "dependsOn": [],
+      "requiredInputs": ["docs/PHASE-0.md", "docs/LINTER-CONTRACT.md"],
+      "allowedPaths": ["schemas/**"],
+      "forbiddenPaths": ["src/**"],
+      "expectedArtifacts": [
+        "schemas/plan.schema.json",
+        "schemas/finding.schema.json",
+        "schemas/planning-provenance.schema.json"
+      ],
+      "acceptanceCriteria": [
+        "schemas/plan.schema.json exists and is valid JSON Schema draft 2020-12",
+        "schemas/finding.schema.json exists and is valid JSON Schema draft 2020-12",
+        "schemas/planning-provenance.schema.json exists and is valid JSON Schema draft 2020-12"
+      ],
+      "verify": ["verify-schema-plan"],
+      "concurrencyKeys": ["schemas"],
+      "risk": "low"
+    },
+    {
+      "id": "SCHEMA-EXECUTION-PROFILE",
+      "kind": "contract",
+      "role": "Author the JSON Schema file for execution-profile.",
+      "dependsOn": ["SCHEMA-DRAFT"],
+      "requiredInputs": ["schemas/plan.schema.json", "docs/LINTER-CONTRACT.md"],
+      "allowedPaths": ["schemas/**"],
+      "forbiddenPaths": ["src/**"],
+      "expectedArtifacts": ["schemas/execution-profile.schema.json"],
+      "acceptanceCriteria": [
+        "schemas/execution-profile.schema.json exists and is valid JSON Schema draft 2020-12",
+        "schema references plan.schema.json executionProfile field correctly"
+      ],
+      "verify": ["verify-schema-execution-profile"],
+      "concurrencyKeys": ["schemas"],
+      "risk": "low"
+    },
+    {
+      "id": "FIXTURES",
+      "kind": "docs",
+      "role": "Author valid and invalid fixtures for the planner linter contract.",
+      "dependsOn": ["SCHEMA-DRAFT", "SCHEMA-EXECUTION-PROFILE"],
+      "requiredInputs": ["docs/LINTER-CONTRACT.md", "schemas/plan.schema.json"],
+      "allowedPaths": ["fixtures/**"],
+      "forbiddenPaths": ["src/**", "schemas/"],
+      "expectedArtifacts": [
+        "fixtures/valid/worker-v1.manifest.json",
+        "fixtures/invalid/README.md"
+      ],
+      "acceptanceCriteria": [
+        "fixtures/valid/worker-v1.manifest.json validates against the worker manifest schema at pin d23d5a0",
+        "One invalid fixture file exists per linter rule documented in docs/LINTER-CONTRACT.md",
+        "fixtures/invalid/README.md indexes each invalid fixture with its target linter rule"
+      ],
+      "verify": ["verify-fixtures"],
+      "concurrencyKeys": ["fixtures"],
+      "risk": "medium"
+    }
+  ],
+  "globalGates": ["verify-schema-plan", "verify-fixtures"],
+  "budgets": {
+    "maximumParallelWriters": 2,
+    "maximumRepairCycles": 3,
+    "maximumTaskMinutes": 30,
+    "maximumRunMinutes": 90,
+    "maximumAgentInvocations": 20,
+    "maximumRunInputUncachedTokens": 500000,
+    "maximumRunCacheReadTokens": 2000000,
+    "maximumRunCacheWriteTokens": 1000000,
+    "maximumRunOutputTokens": 100000,
+    "maximumRunCostUsd": 10.0,
+    "onUnknownUsage": "warn"
+  }
+}

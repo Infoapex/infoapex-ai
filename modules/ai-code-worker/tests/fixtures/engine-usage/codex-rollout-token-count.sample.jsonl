@@ -1,0 +1,5 @@
+{"type":"thread.started","thread_id":"fixture-thread"}
+{"type":"turn.started"}
+{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":6420,"cached_input_tokens":5900,"output_tokens":184,"total_tokens":6604},"last_token_usage":{"input_tokens":6420,"cached_input_tokens":5900,"output_tokens":184,"total_tokens":6604},"model_context_window":258400},"rate_limits":{"primary":{"used_percent":41.0,"window_minutes":10080,"resets_at":1787202059},"plan_type":"plus"}}}
+{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":83421,"cached_input_tokens":71200,"output_tokens":2114,"total_tokens":85535},"last_token_usage":{"input_tokens":9800,"cached_input_tokens":9100,"output_tokens":320,"total_tokens":10120},"model_context_window":258400},"rate_limits":{"primary":{"used_percent":86.0,"window_minutes":10080,"resets_at":1787202059},"plan_type":"plus"}}}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"{\"schemaVersion\":\"1.0\",\"runId\":\"run-codex\",\"taskId\":\"TASK-01\",\"status\":\"DONE\",\"summary\":\"done\",\"touchedFiles\":[],\"failures\":[]}"}}

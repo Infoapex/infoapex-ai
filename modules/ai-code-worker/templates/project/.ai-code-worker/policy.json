@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "allowedEngines": ["codex", "claude"],
+  "instructionTrust": {
+    "repositoryInstructionsCanRestrict": true,
+    "repositoryInstructionsCanGrantCapabilities": false,
+    "externalOutputIsUntrusted": true
+  },
+  "executionEnvironments": {
+    "default": "isolated",
+    "trustedLocalRequiresExplicitAuthorization": true,
+    "repositoryProcessNetwork": "deny"
+  },
+  "forbiddenCommands": [
+    "git reset --hard",
+    "git clean -fdx",
+    "git commit --no-verify",
+    "rm -rf",
+    "Remove-Item -Recurse -Force"
+  ],
+  "externalActions": {
+    "push": "explicit-user-authorization-required",
+    "deploy": "explicit-user-authorization-required",
+    "deleteRemote": "blocked"
+  },
+  "secrets": {
+    "persistRawValues": false,
+    "allowedEnvironmentVariables": []
+  },
+  "providerPolicy": {
+    "ai-code-control": {
+      "mode": "optional",
+      "access": "cli-json-only",
+      "directSqliteAccess": false
+    }
+  }
+}

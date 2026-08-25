@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.ai-code-review/runs/
+*.log

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0",
+  "minimumDoneTasks": 2,
+  "maximumConsecutiveWorkerCausedFailures": 2,
+  "requiredComparableMetrics": [
+    "elapsedTime",
+    "humanActiveMinutes",
+    "humanInterventions"
+  ],
+  "conditionalComparableMetrics": ["reportedCostUsd"],
+  "thresholds": {
+    "maximumElapsedTimeRatio": 1.5,
+    "maximumReportedCostRatio": 1.5,
+    "maximumHumanActiveMinutesRatio": 1.5,
+    "maximumHumanInterventionsRatio": 1.5,
+    "maximumHumanInterventionsPerTask": 1
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-docs:schemas:docs-report.schema.json",
+  "title": "ai-code-docs report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "docsId", "status", "planner", "control", "worker", "review", "artifacts", "taskCommits"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "runId": { "type": "string", "minLength": 1 },
+    "docsId": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["DONE", "BLOCKED"] },
+    "planner": { "$ref": "#/$defs/stage" },
+    "control": { "$ref": "#/$defs/stage" },
+    "worker": { "$ref": "#/$defs/workerStage" },
+    "review": { "$ref": "#/$defs/stage" },
+    "artifacts": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "taskCommits": { "type": "object", "additionalProperties": { "type": "string" } },
+    "message": { "type": "string" }
+  },
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["PASS", "BLOCKED"] },
+        "message": { "type": "string" },
+        "path": { "type": "string" },
+        "engine": { "type": "string" },
+        "verdict": { "enum": ["pass", "fail"] }
+      }
+    },
+    "workerStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["PASS", "BLOCKED"] },
+        "message": { "type": "string" },
+        "path": { "type": "string" },
+        "engine": { "type": "string" },
+        "verdict": { "enum": ["pass", "fail"] },
+        "taskCommits": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run-review-ingest",
+  "reviewId": "review-fixture-pass",
+  "reviewer": "fake-reviewer",
+  "graphVersion": 1,
+  "createdAt": "2026-08-14T10:00:00Z",
+  "verdict": "pass",
+  "criterionCoverage": [
+    {
+      "criterionId": "AC-01",
+      "verdict": "supported",
+      "tests": ["ExampleTests.CriterionA"],
+      "commands": ["backend-tests"],
+      "evidence": "Test covers the criterion end to end."
+    }
+  ],
+  "findings": []
+}

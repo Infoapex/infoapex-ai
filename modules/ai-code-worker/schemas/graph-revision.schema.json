@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:graph-revision.schema.json",
+  "title": "ai-code-worker graph revision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "graphVersion",
+    "previousGraphVersion",
+    "supersedesRunId",
+    "reason",
+    "manifestSha256",
+    "authorizationId",
+    "createdAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "graphVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "previousGraphVersion": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "supersedesRunId": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manifestSha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "authorizationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

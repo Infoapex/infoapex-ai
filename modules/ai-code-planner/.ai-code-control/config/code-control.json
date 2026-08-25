@@ -1,0 +1,25 @@
+{
+  "toolchains": [
+    {
+      "name": "example",
+      "enabled": false,
+      "path": ".",
+      "commands": [
+        { "name": "build", "run": "echo replace-with-your-build-command", "timeoutSeconds": 300 }
+      ]
+    }
+  ],
+  "git": {
+    "protectedBranches": ["main", "master"],
+    "forbiddenPaths": ["node_modules/", "dist/", "bin/", "obj/", "generated/"]
+  },
+  "indexing": {
+    "database": ".ai-code-control/db/codegraph.sqlite",
+    "exclude": ["**/node_modules/**", "**/dist/**", "**/.git/**"]
+  },
+  "logging": {
+    "level": "info",
+    "file": ".ai-code-control/reports/tool.log",
+    "maxFileSizeMb": 10
+  }
+}

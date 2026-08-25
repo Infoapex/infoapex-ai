@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run_phase0_002",
+  "graphVersion": 1,
+  "plan": {
+    "path": "Plan/PROPOSED.md",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "status": "proposed"
+  },
+  "base": {
+    "ref": "main",
+    "commit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "goal": "This fixture must fail because writer manifests require accepted plans.",
+  "tasks": [
+    {
+      "id": "T1",
+      "kind": "test",
+      "role": "phase0-worker",
+      "dependsOn": [],
+      "requiredInputs": ["schemas/manifest.schema.json"],
+      "allowedPaths": ["src/manifest/**", "tests/**"],
+      "forbiddenPaths": [".git/**"],
+      "expectedArtifacts": ["dist/tests/unit/manifest-normalize.test.js"],
+      "acceptanceCriteria": ["Invalid proposed plans are rejected."],
+      "verify": ["npm test"],
+      "concurrencyKeys": ["manifest"],
+      "risk": "low"
+    }
+  ],
+  "globalGates": ["npm test"],
+  "budgets": {
+    "maximumParallelWriters": 1,
+    "maximumRepairCycles": 0,
+    "maximumTaskMinutes": 10,
+    "maximumRunMinutes": 30,
+    "maximumAgentInvocations": 1,
+    "maximumRunInputUncachedTokens": 100000,
+    "maximumRunCacheReadTokens": 100000,
+    "maximumRunCacheWriteTokens": 100000,
+    "maximumRunOutputTokens": 20000,
+    "maximumRunCostUsd": null,
+    "onUnknownUsage": "block"
+  }
+}

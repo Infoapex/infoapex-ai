@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "20260801-example-a1b2",
+  "maximumRepairCycles": 3,
+  "consumedCycles": 1,
+  "remainingCycles": 2,
+  "stopReason": null,
+  "updatedAt": "2026-08-01T12:11:00Z"
+}

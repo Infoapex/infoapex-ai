@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-review:schemas:review-report.schema.json",
+  "title": "ai-code-review report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "reviewId", "status", "planner", "control", "worker", "coverage", "findings"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "runId": { "type": "string", "minLength": 1 },
+    "reviewId": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["PASS", "FAIL", "BLOCKED"] },
+    "planner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["PASS", "SKIPPED", "BLOCKED"] },
+        "draftPath": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["PASS", "SKIPPED", "BLOCKED"] },
+        "health": { "type": "string" },
+        "brief": { "type": "string" },
+        "impact": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["PASS", "FAIL", "BLOCKED"] },
+        "engine": { "type": "string" },
+        "verdict": { "enum": ["pass", "fail"] },
+        "message": { "type": "string" }
+      }
+    },
+    "coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterionId", "verdict", "tests", "commands", "evidence"],
+        "properties": {
+          "criterionId": { "type": "string", "minLength": 1 },
+          "verdict": { "enum": ["supported", "weak", "missing", "contradicted"] },
+          "tests": { "type": "array", "items": { "type": "string" } },
+          "commands": { "type": "array", "items": { "type": "string" } },
+          "evidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "category", "files", "evidence"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "severity": { "enum": ["blocking", "major", "minor", "note"] },
+          "category": { "type": "string", "minLength": 1 },
+          "files": { "type": "array", "items": { "type": "string" } },
+          "evidence": { "type": "string", "minLength": 1 },
+          "criterionIds": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:event.schema.json",
+  "title": "ai-code-worker event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "eventId", "runId", "sequence", "type", "createdAt", "payload"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "eventId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "type": {
+      "enum": [
+        "run.created",
+        "run.intent-created",
+        "manifest.compiled",
+        "manifest.frozen",
+        "authorization.bound",
+        "run.recovering",
+        "run.superseded",
+        "task.input-frozen",
+        "task.stale",
+        "task.worktree-created",
+        "run.wave-dispatched",
+        "task.started",
+        "task.committed",
+        "task.finished",
+        "gate.started",
+        "gate.finished",
+        "review.finished",
+        "review.finding-ingested",
+        "repair.budget-initialized",
+        "repair.task-compiled",
+        "repair.attempt-started",
+        "repair.attempt-finished",
+        "repair.cycle-exhausted",
+        "graph.revision-created",
+        "run.done",
+        "run.blocked"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object"
+    }
+  }
+}

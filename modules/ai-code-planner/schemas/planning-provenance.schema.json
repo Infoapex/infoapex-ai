@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-planner:schemas:planning-provenance.schema.json",
+  "title": "PlanningProvenance",
+  "description": "Provenance record for an ai-code-planner session. This record must be attached to the frozen plan for auditability, per the ai-code-planner design specification (section 7.10). It captures who planned, with what topology, how many rounds ran, and what it cost.",
+  "type": "object",
+  "required": [
+    "mode",
+    "panelMembers",
+    "roundsUsed",
+    "roundsAllowed",
+    "outcome",
+    "findings",
+    "planningCostUsd",
+    "planningDurationSec"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "type": "string",
+      "description": "Planning mode used for this session.",
+      "enum": ["single-agent", "panel"]
+    },
+    "topology": {
+      "description": "Panel topology. Must be null or omitted when mode is single-agent; required and non-null when mode is panel.",
+      "enum": ["sequential-review", "blind-parallel", "adversarial", "arbiter", null]
+    },
+    "panelMembers": {
+      "type": "array",
+      "description": "Ordered list of agents that participated in the planning panel. Empty array when mode is single-agent.",
+      "items": {
+        "type": "object",
+        "required": ["id", "role", "resolvedModel", "policyVersion"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable, unique identifier for this panel member within the session.",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "description": "Role this member played in the panel (e.g. proposer, reviewer, arbiter).",
+            "minLength": 1
+          },
+          "resolvedModel": {
+            "type": "string",
+            "description": "Effective model identifier used at runtime. Must be the canonical model ID as returned by the provider, not an alias or friendly name (e.g. 'claude-sonnet-4-6', not 'sonnet').",
+            "minLength": 1
+          },
+          "policyVersion": {
+            "type": "string",
+            "description": "Version of the routing policy that was active when this member was assigned.",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "roundsUsed": {
+      "type": "integer",
+      "description": "Number of deliberation rounds that actually ran.",
+      "minimum": 0
+    },
+    "roundsAllowed": {
+      "type": "integer",
+      "description": "Maximum number of deliberation rounds permitted by policy.",
+      "minimum": 1
+    },
+    "outcome": {
+      "type": "string",
+      "description": "Terminal outcome of the planning session.",
+      "enum": ["CONSENSUS", "CONSENSUS_WITH_DISSENT", "HUMAN_DECISION_REQUIRED", "INVALID_PLAN"]
+    },
+    "findings": {
+      "type": "object",
+      "description": "Aggregate counts of findings produced during the planning session.",
+      "required": ["total", "verified", "refuted", "acceptedAsAssumption", "needsHuman"],
+      "additionalProperties": false,
+      "properties": {
+        "total": {
+          "type": "integer",
+          "description": "Total number of findings raised.",
+          "minimum": 0
+        },
+        "verified": {
+          "type": "integer",
+          "description": "Findings that were fully verified.",
+          "minimum": 0
+        },
+        "refuted": {
+          "type": "integer",
+          "description": "Findings that were refuted.",
+          "minimum": 0
+        },
+        "acceptedAsAssumption": {
+          "type": "integer",
+          "description": "Findings accepted as assumptions due to insufficient evidence.",
+          "minimum": 0
+        },
+        "needsHuman": {
+          "type": "integer",
+          "description": "Findings escalated for human decision.",
+          "minimum": 0
+        }
+      }
+    },
+    "openDissents": {
+      "type": "array",
+      "description": "Finding IDs for which at least one panel member registered a dissent that was not resolved before the session closed.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "planningCostUsd": {
+      "type": "number",
+      "description": "Total cost of the planning session in US dollars.",
+      "minimum": 0
+    },
+    "planningDurationSec": {
+      "type": "number",
+      "description": "Wall-clock duration of the planning session in seconds.",
+      "minimum": 0
+    }
+  }
+}

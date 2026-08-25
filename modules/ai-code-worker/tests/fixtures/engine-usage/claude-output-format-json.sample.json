@@ -1,0 +1,17 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "duration_ms": 4231,
+  "duration_api_ms": 3980,
+  "num_turns": 3,
+  "result": "{\"schemaVersion\":\"1.0\",\"runId\":\"run-claude\",\"taskId\":\"TASK-01\",\"status\":\"DONE\",\"summary\":\"done\",\"touchedFiles\":[],\"failures\":[]}",
+  "session_id": "b6c1b0b0-1111-4a2b-9c3d-abcdef123456",
+  "total_cost_usd": 0.0842,
+  "usage": {
+    "input_tokens": 4,
+    "cache_creation_input_tokens": 1823,
+    "cache_read_input_tokens": 15420,
+    "output_tokens": 612
+  }
+}

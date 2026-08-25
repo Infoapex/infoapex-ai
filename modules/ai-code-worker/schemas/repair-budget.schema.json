@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:repair-budget.schema.json",
+  "title": "ai-code-worker repair budget state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "maximumRepairCycles", "consumedCycles", "remainingCycles", "stopReason", "updatedAt"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "maximumRepairCycles": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "consumedCycles": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "remainingCycles": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "stopReason": {
+      "enum": [
+        "repeated-failure-no-progress",
+        "scope-expansion-required",
+        "cycles-exhausted",
+        "time-exhausted",
+        "usage-exhausted",
+        "cost-exhausted",
+        null
+      ]
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

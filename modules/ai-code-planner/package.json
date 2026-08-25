@@ -1,0 +1,36 @@
+{
+  "name": "@infoapex/ai-code-planner",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Independent AI planning tool: turns a task prompt into a scoped, linted, routed implementation plan for ai-code-worker.",
+  "type": "module",
+  "bin": {
+    "ai-code-planner": "dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "pretest": "npm run build",
+    "test": "node --test dist/tests/**/*.test.js",
+    "posttest": "npm run validate:json",
+    "validate:json": "node scripts/validate-json.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "docs",
+    "schemas",
+    "src",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
+}

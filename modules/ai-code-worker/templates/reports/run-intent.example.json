@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0",
+  "intentId": "intent-example-a1b2",
+  "runId": "20260801-example-a1b2",
+  "planPath": "Plan/PLAN-X.md",
+  "planSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "baseRef": "main",
+  "baseCommit": "dddddddddddddddddddddddddddddddddddddddd",
+  "repositoryFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "requestedCapabilities": [
+    "write-worktree",
+    "run-isolated-tests",
+    "create-local-commits"
+  ],
+  "forbiddenCapabilities": ["push", "deploy", "network-write"],
+  "approvalMode": "never",
+  "executionEnvironmentKind": "isolated",
+  "limits": {
+    "maximumRunMinutes": 180,
+    "maximumAgentInvocations": 12,
+    "maximumInputUncachedTokens": 1000000,
+    "maximumCacheReadTokens": 5000000,
+    "maximumCacheWriteTokens": 1000000,
+    "maximumOutputTokens": 100000,
+    "maximumCostUsd": null
+  },
+  "createdAt": "2026-08-01T10:00:00Z",
+  "expiresAt": "2026-08-01T13:00:00Z"
+}

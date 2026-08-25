@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:evidence.schema.json",
+  "title": "ai-code-worker run evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "engine", "input", "output", "cost", "commands", "artifacts"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "adapterVersion"],
+      "properties": {
+        "name": {
+          "enum": ["codex", "claude", "fake"]
+        },
+        "version": {
+          "type": ["string", "null"]
+        },
+        "adapterVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uncachedTokens", "cacheReadTokens", "cacheWriteTokens", "totalReportedTokens"],
+      "properties": {
+        "uncachedTokens": {
+          "$ref": "#/$defs/nullableCount"
+        },
+        "cacheReadTokens": {
+          "$ref": "#/$defs/nullableCount"
+        },
+        "cacheWriteTokens": {
+          "$ref": "#/$defs/nullableCount"
+        },
+        "totalReportedTokens": {
+          "$ref": "#/$defs/nullableCount"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["standardTokens", "reasoningTokens", "totalReportedTokens"],
+      "properties": {
+        "standardTokens": {
+          "$ref": "#/$defs/nullableCount"
+        },
+        "reasoningTokens": {
+          "$ref": "#/$defs/nullableCount"
+        },
+        "totalReportedTokens": {
+          "$ref": "#/$defs/nullableCount"
+        }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reportedCostUsd", "estimatedCostUsd", "currency"],
+      "properties": {
+        "reportedCostUsd": {
+          "$ref": "#/$defs/nullableMoney"
+        },
+        "estimatedCostUsd": {
+          "$ref": "#/$defs/nullableMoney"
+        },
+        "currency": {
+          "enum": ["USD", null]
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "executable", "args", "exitCode", "durationMs"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "executable": {
+            "type": "string",
+            "minLength": 1
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exitCode": {
+            "type": ["integer", "null"]
+          },
+          "durationMs": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nullableCount": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "nullableMoney": {
+      "type": ["number", "null"],
+      "minimum": 0
+    }
+  }
+}

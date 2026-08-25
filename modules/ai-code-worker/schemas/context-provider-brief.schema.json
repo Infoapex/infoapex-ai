@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:context-provider-brief.schema.json",
+  "title": "ai-code-control provider brief response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "error", "summary", "relevantFiles"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "status": { "enum": ["ok", "error"] },
+    "error": { "type": ["string", "null"] },
+    "summary": { "type": ["string", "null"] },
+    "relevantFiles": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    }
+  }
+}

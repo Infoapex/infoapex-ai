@@ -1,0 +1,27 @@
+{
+  "name": "@infoapex/ai-code-review",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "bin": {
+    "ai-code-review": "dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/**/*.test.js",
+    "posttest": "npm run validate:json",
+    "validate:json": "node scripts/validate-json.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": ["dist", "schemas", "templates", "README.md", "docs", "src"],
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}

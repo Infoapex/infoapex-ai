@@ -1,0 +1,18 @@
+# .NET
+bin/
+obj/
+*.user
+tools/ai-code-control/bin/
+
+# Node
+node_modules/
+dist/
+
+# ai-code-control generated (ADR-0006: db/ și reports/ sunt derivate, nu canonice)
+.ai-code-control/db/
+.ai-code-control/reports/tool.log
+.ai-code-control/reports/validation/
+
+# OS
+Thumbs.db
+.DS_Store

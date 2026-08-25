@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0",
+  "managedBlocks": {
+    "AGENTS.md": {
+      "start": "<!-- ai-code-worker:start -->",
+      "end": "<!-- ai-code-worker:end -->"
+    },
+    "CLAUDE.md": {
+      "start": "<!-- ai-code-worker:start -->",
+      "end": "<!-- ai-code-worker:end -->"
+    }
+  },
+  "submodulePath": "ai-code-worker",
+  "configPath": ".ai-code-worker"
+}

@@ -1,0 +1,40 @@
+{
+  "name": "@infoapex/ai-code-worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Independent AI coding-worker orchestrator contracts and MVP runtime.",
+  "type": "module",
+  "bin": {
+    "ai-code-worker": "dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "phase0:demo": "node scripts/phase0-demo.mjs",
+    "phase2:demo": "node scripts/phase2-demo.mjs",
+    "pretest": "npm run build",
+    "test": "node --test dist/tests/**/*.test.js",
+    "posttest": "npm run validate:json",
+    "validate:json": "node scripts/validate-json.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "docs",
+    "schemas",
+    "templates",
+    "src",
+    "scripts",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
+}

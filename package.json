@@ -1,0 +1,26 @@
+{
+  "name": "@infoapex/ai-code-apex",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "bin": {
+    "ai-code-apex": "dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/**/*.test.js",
+    "check:generic-boundary": "node scripts/check-generic-boundary.mjs",
+    "value-gate:internal": "node scripts/value-gate.mjs",
+    "value-gate:live": "node scripts/value-gate.mjs --live",
+    "review-gate:internal": "node scripts/review-gate.mjs",
+    "docs-gate:internal": "node scripts/docs-gate.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}

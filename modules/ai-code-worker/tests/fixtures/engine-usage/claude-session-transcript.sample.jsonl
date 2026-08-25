@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":"Implement TASK-01."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Looking at the code now."}],"usage":{"input_tokens":120,"cache_creation_input_tokens":8000,"cache_read_input_tokens":0,"output_tokens":45}}}
+{"type":"user","message":{"role":"user","content":"Continue."}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Done with the change."}],"usage":{"input_tokens":90,"cache_creation_input_tokens":1500,"cache_read_input_tokens":8000,"output_tokens":220}}}

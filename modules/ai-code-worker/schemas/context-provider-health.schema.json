@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:context-provider-health.schema.json",
+  "title": "ai-code-control provider health response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "error", "available", "version", "detail"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "status": { "enum": ["ok", "error"] },
+    "error": { "type": ["string", "null"] },
+    "available": { "type": ["boolean", "null"] },
+    "version": { "type": ["string", "null"] },
+    "detail": { "type": ["string", "null"] }
+  }
+}

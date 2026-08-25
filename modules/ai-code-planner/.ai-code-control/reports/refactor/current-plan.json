@@ -1,0 +1,10 @@
+{
+  "task": "none",
+  "language": "",
+  "affectedSymbol": "",
+  "allowedFiles": [],
+  "forbiddenPaths": [".ai-code-control/db/"],
+  "allowedUntrackedPatterns": [".ai-code-control/memory/"],
+  "requiredValidation": ["run-validation"],
+  "riskLevel": "low"
+}

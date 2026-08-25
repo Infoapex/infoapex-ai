@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:engine-event.schema.json",
+  "title": "ai-code-worker normalized engine event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "executionId",
+    "sequence",
+    "createdAt",
+    "type",
+    "sessionId",
+    "payload",
+    "rawPayloadSha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "executionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "type": {
+      "enum": [
+        "execution.started",
+        "session.bound",
+        "progress",
+        "command.started",
+        "command.finished",
+        "file.changed",
+        "usage.reported",
+        "heartbeat",
+        "warning",
+        "execution.completed",
+        "execution.failed",
+        "execution.cancelled"
+      ]
+    },
+    "sessionId": {
+      "type": ["string", "null"]
+    },
+    "payload": {
+      "type": "object"
+    },
+    "rawPayloadSha256": {
+      "type": ["string", "null"],
+      "pattern": "^[a-fA-F0-9]{64}$"
+    }
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "schemaVersion": "1.0",
+  "gates": [
+    {
+      "id": "json-parse",
+      "description": "Every JSON file in the repository parses.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/validate-json.mjs"],
+      "timeoutSeconds": 60,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "verify-adr-0002",
+      "description": "docs/adr/0002-plan-and-manifest-ownership.md contains the required decision content.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/verify/adr-0002.mjs"],
+      "timeoutSeconds": 30,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "verify-adr-0003",
+      "description": "docs/adr/0003-fallback-ownership.md contains the required decision content.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/verify/adr-0003.mjs"],
+      "timeoutSeconds": 30,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "verify-adr-0004",
+      "description": "docs/adr/0004-agent-runner.md contains the required decision content.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/verify/adr-0004.mjs"],
+      "timeoutSeconds": 30,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "verify-adr-0005",
+      "description": "docs/adr/0005-worker-compatibility-matrix.md contains the required decision content.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/verify/adr-0005.mjs"],
+      "timeoutSeconds": 30,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "verify-schema-plan",
+      "description": "schemas/plan.schema.json parses and has the required structure.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/verify/schema-plan.mjs"],
+      "timeoutSeconds": 30,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "verify-schema-planning-provenance",
+      "description": "schemas/planning-provenance.schema.json parses and has the required structure.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/verify/schema-planning-provenance.mjs"],
+      "timeoutSeconds": 30,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "verify-schema-execution-profile",
+      "description": "schemas/execution-profile.schema.json parses and has the required structure.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/verify/schema-execution-profile.mjs"],
+      "timeoutSeconds": 30,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "verify-linter-contract",
+      "description": "docs/LINTER-CONTRACT.md contains the required sections and content.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/verify/linter-contract.mjs"],
+      "timeoutSeconds": 30,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "verify-fixtures",
+      "description": "fixtures/ has a valid worker v1.0 manifest and at least 5 invalid fixtures with an index.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["scripts/verify/fixtures.mjs"],
+      "timeoutSeconds": 30,
+      "allowedEnvironmentVariables": []
+    },
+    {
+      "id": "build",
+      "description": "TypeScript build (tsc -p tsconfig.json), invoked via node directly since spawnSync with shell:false cannot resolve npm's .cmd wrapper on Windows.",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["node_modules/typescript/bin/tsc", "-p", "tsconfig.json"],
+      "timeoutSeconds": 120,
+      "allowedEnvironmentVariables": [],
+      "linkedDirectories": [
+        { "fromRepository": "node_modules", "toWorktree": "node_modules" }
+      ]
+    },
+    {
+      "id": "test-schema-validate",
+      "description": "Phase 1: tests/unit/schema-validate.test.ts",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["--test", "dist/tests/unit/schema-validate.test.js"],
+      "timeoutSeconds": 60,
+      "allowedEnvironmentVariables": [],
+      "linkedDirectories": [
+        { "fromRepository": "node_modules", "toWorktree": "node_modules" }
+      ]
+    },
+    {
+      "id": "test-lint-plan",
+      "description": "Phase 1: tests/unit/lint-plan.test.ts",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["--test", "dist/tests/unit/lint-plan.test.js"],
+      "timeoutSeconds": 60,
+      "allowedEnvironmentVariables": [],
+      "linkedDirectories": [
+        { "fromRepository": "node_modules", "toWorktree": "node_modules" }
+      ]
+    },
+    {
+      "id": "test-project-to-worker-v1",
+      "description": "Phase 1: tests/unit/project-to-worker-v1.test.ts",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["--test", "dist/tests/unit/project-to-worker-v1.test.js"],
+      "timeoutSeconds": 60,
+      "allowedEnvironmentVariables": [],
+      "linkedDirectories": [
+        { "fromRepository": "node_modules", "toWorktree": "node_modules" }
+      ]
+    },
+    {
+      "id": "test-plan-markdown",
+      "description": "Phase 1: tests/unit/plan-markdown.test.ts",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["--test", "dist/tests/unit/plan-markdown.test.js"],
+      "timeoutSeconds": 60,
+      "allowedEnvironmentVariables": [],
+      "linkedDirectories": [
+        { "fromRepository": "node_modules", "toWorktree": "node_modules" }
+      ]
+    },
+    {
+      "id": "test-claude-adapter",
+      "description": "Phase 1: tests/unit/claude-adapter.test.ts",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["--test", "dist/tests/unit/claude-adapter.test.js"],
+      "timeoutSeconds": 60,
+      "allowedEnvironmentVariables": [],
+      "linkedDirectories": [
+        { "fromRepository": "node_modules", "toWorktree": "node_modules" }
+      ]
+    },
+    {
+      "id": "test-decompose-prompt",
+      "description": "Phase 1: tests/unit/decompose-prompt.test.ts",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["--test", "dist/tests/unit/decompose-prompt.test.js"],
+      "timeoutSeconds": 60,
+      "allowedEnvironmentVariables": [],
+      "linkedDirectories": [
+        { "fromRepository": "node_modules", "toWorktree": "node_modules" }
+      ]
+    },
+    {
+      "id": "test-cli",
+      "description": "Phase 1: tests/unit/cli.test.ts",
+      "workingDirectory": ".",
+      "executable": "node",
+      "args": ["--test", "dist/tests/unit/cli.test.js"],
+      "timeoutSeconds": 90,
+      "allowedEnvironmentVariables": [],
+      "linkedDirectories": [
+        { "fromRepository": "node_modules", "toWorktree": "node_modules" }
+      ]
+    }
+  ]
+}

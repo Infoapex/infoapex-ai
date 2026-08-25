@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "policyVersion": "local-1",
+  "profiles": {
+    "mechanical-fast-v1": {
+      "candidates": [
+        { "engine": "codex", "model": null },
+        { "engine": "claude", "model": null }
+      ],
+      "reason": "Prefer the configured fast coding engine, then use the alternate engine only when it is unavailable.",
+      "confidence": "medium"
+    },
+    "balanced-default-v1": {
+      "candidates": [
+        { "engine": "codex", "model": null },
+        { "engine": "claude", "model": null }
+      ],
+      "reason": "Use the local default engine configuration with a bounded availability fallback.",
+      "confidence": "low"
+    }
+  }
+}

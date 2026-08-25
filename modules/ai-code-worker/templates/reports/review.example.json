@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run-example",
+  "reviewer": "deterministic-read-only",
+  "status": "PASS",
+  "coverageMatrix": [
+    {
+      "criterion": "The accepted plan compiles without mutating the repository.",
+      "test": "task:TASK-01",
+      "command": "node -e \"process.exit(0)\"",
+      "evidence": "tasks/TASK-01/evidence.json"
+    }
+  ],
+  "findings": []
+}

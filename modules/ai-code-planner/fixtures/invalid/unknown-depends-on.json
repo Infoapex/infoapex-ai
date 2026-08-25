@@ -1,0 +1,21 @@
+{
+  "goal": "Fixture for UNKNOWN_DEPENDENCY linter rule (DEPENDENCY_EXISTS check).",
+  "tasks": [
+    {
+      "id": "TASK-A",
+      "goal": "Task A depends on a task ID that does not exist in this plan.",
+      "acceptanceCriteria": [
+        { "criterionId": "AC-001", "text": "Output file exists." }
+      ],
+      "gates": [
+        { "gateId": "G-001", "command": "verify-a", "evidenceContract": "Exit code 0." }
+      ],
+      "dependsOn": ["TASK-DOES-NOT-EXIST"],
+      "scope": {
+        "allowedPaths": ["src/a/**"],
+        "forbiddenPaths": []
+      },
+      "requiredInputs": []
+    }
+  ]
+}

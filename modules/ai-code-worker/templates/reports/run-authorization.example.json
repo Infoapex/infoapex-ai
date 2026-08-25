@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "authorizationId": "auth-example-a1b2",
+  "runId": "20260801-example-a1b2",
+  "repositoryFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "planSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "manifestSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "baseCommit": "dddddddddddddddddddddddddddddddddddddddd",
+  "graphVersion": 1,
+  "executionEnvironment": {
+    "profileId": "isolated",
+    "kind": "isolated",
+    "profileSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "allowedCapabilities": [
+    "write-worktree",
+    "run-isolated-tests",
+    "create-local-commits"
+  ],
+  "forbiddenCapabilities": ["push", "deploy", "network-write"],
+  "approvalMode": "never",
+  "limits": {
+    "maximumRunMinutes": 180,
+    "maximumAgentInvocations": 12,
+    "maximumInputUncachedTokens": 1000000,
+    "maximumCacheReadTokens": 5000000,
+    "maximumCacheWriteTokens": 1000000,
+    "maximumOutputTokens": 100000,
+    "maximumCostUsd": null
+  },
+  "issuedAt": "2026-08-01T10:00:00Z",
+  "expiresAt": "2026-08-01T13:00:00Z"
+}

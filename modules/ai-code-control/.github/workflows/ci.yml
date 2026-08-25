@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Build solution
+        run: dotnet build tools/ai-code-control/AiCodeControl.sln --nologo
+
+      - name: Run tests
+        run: dotnet test tools/ai-code-control/AiCodeControl.sln --nologo --no-build
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build MCP server
+        working-directory: tools/ai-code-control/mcp-server
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build

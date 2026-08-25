@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:usage-checkpoint.schema.json",
+  "title": "ai-code-worker usage benchmark checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "checkpointId",
+    "runId",
+    "taskId",
+    "scope",
+    "engine",
+    "phase",
+    "createdAt",
+    "taskKind",
+    "taskRisk",
+    "tokens",
+    "contextEstimateTokens",
+    "percentUsedReported",
+    "percentUsedEstimated"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "checkpointId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskId": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "scope": {
+      "enum": ["run", "task"]
+    },
+    "engine": {
+      "enum": ["fake", "claude", "codex"]
+    },
+    "phase": {
+      "enum": ["start", "end"]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "taskKind": {
+      "enum": ["contract", "backend", "frontend", "database", "docs", "test", "review", "repair", "other", null]
+    },
+    "taskRisk": {
+      "enum": ["low", "medium", "high", null]
+    },
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputUncachedTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "costUsd"],
+      "properties": {
+        "inputUncachedTokens": { "type": ["number", "null"] },
+        "cacheReadTokens": { "type": ["number", "null"] },
+        "cacheWriteTokens": { "type": ["number", "null"] },
+        "outputTokens": { "type": ["number", "null"] },
+        "costUsd": { "type": ["number", "null"] }
+      }
+    },
+    "contextEstimateTokens": {
+      "type": ["number", "null"]
+    },
+    "percentUsedReported": {
+      "type": ["number", "null"]
+    },
+    "percentUsedEstimated": {
+      "type": ["number", "null"]
+    }
+  }
+}

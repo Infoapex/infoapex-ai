@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:review-finding.schema.json",
+  "title": "ai-code-worker independent review finding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "severity", "category", "criterionIds", "files", "evidence"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "severity": {
+      "enum": ["blocking", "major", "minor", "note"]
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1
+    },
+    "criterionIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recommendedScope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "goal": "Fixture for HIGH_RISK_NO_GATES linter rule (HIGH_RISK_REQUIRES_GATES check).",
+  "tasks": [
+    {
+      "id": "TASK-A",
+      "goal": "Task A has risk 'high' but an empty gates array.",
+      "risk": "high",
+      "acceptanceCriteria": [
+        { "criterionId": "AC-001", "text": "Database migration completes without error." }
+      ],
+      "gates": [],
+      "dependsOn": [],
+      "scope": {
+        "allowedPaths": ["db/migrations/**"],
+        "forbiddenPaths": []
+      },
+      "requiredInputs": []
+    }
+  ]
+}
