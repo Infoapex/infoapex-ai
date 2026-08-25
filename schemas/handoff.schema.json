@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:infoapex:ai-code:ai-code-apex:schemas:handoff.schema.json",
+  "$id": "urn:infoapex:ai-code:infoapex-ai:schemas:handoff.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "handoffId", "direction", "createdAt", "runId", "payload"],

@@ -2,11 +2,11 @@
 
 - **Status:** `accepted` — 2026-08-15
 - **Date:** 2026-08-15
-- **Supersedes:** decision 4 of `AI-CODE-APEX-VISION.md` (in the `ai-code-worker` repository, `docs/AI-CODE-APEX-VISION.md`, dated 2026-08-15)
+- **Supersedes:** decision 4 of `INFOAPEX-AI-VISION.md` (in the `ai-code-worker` repository, `docs/INFOAPEX-AI-VISION.md`, dated 2026-08-15)
 
 ## Context
 
-`AI-CODE-APEX-VISION.md` records two decisions that cannot both hold:
+`INFOAPEX-AI-VISION.md` records two decisions that cannot both hold:
 
 - **Decision 2:** *ai-code-architect (now ai-code-planner) picks the LLM model per task.*
 - **Decision 4:** *The worker does not change at all for this.*

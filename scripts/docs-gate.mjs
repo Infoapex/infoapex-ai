@@ -45,7 +45,7 @@ try {
   writeFileSync(join(root, "Plan", "DOCS-001.md"), ["---", "status: accepted", "---", "", "# Generate verified documentation", "", "```ai-code-worker-plan", JSON.stringify(workerPlan, null, 2), "```", ""].join("\n"), "utf8");
   git("init", "-b", "main");
   git("config", "user.email", "ci@example.invalid");
-  git("config", "user.name", "Apex CI");
+  git("config", "user.name", "Infoapex AI CI");
   git("add", ".");
   git("commit", "-m", "docs fixture");
   writeFileSync(join(root, "request.json"), `${JSON.stringify({ schemaVersion: "1.0", runId: "apex-docs-gate", docsId: "DOCS-001", baseCommit: "BASE", headCommit: "HEAD", prompt: "Generate verified documentation.", criteria: [{ id: "AC-01", description: "Documentation is generated from verified repository evidence." }], outputPaths: ["docs/generated/"], plannerDraftPath: "draft.json", workerPlanPath: "Plan/DOCS-001.md", reviewFixturePath: fixture }, null, 2)}\n`, "utf8");

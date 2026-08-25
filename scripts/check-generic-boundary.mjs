@@ -42,5 +42,5 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exitCode = 1;
 } else {
-  console.log("Generic Apex boundary check passed.");
+  console.log("Generic bundle boundary check passed.");
 }

@@ -4,7 +4,7 @@
 the `infoapex-ai` bundle. It is invoked only when a user explicitly asks a
 coding task or accepted plan to be implemented by the worker.
 
-The repository currently contains the v1.2 implementation plan, its safety/recovery amendment, accepted ADRs, public JSON contracts, consumer-project templates, deterministic Phase 0 runtime coverage, Phase 1/2 runtime paths, dynamic engine discovery, bounded per-task context injection, per-task routing snapshots, bounded availability fallback, and optional ai-code-apex handoff feedback.
+The repository currently contains the v1.2 implementation plan, its safety/recovery amendment, accepted ADRs, public JSON contracts, consumer-project templates, deterministic Phase 0 runtime coverage, Phase 1/2 runtime paths, dynamic engine discovery, bounded per-task context injection, per-task routing snapshots, bounded availability fallback, and optional infoapex-ai handoff feedback.
 
 ## Core Decision
 
@@ -75,7 +75,7 @@ The demo creates a temporary fixture repository and executes `doctor -> compile 
 
 ## Status
 
-Status: Phase 1/2 MVP plus routing, fallback and optional apex handoff implemented on `main`; production acceptance of live quota classification remains an explicit validation gate.
+Status: Phase 1/2 MVP plus routing, fallback and optional Infoapex AI handoff implemented on `main`; production acceptance of live quota classification remains an explicit validation gate.
 
 Implemented runtime slices include schema validation, manifest freeze hashing, authorization binding, instruction trust policy, environment preflight, event replay, dependency snapshots, fake engine/gates, compile/status, deterministic fake runs, dynamically discovered Claude/Codex CLIs with behavioral compatibility checks, single-writer real-engine runs, worker-owned Git commits, real quality gates, read-only review coverage, terminal reports, bounded per-task `ai-code-control` context, and minimum local recovery checkpoints.
 

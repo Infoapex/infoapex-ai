@@ -61,7 +61,7 @@ Modulele nu își importă reciproc codul sursă. Ele comunică prin CLI, JSON, 
 
 | Modul | Rol real |
 |---|---|
-| `ai-code-apex` | Bootstrap minim pentru modul independent/integrat, stare și handoff-uri. În versiunea curentă nu este încă o interfață unică pentru toate comenzile. |
+| `infoapex-ai` | Bootstrap minim pentru modul independent/integrat, stare și handoff-uri. În versiunea curentă nu este încă o interfață unică pentru toate comenzile. |
 | `ai-code-planner` | Transformă un prompt într-un plan structurat, îl validează, îl lint-uiește, propune rutarea logică și îl compilează în formatul worker-ului. Nu implementează singur codul. |
 | `ai-code-worker` | Îngheață manifestul autorizat, construiește DAG-ul, rulează task-urile prin motoarele `codex`, `claude` sau `fake`, aplică gate-uri, bugete, review și cicluri limitate de reparare. |
 | `ai-code-review` | Orchestrare read-only pentru verificarea criteriilor și a diferențelor dintre commit-uri. |
@@ -153,13 +153,13 @@ flowchart LR
 ## Moduri de integrare
 
 ```text
-ai-code-apex init --repo <cale> --mode independent
-ai-code-apex init --repo <cale> --mode integrated
+infoapex-ai init --repo <cale> --mode independent
+infoapex-ai init --repo <cale> --mode integrated
 ```
 
 `independent` este modul implicit. Planner-ul, worker-ul și celelalte module pot fi folosite separat.
 
-`integrated` activează canalul comun `.ai-code-apex/runs`: planner-ul poate publica planul acceptat și propunerea de rutare, worker-ul poate publica feedback-ul execuției, iar planner-ul poate genera o continuare. Canalul este bazat pe fișiere și nu transformă modulele într-un monolit.
+`integrated` activează canalul comun `.infoapex-ai/runs`: planner-ul poate publica planul acceptat și propunerea de rutare, worker-ul poate publica feedback-ul execuției, iar planner-ul poate genera o continuare. Canalul este bazat pe fișiere și nu transformă modulele într-un monolit.
 
 ## Cerințe
 
@@ -183,11 +183,11 @@ npm test
 
 ## Pornire rapidă
 
-Inițializează bootstrap-ul Apex în proiectul țintă:
+Inițializează bootstrap-ul Infoapex AI în proiectul țintă:
 
 ```bash
-node dist/src/cli.js init --repo /cale/catre/proiect --mode independent
-node dist/src/cli.js status --repo /cale/catre/proiect
+npx --package . infoapex-ai init --repo /cale/catre/proiect --mode independent
+npx --package . infoapex-ai status --repo /cale/catre/proiect
 ```
 
 Inițializează worker-ul și verifică mediul:
@@ -278,7 +278,7 @@ Folosește direct CLI-ul sau extensia IDE pentru explorare, depanare și schimb�
 - Motorul `fake` verifică orchestration wiring, nu calitatea unui provider real.
 - Worktree-urile și verificarea scope-ului nu echivalează singure cu un sandbox de sistem de operare.
 - Configurarea greșită a comenzilor de validare poate executa procese locale nedorite.
-- Interfața root `ai-code-apex` este în prezent un bootstrap subțire, nu încă un CLI unificat.
+- Interfața root `infoapex-ai` este în prezent un bootstrap subțire, nu încă un CLI unificat.
 - Integrarea live, securizarea distribuției și măsurarea A/B față de agenții direcți necesită validare suplimentară înaintea unui release de producție.
 
 ## Direcții de dezvoltare
@@ -296,7 +296,7 @@ Folosește direct CLI-ul sau extensia IDE pentru explorare, depanare și schimb�
 
 ```text
 infoapex-ai/
-├── src/                         # CLI-ul root ai-code-apex
+├── src/                         # CLI-ul root infoapex-ai
 ├── schemas/                     # contractele root de integrare
 ├── modules/
 │   ├── ai-code-planner/

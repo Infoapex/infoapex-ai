@@ -23,7 +23,7 @@ export interface WorkerFeedbackInput {
 }
 
 export function readApexIntegrationConfig(repositoryPath: string): ApexIntegrationConfig | null {
-  const path = join(repositoryPath, ".ai-code-apex", "config.json");
+  const path = join(repositoryPath, ".infoapex-ai", "config.json");
   if (!existsSync(path)) return null;
   const config = JSON.parse(readFileSync(path, "utf8")) as ApexIntegrationConfig;
   if (config.schemaVersion !== "1.0" || config.mode !== "integrated" || config.worker?.enabled === false) return null;

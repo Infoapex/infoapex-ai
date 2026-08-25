@@ -8,7 +8,7 @@ control, review and docs modules.
 
 ```text
 infoapex-ai/
-  modules/ai-code-apex/
+  src/
   modules/ai-code-control/
   modules/ai-code-planner/
   modules/ai-code-worker/
@@ -22,7 +22,7 @@ inside that directory. No install step fetches another private repository.
 ## ZIP distribution
 
 A release ZIP contains the bundle source, lockfiles and documentation. The
-recipient extracts it, installs Node dependencies, and invokes the root Apex
+recipient extracts it, installs Node dependencies, and invokes the root Infoapex AI
 installer against a target project. The archive must not contain credentials,
 provider tokens, personal data, `node_modules`, generated databases or runtime
 state.
@@ -32,7 +32,7 @@ Expand-Archive infoapex-ai-0.1.0.zip -DestinationPath .\tools
 Set-Location .\tools\infoapex-ai
 npm run setup
 npm run build
-node dist/src/cli.js init --repo C:\work\target-project --mode independent
+infoapex-ai init --repo C:\work\target-project --mode independent
 ```
 
 The target machine needs Node.js 22 or newer. The optional control runtime also

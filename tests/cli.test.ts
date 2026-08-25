@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
@@ -26,7 +26,12 @@ test("installer keeps independent mode isolated and exposes status", () => {
   try {
     const init = runCli(repository, ["init", "--repo", repository, "--mode", "independent"]);
     assert.equal(init.status, 0, init.stderr);
-    assert.equal(JSON.parse(init.stdout).mode, "independent");
+    const initBody = JSON.parse(init.stdout) as { mode: string; configPath: string; handoffRoot: string };
+    assert.equal(initBody.mode, "independent");
+    assert.match(initBody.configPath, /[\\/]\.infoapex-ai[\\/]config\.json$/);
+    assert.match(initBody.handoffRoot, /[\\/]\.infoapex-ai[\\/]runs$/);
+    assert.equal(existsSync(join(repository, ".infoapex-ai", "README.md")), true);
+    assert.match(readFileSync(join(repository, ".infoapex-ai", "README.md"), "utf8"), /infoapex-ai init/);
 
     const status = runCli(repository, ["status", "--repo", repository]);
     const statusBody = JSON.parse(status.stdout) as { configured: boolean; config: { mode: string; planner: { enabled: boolean } } };

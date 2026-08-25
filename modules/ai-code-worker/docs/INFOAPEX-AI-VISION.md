@@ -1,4 +1,4 @@
-# ai-code-apex — viziune (decisă 2026-08-15, nu implementată)
+# infoapex-ai — viziune (decisă 2026-08-15, nu implementată)
 
 Acest document înregistrează o decizie de produs luată de user într-o discuție directă
 (nu derivată din cod sau dintr-un alt document), separată de `IMPLEMENTATION-PLAN.md`
@@ -6,7 +6,7 @@ al lui `ai-code-worker` (care rămâne autoritatea pentru worker însuși). Nimi
 document nu e implementat — e context pentru sesiuni viitoare, în orice repo din
 familia asta.
 
-## Ce este ai-code-apex
+## Ce este infoapex-ai
 
 Un proiect umbrelă care leagă cinci tool-uri independente într-un pipeline coerent de
 dezvoltare asistată de AI:
@@ -44,9 +44,9 @@ ai-code-architect  →  ai-code-worker  →  ai-code-control  →  ai-code-revie
 2. **`ai-code-architect` alege modelul LLM per task**, nu doar scrie planul — parte din
    designul lui e optimizarea cost/efort per task (unele task-uri pot merge pe un model
    mai ieftin/rapid, altele au nevoie de unul mai capabil). E independent de worker.
-3. **Fiecare componentă a ai-code-apex e un repo Git independent** — `ai-code-worker`,
+3. **Fiecare componentă a infoapex-ai e un repo Git independent** — `ai-code-worker`,
    `ai-code-control`, `ai-code-architect`, `ai-code-review`, `ai-code-docs`, fiecare cu
-   propriul ciclu de release, versionare, teste. `ai-code-apex` însuși e un repo
+   propriul ciclu de release, versionare, teste. `infoapex-ai` însuși e un repo
    subțire: submodule-uri + installer + configurare + meniu CLI interactiv de
    instalare — fără cod de business propriu.
 4. **Contractul architect → worker e formatul deja existent al lui worker** —
@@ -56,7 +56,7 @@ ai-code-architect  →  ai-code-worker  →  ai-code-control  →  ai-code-revie
    fișier, niciodată prin cuplare de cod.
 5. **Installer-ul orchestrează, nu duplică** — fiecare tool își păstrează propriul
    `init`/`doctor`/`update` (worker le are deja, vezi Part B/Faza 4 Etapa 4). Installer-ul
-   din `ai-code-apex` doar le apelează în ordine și scrie configurările combinate
+   din `infoapex-ai` doar le apelează în ordine și scrie configurările combinate
    (bloc AGENTS.md comun, `.mcp.json` etc.) — nu reimplementează logica niciunui tool.
 6. **architect/review/docs se implementează independent, unul câte unul** — nu
    simultan. Ordinea exactă nu e decisă încă.
@@ -66,7 +66,7 @@ ai-code-architect  →  ai-code-worker  →  ai-code-control  →  ai-code-revie
 `IMPLEMENTATION-PLAN.md` al lui `ai-code-worker` afirmă independența ca principiu de
 bază: "El nu este o extensie a ai-code-control și nu îi va referenția proiectele, bazele
 de date sau tipurile interne." Acest principiu se extinde la **toate** perechile din
-ai-code-apex, nu doar worker↔control: fiecare tool comunică cu celelalte exclusiv prin
+infoapex-ai, nu doar worker↔control: fiecare tool comunică cu celelalte exclusiv prin
 CLI JSON și/sau fișiere pe disc (ca `Plan/*.md`), niciodată prin import de cod sau acces
 direct la baza de date/starea internă a altui tool. Fiecare tool trebuie să funcționeze
 și dacă toate celelalte patru sunt șterse.
@@ -77,7 +77,7 @@ direct la baza de date/starea internă a altui tool. Fiecare tool trebuie să fu
 - Dacă `consumer-project-ai-code-worker-integration`
   (`C:\Users\enach\source\consumer-project-ai-code-worker-integration`, deja are
   ai-code-worker + ai-code-control ca submodule-uri, dar fixat pe un commit vechi al
-  worker-ului) devine nucleul lui `ai-code-apex`, sau se pornește un repo nou separat.
+  worker-ului) devine nucleul lui `infoapex-ai`, sau se pornește un repo nou separat.
 - Forma exactă a installer-ului/meniului CLI interactiv.
 - Task B din `ai-code-worker` (detecție dinamică de versiune Claude/Codex, vezi
   `todo.md` #10) — user a confirmat direcția arhitecturală (fără listă de versiuni
@@ -89,4 +89,4 @@ direct la baza de date/starea internă a altui tool. Fiecare tool trebuie să fu
 ## Pasul următor (confirmat de user, 2026-08-15)
 
 **Se revine la finalizarea `ai-code-worker`** — acest document e doar o înregistrare a
-contextului mai larg, nu o comandă de a începe `ai-code-apex` acum.
+contextului mai larg, nu o comandă de a începe `infoapex-ai` acum.

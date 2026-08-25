@@ -1,4 +1,4 @@
-name: ai-code-apex CI
+name: infoapex-ai CI
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
       - name: Install bundle dependencies
         run: npm run setup
 
-      - name: Validate Apex boundary and installer
+      - name: Validate Infoapex AI boundary and installer
         run: |
           npm run check:generic-boundary
           npm test

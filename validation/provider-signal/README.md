@@ -23,7 +23,7 @@ The live gate:
 
 Use `APEX_CLAUDE_EXECUTABLE` or `APEX_CLAUDE_MODEL` only when the default CLI
 discovery or model is not the desired one. The temporary repository and reports
-are removed after the command; no raw transcript is persisted by Apex.
+are removed after the command; no raw transcript is persisted by Infoapex AI.
 
 For a CLI session that requires explicit edit approval in a non-interactive run,
 the disposable live gate can receive the worker permission mode through+`APEX_CLAUDE_PERMISSION_MODE=acceptEdits`. This affects only the temporary value+gate invocation, not the worker's project configuration.

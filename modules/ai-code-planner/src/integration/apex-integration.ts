@@ -38,14 +38,14 @@ export function publishPlannerHandoff(input: {
 
 export function readWorkerFeedback(repositoryPath: string, runId: string): unknown {
   const config = readConfig(repositoryPath);
-  if (!config) throw new Error('ai-code-apex integration is not enabled for this repository.');
+  if (!config) throw new Error('infoapex-ai integration is not enabled for this repository.');
   const path = join(resolveHandoffRoot(repositoryPath, config.handoffRoot), runId, 'worker-to-planner.json');
   if (!existsSync(path)) throw new Error(`Worker feedback not found for run ${runId}.`);
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
 function readConfig(repositoryPath: string): ApexConfig | null {
-  const path = join(repositoryPath, '.ai-code-apex', 'config.json');
+  const path = join(repositoryPath, '.infoapex-ai', 'config.json');
   if (!existsSync(path)) return null;
   const config = JSON.parse(readFileSync(path, 'utf8')) as ApexConfig;
   return config.schemaVersion === '1.0' && config.mode === 'integrated' ? config : null;

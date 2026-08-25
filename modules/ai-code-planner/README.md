@@ -2,13 +2,13 @@
 
 ## Current implementation status
 
-Planner v1 is implemented and verified for the planner-worker contract. It includes optional `ai-code-control` context, deterministic logical routing, worker-export validation, opt-in apex handoff, worker feedback ingestion, and deterministic `replan` after an incomplete run. A synthetic planner -> worker run and an integrated bidirectional handoff both pass.
+Planner v1 is implemented and verified for the planner-worker contract. It includes optional `ai-code-control` context, deterministic logical routing, worker-export validation, opt-in Infoapex AI handoff, worker feedback ingestion, and deterministic `replan` after an incomplete run. A synthetic planner -> worker run and an integrated bidirectional handoff both pass.
 
 Live production acceptance with real Claude/Codex quota signals and the separate three-plan consumer project value gate remain operational validation, not missing planner code.
 
 Turns a task prompt into a **scoped, linted, routed implementation plan** that `ai-code-worker` executes.
 
-> **Status: Phase 1 mechanically complete, optional apex handoff implemented, value gate not yet demonstrated.** `propose`/`inspect`/`compile`/`explain-routing`/`ingest-worker-report` exist and are exercised by tests, including projection to the worker manifest and opt-in planner-to-worker handoff. What has NOT been demonstrated: `_FINAL.md`'s actual Phase 1 exit gate — "3 real consumer project plans pass the linter and run on the existing worker." See `docs/PHASE-1.md`.
+> **Status: Phase 1 mechanically complete, optional Infoapex AI handoff implemented, value gate not yet demonstrated.** `propose`/`inspect`/`compile`/`explain-routing`/`ingest-worker-report` exist and are exercised by tests, including projection to the worker manifest and opt-in planner-to-worker handoff. What has NOT been demonstrated: `_FINAL.md`'s actual Phase 1 exit gate — "3 real consumer project plans pass the linter and run on the existing worker." See `docs/PHASE-1.md`.
 
 ## What it does
 
@@ -39,7 +39,7 @@ The gain is not "spend less". It is **being able to afford the capable model exa
 
 ## Independence
 
-`ai-code-apex init --mode integrated` enables the optional planner <-> worker handoff. Without that flag, both modules remain independent. The planner assigns logical profiles such as `mechanical-fast-v1` and `balanced-default-v1`; worker resolves and freezes concrete engine/model values from the repository routing policy.
+`infoapex-ai init --mode integrated` enables the optional planner <-> worker handoff. Without that flag, both modules remain independent. The planner assigns logical profiles such as `mechanical-fast-v1` and `balanced-default-v1`; worker resolves and freezes concrete engine/model values from the repository routing policy.
 
 Each tool in the family runs standalone. `ai-code-planner` may *optionally consume* `ai-code-control` for context and `ai-code-worker`'s plan format for output, but requires neither to function — missing neighbours reduce context richness and confidence, they do not stop it.
 
@@ -55,7 +55,7 @@ Interoperability is by **versioned JSON schema and CLI-JSON only** — never by 
 | `ai-code-review` | milestone-level audit |
 | `ai-code-docs` | final documentation |
 
-`ai-code-apex` is the thin umbrella that installs them together. Components never depend on the umbrella.
+`infoapex-ai` is the thin umbrella that installs them together. Components never depend on the umbrella.
 
 ## Design record
 

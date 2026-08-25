@@ -12,7 +12,7 @@ Every material decision is either **accepted** or explicitly marked `proposed`. 
 
 ### ADRs
 
-- [x] `adr/0001-per-task-routing-contract.md` — reformulates decision 4 of the apex vision *(status: accepted, 2026-08-15)*
+- [x] `adr/0001-per-task-routing-contract.md` — reformulates decision 4 of the Infoapex AI vision *(status: accepted, 2026-08-15)*
 - [x] `adr/0002-plan-and-manifest-ownership.md` — planner emits the plan; worker compiles, validates, freezes *(status: accepted, 2026-08-16)*
 - [x] `adr/0003-fallback-ownership.md` — planner proposes, worker verifies, freezes, and executes; never used to mask a policy failure, scope violation, or deterministic test failure *(status: accepted, 2026-08-16)*
 - [x] `adr/0004-agent-runner.md` — planner uses its own adapters; the model-identity and usage schemas stay shared with worker *(status: accepted, 2026-08-15, formalized 2026-08-16)*

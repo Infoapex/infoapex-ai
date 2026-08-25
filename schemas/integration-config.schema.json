@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:infoapex:ai-code:ai-code-apex:schemas:integration-config.schema.json",
+  "$id": "urn:infoapex:ai-code:infoapex-ai:schemas:integration-config.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "mode", "handoffRoot"],

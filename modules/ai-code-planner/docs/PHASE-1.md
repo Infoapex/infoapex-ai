@@ -7,7 +7,7 @@ Claude-only, no independent review, at the user's explicit direction to conserve
 ## Verified planner-worker flow
 
 - Standalone: planner `compile` -> worker `compile` -> worker `run --engine fake`, with one task completed and its gate passing.
-- Integrated: `ai-code-apex init --mode integrated` -> planner publishes `planner-to-worker.json` -> worker publishes `worker-to-planner.json` -> planner `ingest-worker-report` returns `DONE`.
+- Integrated: `infoapex-ai init --mode integrated` -> planner publishes `planner-to-worker.json` -> worker publishes `worker-to-planner.json` -> planner `ingest-worker-report` returns `DONE`.
 - Continuation: a `BLOCKED` worker handoff is consumed by planner `replan`, which writes a new draft with the replacement logical profile and provenance.
 
 ## What exists

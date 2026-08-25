@@ -7,17 +7,17 @@ import { publishWorkerFeedback, readApexIntegrationConfig } from "../../src/inte
 
 test("publishes worker feedback only when apex integration is explicitly enabled", () => {
   const repo = mkdtempSync(join(tmpdir(), "aicw-apex-"));
-  writeFileSync(join(repo, ".ai-code-apex-config-placeholder"), "", "utf8");
+  writeFileSync(join(repo, ".infoapex-ai-config-placeholder"), "", "utf8");
   assert.equal(publishWorkerFeedback(repo, { runId: "run-1", status: "DONE", executedTasks: [], findings: [] }), null);
 });
 
 test("publishes versioned worker-to-planner feedback in the configured handoff root", () => {
   const repo = mkdtempSync(join(tmpdir(), "aicw-apex-"));
-  const apex = join(repo, ".ai-code-apex");
+  const apex = join(repo, ".infoapex-ai");
   requireFsWrite(join(apex, "config.json"), {
     schemaVersion: "1.0",
     mode: "integrated",
-    handoffRoot: ".ai-code-apex/runs",
+    handoffRoot: ".infoapex-ai/runs",
     worker: { enabled: true }
   });
   const output = publishWorkerFeedback(repo, {

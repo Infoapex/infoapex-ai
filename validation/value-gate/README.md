@@ -26,7 +26,7 @@ replacement for the deterministic contract gate.
 
 The live gate uses three representative tasks from the target repository under
 test. Their identifiers and product terminology stay outside this repository;
-the Apex-owned gate only records the acceptance criteria and outcome.
+the Infoapex-owned gate only records the acceptance criteria and outcome.
 
 The first real planner proposal attempt was run with the installed Claude Code
 CLI. The planner adapter was corrected to use the target repository as its

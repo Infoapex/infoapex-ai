@@ -12,7 +12,7 @@ if (command === "init") {
   if (mode !== "independent" && mode !== "integrated") {
     fail("--mode must be independent or integrated");
   }
-  const apexRoot = join(repo, ".ai-code-apex");
+  const apexRoot = join(repo, ".infoapex-ai");
   const handoffRoot = join(apexRoot, "runs");
   mkdirSync(handoffRoot, { recursive: true });
   const config = {
@@ -23,12 +23,12 @@ if (command === "init") {
     worker: { enabled: mode === "integrated" }
   };
   writeJson(join(apexRoot, "config.json"), config);
-  writeText(join(apexRoot, "README.md"), "# ai-code-apex integration\n\nMode: " + mode + "\n\nManaged by ai-code-apex init. The modules remain independently runnable.\n");
+  writeText(join(apexRoot, "README.md"), "# infoapex-ai integration\n\nMode: " + mode + "\n\nManaged by infoapex-ai init. The modules remain independently runnable.\n");
   console.log(JSON.stringify({ status: "DONE", mode, configPath: join(apexRoot, "config.json"), handoffRoot }, null, 2));
   process.exitCode = 0;
 } else if (command === "status") {
   const repo = resolve(option("--repo") ?? process.cwd());
-  const path = join(repo, ".ai-code-apex", "config.json");
+  const path = join(repo, ".infoapex-ai", "config.json");
   if (!existsSync(path)) {
     console.log(JSON.stringify({ status: "INDEPENDENT", configured: false }, null, 2));
     process.exitCode = 0;
@@ -41,11 +41,11 @@ if (command === "init") {
   const runId = option("--run-id");
   const payloadPath = option("--payload");
   if ((direction !== "planner-to-worker" && direction !== "worker-to-planner") || !runId || !payloadPath) {
-    fail("Usage: ai-code-apex handoff --direction <planner-to-worker|worker-to-planner> --run-id <id> --payload <json>");
+    fail("Usage: infoapex-ai handoff --direction <planner-to-worker|worker-to-planner> --run-id <id> --payload <json>");
   }
   const config = readConfig(repo);
   if (config.mode !== "integrated") {
-    fail("Integration is disabled. Run ai-code-apex init --mode integrated first.");
+    fail("Integration is disabled. Run infoapex-ai init --mode integrated first.");
   }
   const payload = JSON.parse(readFileSync(resolve(repo, payloadPath!), "utf8"));
   const handoff = {
@@ -60,7 +60,7 @@ if (command === "init") {
   writeJson(output, handoff);
   console.log(JSON.stringify({ status: "DONE", output }, null, 2));
 } else {
-  console.error("Usage: ai-code-apex <init|status|handoff>");
+  console.error("Usage: infoapex-ai <init|status|handoff>");
   process.exitCode = 1;
 }
 
@@ -70,9 +70,9 @@ function option(name: string): string | null {
 }
 
 function readConfig(repo: string): { mode: "independent" | "integrated"; handoffRoot: string } {
-  const path = join(repo, ".ai-code-apex", "config.json");
+  const path = join(repo, ".infoapex-ai", "config.json");
   if (!existsSync(path)) {
-    fail("ai-code-apex is not initialized for this repository");
+    fail("infoapex-ai is not initialized for this repository");
   }
   return JSON.parse(readFileSync(path, "utf8")) as { mode: "independent" | "integrated"; handoffRoot: string };
 }

@@ -8,9 +8,9 @@ Implemented in this batch:
 
 - #14 dynamic Claude/Codex discovery and behavioral compatibility gating.
 - #21 per-task `ai-code-control` brief/symbol context injection, bounded and advisory.
-- #13 worker-side distribution decision recorded as pinned submodule for bootstrap/pilot; no packaging shim is needed until `ai-code-apex` defines the umbrella installer contract.
+- #13 worker-side distribution decision recorded as pinned submodule for bootstrap/pilot; no packaging shim is needed until `infoapex-ai` defines the umbrella installer contract.
 - #20 bounded per-task routing and mid-task availability fallback. The worker now freezes an ordered candidate list from `routing-policy.json`, records it in the manifest, and only advances on classified provider availability/quota signals.
-- `ai-code-apex` handoff: when explicitly enabled, worker publishes versioned `worker-to-planner.json` feedback. Standalone runs do not read or write the channel.
+- `infoapex-ai` handoff: when explicitly enabled, worker publishes versioned `worker-to-planner.json` feedback. Standalone runs do not read or write the channel.
 
 Still intentionally open:
 
@@ -42,7 +42,7 @@ stale) sunt **complete și pushed**. Rămân neimplementate, ambele așteptând 
   dogfooding real: un audit de tokeni pe `ai-code-planner` a arătat ~8.3M tokeni
   pentru 6 task-uri, fiecare redescoperind repo-ul de la zero.
 
-Ambele legate de `docs/AI-CODE-APEX-VISION.md` (installer-ul umbrelă `ai-code-apex`,
+Ambele legate de `docs/INFOAPEX-AI-VISION.md` (installer-ul umbrelă `infoapex-ai`,
 neimplementat încă).
 
 ## Găsite prin dogfooding din `ai-code-planner` (2026-08-15/16)
@@ -604,14 +604,14 @@ executable). Următorul pas e alegerea userului, apoi implementarea config-ului 
 (mic, per document).
 
 **Update 2026-08-15**: userul a confirmat submodule ca și canal — dar în contextul mai
-larg al `docs/AI-CODE-APEX-VISION.md`: `ai-code-worker` va fi unul din cinci repo-uri
+larg al `docs/INFOAPEX-AI-VISION.md`: `ai-code-worker` va fi unul din cinci repo-uri
 independente (worker/control/architect/review/docs) legate de un installer umbrelă
-separat (`ai-code-apex`). Config-ul mic rămas de implementat aici (ex. verificare
+separat (`infoapex-ai`). Config-ul mic rămas de implementat aici (ex. verificare
 versiune worker vs. schemaVersion config, dacă mai e nevoie) ar trebui reevaluat după ce
 forma installer-ului umbrelă e mai clară — posibil să fie subsumat de installer, nu
 implementat separat în worker.
 
-### 14. Detecție dinamică de versiune Claude/Codex (nu listă hardcodată) — neimplementat, așteaptă forma installer-ului din ai-code-apex
+### 14. Detecție dinamică de versiune Claude/Codex (nu listă hardcodată) — neimplementat, așteaptă forma installer-ului din infoapex-ai
 
 Legat de Etapa 6 (matrice compatibilitate, `todo.md` context) și de descoperirea live
 2026-08-15 că `codex-cli 0.148.0-alpha.9` există deja local (livrat cu extensia VS Code
@@ -628,7 +628,7 @@ versiune care nu trece smoke test-ul tot BLOCKED), doar mecanismul de verificare
 devine dinamic în loc de static.
 
 **De ce e amânat, nu implementat direct**: userul a legat explicit acest item de
-installer-ul din punctul C (`docs/AI-CODE-APEX-VISION.md`) — "probabil printr-un fișier
+installer-ul din punctul C (`docs/INFOAPEX-AI-VISION.md`) — "probabil printr-un fișier
 de init-config al installer-ului îi spunem ce LLM-uri folosim și cum le folosim", nu
 doar o schimbare izolată în `ai-code-worker`. Forma exactă a acelui config (cine îl
 scrie, unde stă, cum îl citește worker-ul) nu e clarificată încă. Implementarea aici

@@ -8,11 +8,11 @@
 
 ## Current status
 
-Planner v1 implementation is complete for context, deterministic planning, logical routing, worker export, apex handoff, feedback ingestion, and replan. Consensus-panel planning, routing outcome analytics, and effort-per-task remain separate extensions.
+Planner v1 implementation is complete for context, deterministic planning, logical routing, worker export, Infoapex AI handoff, feedback ingestion, and replan. Consensus-panel planning, routing outcome analytics, and effort-per-task remain separate extensions.
 
 ## 1. Blocajul inițial — rezolvat
 
-`docs/AI-CODE-APEX-VISION.md` conținea o contradicție: decizia 2 ("architect alege modelul per task") și decizia 4 ("worker nu se schimbă deloc") nu pot fi ambele adevărate — `manifest.schema.json` nu are câmp de engine/model pe task.
+`docs/INFOAPEX-AI-VISION.md` conținea o contradicție: decizia 2 ("architect alege modelul per task") și decizia 4 ("worker nu se schimbă deloc") nu pot fi ambele adevărate — `manifest.schema.json` nu are câmp de engine/model pe task.
 
 **Corecție acceptată:** rutarea per task e inexprimabilă azi, dar asta blochează *doar* Faza 3, nu tot proiectul. Planner scrie planuri, worker le execută, azi, fără nicio modificare — Fazele 0, 1 și 2A nu ating worker-ul deloc. ADR-0001 (`ai-code-planner`, status `accepted`) reformulează decizia 4: formatul de plan rămâne stabil, schema câștigă un bloc opțional `executionProfile` retrocompatibil.
 
@@ -98,7 +98,7 @@ Panelul se construiește **numai după** ce value gate-ul mono-agent trece (§9)
 
 ## 7bis. Decizii de produs ale userului (2026-08-15)
 
-- **#11** Umbrela se numește `ai-code-apex`; numele retrase (`ai-code-runner`, `ai-code-architect`) rămân retrase.
+- **#11** Umbrela se numește `infoapex-ai`; numele retrase (`ai-code-runner`, `ai-code-architect`) rămân retrase.
 - **#12** Dependența merge doar în sensul pipeline-ului (`planner → worker → control → review → docs`) și e mereu opțională cu degradare. Un tool consumă opțional, nu cere niciodată alt tool.
 - **#13** Copierea de cod din worker în planner e permisă (nu importul) — dar schemele (identitate model, usage) rămân comune obligatoriu. Consecință: agent-runner-ul planner-ului folosește **adaptoare proprii**, nu un runtime comun extras (worker e fixat la `d23d5a0`; extragerea ar serializa tot proiectul după un refactor pilotat pe un singur consumator).
 - **#14** Politica panelului: **oprit acum**. Mod principal = invocare manuală de user pentru PBI-uri mari (frontend+backend+DB), nu pentru modificări simple. Pornit implicit la L/XL și la orice atinge plăți/securitate/migrații, indiferent de mărime.
@@ -110,7 +110,7 @@ Panelul se construiește **numai după** ce value gate-ul mono-agent trece (§9)
 3. Confirmarea amânării `reasoningEffort` (ambele analize recomandă da).
 4. Setul de 3 task-uri consumer project pentru value gate.
 5. Pragurile inițiale de `confidence` pentru review obligatoriu.
-6. Ordinea de implementare în `ai-code-apex`: planner primul din cele trei (planner/review/docs)?
+6. Ordinea de implementare în `infoapex-ai`: planner primul din cele trei (planner/review/docs)?
 
 ---
 

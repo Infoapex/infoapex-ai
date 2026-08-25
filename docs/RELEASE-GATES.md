@@ -9,7 +9,7 @@ Required gates:
 - `ai-code-planner`: full suite plus three representative end-to-end plans that pass linting, compile against the pinned worker contract, and execute through worker.
 - `ai-code-review`: full deterministic suite plus an internal planner -> control -> worker read-only review gate.
 - `ai-code-docs`: full deterministic suite plus an internal planner -> control -> worker -> review documentation gate.
-- `ai-code-apex`: installer init in both modes, status, handoff write/read, bundle clean-clone bootstrap and ZIP extraction.
+- `infoapex-ai`: installer init in both modes, status, handoff write/read, bundle clean-clone bootstrap and ZIP extraction.
 
 The reproducible local gate is `npm run value-gate:internal`. It creates three
 generic target fixtures, runs planner `propose -> inspect -> compile`, and runs

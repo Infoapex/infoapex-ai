@@ -90,7 +90,7 @@ function createTargetRepository() {
   const repository = mkdtempSync(join(tmpdir(), "apex-value-gate-"));
   execFileSync("git", ["init", "--initial-branch", "main"], { cwd: repository, stdio: "ignore" });
   execFileSync("git", ["config", "user.email", "apex-gate@example.invalid"], { cwd: repository });
-  execFileSync("git", ["config", "user.name", "Apex Value Gate"], { cwd: repository });
+  execFileSync("git", ["config", "user.name", "Infoapex AI Value Gate"], { cwd: repository });
   mkdirSync(join(repository, "scripts"), { recursive: true });
   writeFileSync(join(repository, "scripts", "pass-gate.mjs"), "process.exit(0);\n", "utf8");
   for (const seed of taskSeeds) {

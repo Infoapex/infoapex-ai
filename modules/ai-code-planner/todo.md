@@ -43,7 +43,7 @@
 
 ## Restant (2026-08-16, Phase 1)
 
-- Optional `ai-code-apex` bidirectional handoff is implemented locally: `compile` publishes `planner-to-worker.json` when the target repository has initialized apex integration, and `ingest-worker-report` reads `worker-to-planner.json`. The standalone planner path remains unchanged when integration is absent.
+- Optional `infoapex-ai` bidirectional handoff is implemented locally: `compile` publishes `planner-to-worker.json` when the target repository has initialized Infoapex AI integration, and `ingest-worker-report` reads `worker-to-planner.json`. The standalone planner path remains unchanged when integration is absent.
 
 - **Phase 1's actual exit gate is not demonstrated.** `Plan/Architect/_FINAL.md` §3:
   *"3 planuri consumer project reale trec linterul și rulează pe worker-ul existent."*

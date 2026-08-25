@@ -1,4 +1,4 @@
-# ai-code-apex architecture
+# infoapex-ai architecture
 
 ## Ownership
 
@@ -23,9 +23,9 @@ component allowed to invoke a writing provider.
 
 ## Optional bidirectional channel
 
-The installer creates `.ai-code-apex/config.json`. In `independent` mode, the
+The installer creates `.infoapex-ai/config.json`. In `independent` mode, the
 modules do not use the channel. In `integrated` mode, both modules use the shared
-`.ai-code-apex/runs/<runId>/` directory:
+`.infoapex-ai/runs/<runId>/` directory:
 
 ```text
 planner-to-worker.json   planner -> worker plan and logical routing proposal

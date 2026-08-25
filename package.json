@@ -1,10 +1,10 @@
 {
-  "name": "@infoapex/ai-code-apex",
+  "name": "@infoapex/infoapex-ai",
   "version": "0.1.0",
   "private": false,
   "type": "module",
   "bin": {
-    "ai-code-apex": "dist/src/cli.js"
+    "infoapex-ai": "dist/src/cli.js"
   },
   "scripts": {
     "setup": "node scripts/setup-bundle.mjs",
