@@ -30,7 +30,7 @@ state.
 ```powershell
 Expand-Archive infoapex-ai-0.1.0.zip -DestinationPath .\tools
 Set-Location .\tools\infoapex-ai
-npm ci
+npm run setup
 npm run build
 node dist/src/cli.js init --repo C:\work\target-project --mode independent
 ```

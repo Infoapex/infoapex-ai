@@ -7,7 +7,9 @@
     "ai-code-apex": "dist/src/cli.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "setup": "node scripts/setup-bundle.mjs",
+    "build": "npm run build:root && node scripts/build-bundle.mjs",
+    "build:root": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/tests/**/*.test.js",
     "check:generic-boundary": "node scripts/check-generic-boundary.mjs",
     "value-gate:internal": "node scripts/value-gate.mjs",

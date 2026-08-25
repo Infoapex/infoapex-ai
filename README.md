@@ -34,7 +34,7 @@ dependency.
 ## Development
 
 ```text
-npm ci
+npm run setup
 npm run build
 npm test
 npm run value-gate:internal
@@ -57,6 +57,6 @@ node dist/src/cli.js init --repo <path> --mode independent
 node dist/src/cli.js init --repo <path> --mode integrated
 ```
 
-The repository can be distributed as a ZIP. Extract it, install the declared
-Node dependencies, and use the same installer command against any target
+The repository can be distributed as a ZIP. Extract it, run `npm run setup`,
+build the bundle, and use the same installer command against any target
 project.

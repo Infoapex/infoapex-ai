@@ -25,18 +25,8 @@ jobs:
         with:
           dotnet-version: 9.x
 
-      - name: Install Apex dependencies
-        run: npm ci
-
-      - name: Install bundled module dependencies
-        run: |
-          npm ci --prefix modules/ai-code-planner
-          npm ci --prefix modules/ai-code-worker
-          npm ci --prefix modules/ai-code-review
-          npm ci --prefix modules/ai-code-docs
-
-      - name: Install control MCP dependencies
-        run: npm ci --prefix modules/ai-code-control/tools/ai-code-control/mcp-server
+      - name: Install bundle dependencies
+        run: npm run setup
 
       - name: Validate Apex boundary and installer
         run: |
