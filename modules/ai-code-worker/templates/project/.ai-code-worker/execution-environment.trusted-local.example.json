@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0",
+  "profileId": "trusted-local",
+  "kind": "trusted-local",
+  "filesystem": {
+    "hostReadDefault": "allow",
+    "hostWriteDefault": "allow",
+    "mounts": []
+  },
+  "network": {
+    "repositoryProcesses": "unrestricted",
+    "adapterControlPlane": "provider-only"
+  },
+  "environment": {
+    "inheritByDefault": false,
+    "allowedVariables": [
+      "APPDATA",
+      "CI",
+      "ComSpec",
+      "HOME",
+      "LOCALAPPDATA",
+      "NO_COLOR",
+      "PATH",
+      "PATHEXT",
+      "Path",
+      "SystemRoot",
+      "TEMP",
+      "TMP",
+      "USERPROFILE",
+      "XDG_CONFIG_HOME"
+    ]
+  },
+  "limits": {
+    "maximumDurationSeconds": 2700,
+    "maximumOutputBytes": 10485760,
+    "maximumProcesses": null,
+    "maximumMemoryBytes": null,
+    "maximumCpuUnits": null
+  }
+}

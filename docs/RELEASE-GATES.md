@@ -32,7 +32,18 @@ and worker fake execution; only the usage-consuming live variant remains open.
 
 Codex live update 2026-08-25: `codex-cli 0.147.0` passed doctor and a disposable
 real worker task completed with `DONE`, a worker-owned commit and a passing gate
-when invoked with explicit `--codex-sandbox danger-full-access`. The default
-`workspace-write` invocation was blocked by the local CLI approval policy. The
-remaining external validation is Claude's usage-consuming planner/value gate and
-its real quota signal.
+in a historical, explicitly privileged `danger-full-access` pilot. The same host
+blocked the `workspace-write` invocation. This result demonstrates adapter
+compatibility, not OS isolation, and does not change the secure default. Current
+runs use `workspace-write`; `danger-full-access` requires a separate recorded
+approval and is never an automatic fallback. The remaining external validation is
+Claude's usage-consuming planner/value gate and its real quota signal.
+
+Security gate update 2026-08-26: the bundled local backend is truthfully classified
+as `trusted-local`. An `isolated` writer remains blocked until an OS/container/VM or
+remote backend proves every required capability. A release must not describe Git
+worktrees, scope verification or the fake test backend as host isolation. A
+`trusted-local` pilot requires both repository eligibility and a separate CLI/API
+authorization; a repository-controlled config cannot grant it. Codex
+`danger-full-access` follows the same external-approval rule, and both authorization
+records are immutable across recovery.

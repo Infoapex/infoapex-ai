@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, describe, it } from "node:test";
@@ -34,6 +34,75 @@ describe("CLI executable flags", () => {
 
     assert.equal(report.status, "PASS");
     assert.equal(report.engineDoctor?.executable, executable);
+    assert.equal(report.engineDoctor?.sandbox?.mode, "workspace-write");
+    assert.equal(report.engineDoctor?.sandbox?.status, "RESTRICTED");
+  });
+
+  it("blocks a CLI danger-full-access request without explicit approval", () => {
+    const repo = createGitRepository();
+    const executable = writeFakeCli("unauthorized-codex", "codex");
+    const report = invokeDoctorJson(
+      ["--engine", "codex", "--codex-executable", executable, "--codex-sandbox", "danger-full-access"],
+      { repo }
+    );
+
+    assert.equal(report.status, "BLOCKED");
+    assert.equal(report.engineDoctor?.sandbox?.status, "BLOCKED");
+    assert.equal(report.engineDoctor?.findings?.[0]?.code, "CODEX_DANGER_FULL_ACCESS_UNAUTHORIZED");
+  });
+
+  it("accepts an attributable CLI danger-full-access approval and reports provenance", () => {
+    const repo = createGitRepository();
+    const executable = writeFakeCli("authorized-codex", "codex");
+    const report = invokeDoctorJson(
+      [
+        "--engine",
+        "codex",
+        "--codex-executable",
+        executable,
+        "--codex-sandbox",
+        "danger-full-access",
+        "--approve-danger-full-access",
+        "--danger-full-access-authorized-by",
+        "test-owner",
+        "--danger-full-access-reason",
+        "Explicit isolated test fixture",
+        "--danger-full-access-approved-at",
+        "2026-08-26T09:30:00.000Z"
+      ],
+      { repo }
+    );
+
+    assert.equal(report.status, "PASS");
+    assert.equal(report.engineDoctor?.sandbox?.status, "AUTHORIZED");
+    assert.equal(report.engineDoctor?.sandbox?.authorization?.authorizedBy, "test-owner");
+    assert.equal(report.engineDoctor?.sandbox?.authorization?.source, "cli");
+    assert.equal(report.engineDoctor?.sandbox?.authorization?.approvedAt, "2026-08-26T09:30:00.000Z");
+  });
+
+  it("rejects a CLI danger approval without an explicit approval timestamp", () => {
+    const repo = createGitRepository();
+    const executable = writeFakeCli("incomplete-danger-approval-codex", "codex");
+    const report = invokeDoctorJson(
+      [
+        "--engine",
+        "codex",
+        "--codex-executable",
+        executable,
+        "--codex-sandbox",
+        "danger-full-access",
+        "--approve-danger-full-access",
+        "--danger-full-access-authorized-by",
+        "test-owner",
+        "--danger-full-access-reason",
+        "Explicit but incomplete fixture"
+      ],
+      { repo }
+    );
+
+    assert.equal(report.status, "BLOCKED");
+    assert.equal(report.engineDoctor?.sandbox?.status, "BLOCKED");
+    assert.equal(report.engineDoctor?.findings?.[0]?.code, "CODEX_DANGER_FULL_ACCESS_UNAUTHORIZED");
   });
 
   it("discovers the Claude executable when --claude-executable is omitted", () => {
@@ -55,6 +124,16 @@ interface DoctorCliReport {
   readonly status: string;
   readonly engineDoctor?: {
     readonly executable?: string;
+    readonly sandbox?: {
+      readonly mode?: string;
+      readonly status?: string;
+      readonly authorization?: {
+        readonly authorizedBy?: string;
+        readonly source?: string;
+        readonly approvedAt?: string;
+      } | null;
+    };
+    readonly findings?: readonly { readonly code?: string }[];
   } | null;
 }
 
@@ -66,7 +145,15 @@ function invokeDoctorJson(args: readonly string[], options: { readonly repo?: st
   // stdout (still JSON either way) off the thrown error.
   let output: string;
   try {
-    output = execFileSync(process.execPath, [resolve("dist/src/cli.js"), "doctor", "--repo", repo, "--json", ...args], {
+    output = execFileSync(process.execPath, [
+      resolve("dist/src/cli.js"),
+      "doctor",
+      "--repo",
+      repo,
+      "--json",
+      ...trustedLocalCliAuthorization(),
+      ...args
+    ], {
       cwd: tmpdir(),
       encoding: "utf8"
     });
@@ -81,8 +168,22 @@ function createGitRepository(): string {
   const repo = mkdtempSync(join(tmpdir(), "aicw-cli-executable-flags-"));
   tempRepos.push(repo);
 
+  mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
   execFileSync("git", ["init"], { cwd: repo, stdio: "ignore" });
   writeFileSync(join(repo, "README.md"), "# fixture\n");
+  writeFileSync(
+    join(repo, ".ai-code-worker", "config.json"),
+    JSON.stringify({
+      schemaVersion: "1.0",
+      executionEnvironment: { defaultProfile: "trusted-local", allowTrustedLocal: true }
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    join(repo, ".ai-code-worker", "execution-environment.example.json"),
+    readFileSync("templates/project/.ai-code-worker/execution-environment.trusted-local.example.json", "utf8"),
+    "utf8"
+  );
   execFileSync("git", ["add", "README.md"], { cwd: repo, stdio: "ignore" });
   execFileSync("git", ["-c", "user.name=ai-code-worker", "-c", "user.email=worker@example.test", "commit", "-m", "init"], {
     cwd: repo,
@@ -90,6 +191,18 @@ function createGitRepository(): string {
   });
 
   return repo;
+}
+
+function trustedLocalCliAuthorization(): string[] {
+  return [
+    "--allow-trusted-local",
+    "--trusted-local-authorized-by",
+    "cli-doctor-test",
+    "--trusted-local-reason",
+    "Explicit trusted-local CLI doctor fixture",
+    "--trusted-local-approved-at",
+    "2026-08-26T09:00:00.000Z"
+  ];
 }
 
 function writeFakeCli(name: string, engine: "claude" | "codex", root = mkdtempSync(join(tmpdir(), "aicw-cli-fake-"))): string {

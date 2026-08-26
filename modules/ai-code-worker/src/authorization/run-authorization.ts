@@ -1,5 +1,6 @@
 import { canonicalJson, freezeManifest, sha256 } from "../manifest/normalize.js";
 import { SchemaRegistry, type JsonValue } from "../schema/json-schema.js";
+import type { TrustedLocalAuthorizationRecord } from "../execution/environment.js";
 
 export type ApprovalMode = "never" | "on-risk" | "always";
 export type Capability = string;
@@ -18,6 +19,7 @@ export interface RunIntent {
   readonly forbiddenCapabilities: readonly Capability[];
   readonly approvalMode: ApprovalMode;
   readonly executionEnvironmentKind: ExecutionEnvironmentKind;
+  readonly trustedLocalAuthorization?: TrustedLocalAuthorizationRecord;
   readonly limits: AuthorizationLimits;
   readonly createdAt: string;
   readonly expiresAt: string;
@@ -47,6 +49,7 @@ export interface RunAuthorization {
     readonly kind: ExecutionEnvironmentKind;
     readonly profileSha256: string;
   };
+  readonly trustedLocalAuthorization?: TrustedLocalAuthorizationRecord;
   readonly allowedCapabilities: readonly Capability[];
   readonly forbiddenCapabilities: readonly Capability[];
   readonly approvalMode: ApprovalMode;
@@ -100,6 +103,19 @@ export function bindRunAuthorization(input: BindRunAuthorizationInput): RunAutho
   assertEqual("repositoryFingerprint", intent.repositoryFingerprint, input.repositoryFingerprint);
   assertEqual("executionEnvironmentKind", intent.executionEnvironmentKind, profile.kind);
 
+  if (profile.kind === "trusted-local" && intent.trustedLocalAuthorization === undefined) {
+    throw new AuthorizationBindingError(
+      "CAPABILITY_NOT_GRANTED",
+      "trusted-local execution requires an explicit external authorization record."
+    );
+  }
+  if (profile.kind === "isolated" && intent.trustedLocalAuthorization !== undefined) {
+    throw new AuthorizationBindingError(
+      "AUTHORIZATION_MISMATCH",
+      "A trusted-local authorization cannot be bound to an isolated execution profile."
+    );
+  }
+
   const allowedCapabilities = sortUnique(intent.requestedCapabilities);
   const forbiddenCapabilities = sortUnique(intent.forbiddenCapabilities);
 
@@ -126,6 +142,9 @@ export function bindRunAuthorization(input: BindRunAuthorizationInput): RunAutho
       kind: profile.kind,
       profileSha256
     },
+    ...(intent.trustedLocalAuthorization !== undefined
+      ? { trustedLocalAuthorization: intent.trustedLocalAuthorization }
+      : {}),
     allowedCapabilities,
     forbiddenCapabilities,
     approvalMode: intent.approvalMode,

@@ -7,6 +7,14 @@ import { needsShellWrapper } from "./spawn-shell.js";
 import { versionMatchesAny } from "./version-match.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
 import { discoverEngineExecutable } from "./discover-cli.js";
+import type { ExecutionBackendBinding, ExecutionResult } from "../execution/environment.js";
+import {
+  assertCodexSandboxAuthorized,
+  evaluateCodexSandboxPolicy,
+  type CodexDangerFullAccessApproval,
+  type CodexSandboxDecision,
+  type CodexSandboxMode
+} from "../policy/codex-sandbox-policy.js";
 
 export { versionMatches, versionMatchesAny } from "./version-match.js";
 
@@ -18,11 +26,15 @@ export interface CodexCliAdapterConfig {
   /** Optional compatibility override. When absent, behavioral smoke tests are the gate. */
   readonly testedVersionRanges?: readonly string[];
   readonly requiresCapabilitySmokeTest: boolean;
-  readonly sandboxMode?: "workspace-write" | "danger-full-access";
+  readonly sandboxMode?: CodexSandboxMode;
+  readonly dangerFullAccessApproval?: CodexDangerFullAccessApproval;
   readonly adapterVersion?: string;
   readonly defaultModel?: string | null;
   readonly timeoutMs?: number;
   readonly maximumOutputBytes?: number;
+  /** Worker-owned execution binding. When present, writer invocations must pass
+   * through the capability-probed backend instead of spawning on the host directly. */
+  readonly execution?: ExecutionBackendBinding;
 }
 
 export interface CodexDoctorReport {
@@ -33,12 +45,18 @@ export interface CodexDoctorReport {
   readonly testedVersion: boolean;
   readonly smokeTest: "PASS" | "BLOCKED" | "SKIPPED";
   readonly behavioralSmokeTest: "PASS" | "BLOCKED" | "SKIPPED";
+  readonly sandbox: CodexSandboxDecision;
   readonly findings: readonly CodexFinding[];
 }
 
 export interface CodexFinding {
   readonly severity: "blocker";
-  readonly code: "CODEX_VERSION_UNAVAILABLE" | "CODEX_VERSION_UNTESTED" | "CODEX_SMOKE_TEST_FAILED" | "CODEX_BEHAVIORAL_SMOKE_TEST_FAILED";
+  readonly code:
+    | "CODEX_VERSION_UNAVAILABLE"
+    | "CODEX_VERSION_UNTESTED"
+    | "CODEX_SMOKE_TEST_FAILED"
+    | "CODEX_BEHAVIORAL_SMOKE_TEST_FAILED"
+    | "CODEX_DANGER_FULL_ACCESS_UNAUTHORIZED";
   readonly message: string;
 }
 
@@ -57,6 +75,7 @@ export interface CodexExecution {
   readonly sessionId: string;
   readonly events: readonly EngineEvent[];
   readonly usage: EngineUsage;
+  readonly sandbox: CodexSandboxDecision;
   readonly result: AgentExecutionResult;
 }
 
@@ -92,6 +111,14 @@ export class CodexCliAdapter {
 
   doctor(): CodexDoctorReport {
     const findings: CodexFinding[] = [];
+    const sandbox = evaluateCodexSandboxPolicy(this.config);
+    if (sandbox.status === "BLOCKED") {
+      findings.push({
+        severity: "blocker",
+        code: "CODEX_DANGER_FULL_ACCESS_UNAUTHORIZED",
+        message: sandbox.blockedReason ?? "Codex danger-full-access is not authorized."
+      });
+    }
     const versionOutput = spawnSync(this.executable, [...this.baseArgs, "--version"], {
       encoding: "utf8",
       timeout: 10_000,
@@ -121,7 +148,11 @@ export class CodexCliAdapter {
     }
 
     const smokeTest = this.config.requiresCapabilitySmokeTest ? this.smokeTest(findings) : "SKIPPED";
-    const behavioralSmokeTest = this.config.requiresCapabilitySmokeTest ? this.behavioralSmokeTest(findings) : "SKIPPED";
+    const behavioralSmokeTest = this.config.requiresCapabilitySmokeTest
+      ? sandbox.status === "BLOCKED"
+        ? "BLOCKED"
+        : this.behavioralSmokeTest(findings)
+      : "SKIPPED";
 
     return {
       status: findings.length > 0 ? "BLOCKED" : "PASS",
@@ -131,11 +162,13 @@ export class CodexCliAdapter {
       testedVersion,
       smokeTest,
       behavioralSmokeTest,
+      sandbox,
       findings
     };
   }
 
   buildExecInvocation(request: CodexStartRequest): CodexExecInvocation {
+    const sandbox = assertCodexSandboxAuthorized(this.config);
     // --output-schema/--output-last-message are deliberately NOT used: a live run
     // against a real ChatGPT-subscription Codex install (0.136.0-alpha.2) showed the
     // model reliably invokes the structured "final answer" tool --output-schema exposes
@@ -155,7 +188,7 @@ export class CodexCliAdapter {
       "--cd",
       request.worktreePath,
       "--sandbox",
-      this.config.sandboxMode ?? "workspace-write",
+      sandbox.mode,
       "-"
     ];
 
@@ -178,8 +211,15 @@ export class CodexCliAdapter {
       return {
         executionId: request.executionId,
         sessionId: request.sessionId,
-        events: terminalEvents(request, "execution.failed", { reason: result.failures[0]?.message ?? "Codex failed." }, this.registry),
+        events: terminalEvents(
+          request,
+          "execution.failed",
+          { reason: result.failures[0]?.message ?? "Codex failed." },
+          this.registry,
+          doctor.sandbox
+        ),
         usage: unknownUsage(),
+        sandbox: doctor.sandbox,
         result
       };
     }
@@ -190,7 +230,12 @@ export class CodexCliAdapter {
       sequence: 0,
       startedAt: request.startedAt,
       type: "execution.started",
-      payload: { engine: "codex", executable: this.executable },
+      payload: {
+        engine: "codex",
+        executable: this.executable,
+        sandbox: doctor.sandbox,
+        ...executionEnvironmentEvidence(this.config.execution)
+      },
       registry: this.registry
     });
     const session = createEngineEvent({
@@ -202,15 +247,7 @@ export class CodexCliAdapter {
       payload: { sessionId: request.sessionId },
       registry: this.registry
     });
-    const child = spawnSync(invocation.executable, invocation.args, {
-      cwd: request.worktreePath,
-      input: invocation.stdin,
-      encoding: "utf8",
-      maxBuffer: this.maximumOutputBytes,
-      timeout: this.timeoutMs,
-      windowsHide: true,
-      shell: needsShellWrapper(invocation.executable)
-    });
+    const child = this.runWriterSync(invocation, request.worktreePath);
     const result = readAgentResult(child, request, this.registry) ?? failedResult(request, childOutputMessage(child));
     const terminal = createEngineEvent({
       executionId: request.executionId,
@@ -230,6 +267,7 @@ export class CodexCliAdapter {
       sessionId: request.sessionId,
       events,
       usage: parseCodexUsage(child.stdout),
+      sandbox: doctor.sandbox,
       result
     };
   }
@@ -242,8 +280,15 @@ export class CodexCliAdapter {
       return {
         executionId: request.executionId,
         sessionId: request.sessionId,
-        events: terminalEvents(request, "execution.failed", { reason: result.failures[0]?.message ?? "Codex failed." }, this.registry),
+        events: terminalEvents(
+          request,
+          "execution.failed",
+          { reason: result.failures[0]?.message ?? "Codex failed." },
+          this.registry,
+          doctor.sandbox
+        ),
         usage: unknownUsage(),
+        sandbox: doctor.sandbox,
         result
       };
     }
@@ -254,7 +299,13 @@ export class CodexCliAdapter {
       sequence: 0,
       startedAt: request.startedAt,
       type: "execution.started",
-      payload: { engine: "codex", executable: this.executable, async: true },
+      payload: {
+        engine: "codex",
+        executable: this.executable,
+        async: true,
+        sandbox: doctor.sandbox,
+        ...executionEnvironmentEvidence(this.config.execution)
+      },
       registry: this.registry
     });
     const session = createEngineEvent({
@@ -266,13 +317,7 @@ export class CodexCliAdapter {
       payload: { sessionId: request.sessionId },
       registry: this.registry
     });
-    const child = await spawnBuffered(invocation.executable, invocation.args, {
-      cwd: request.worktreePath,
-      input: invocation.stdin,
-      maximumOutputBytes: this.maximumOutputBytes,
-      timeoutMs: this.timeoutMs,
-      shell: needsShellWrapper(invocation.executable)
-    });
+    const child = await this.runWriter(invocation, request.worktreePath);
     const result = readAgentResult(child, request, this.registry) ?? failedResult(request, childOutputMessage(child));
     const terminal = createEngineEvent({
       executionId: request.executionId,
@@ -292,6 +337,7 @@ export class CodexCliAdapter {
       sessionId: request.sessionId,
       events,
       usage: parseCodexUsage(child.stdout),
+      sandbox: doctor.sandbox,
       result
     };
   }
@@ -344,6 +390,67 @@ export class CodexCliAdapter {
 
     return "PASS";
   }
+
+  private runWriterSync(
+    invocation: CodexExecInvocation,
+    cwd: string
+  ): ReturnType<typeof spawnSync> | ExecutionResult {
+    const execution = this.config.execution;
+    if (execution) {
+      return execution.backend.runSync(execution.profile, {
+        executable: invocation.executable,
+        args: invocation.args,
+        cwd,
+        input: invocation.stdin,
+        timeoutMs: this.timeoutMs,
+        maximumOutputBytes: this.maximumOutputBytes,
+        env: execution.environment,
+        shell: needsShellWrapper(invocation.executable)
+      });
+    }
+
+    return spawnSync(invocation.executable, invocation.args, {
+      cwd,
+      input: invocation.stdin,
+      encoding: "utf8",
+      maxBuffer: this.maximumOutputBytes,
+      timeout: this.timeoutMs,
+      windowsHide: true,
+      shell: needsShellWrapper(invocation.executable)
+    });
+  }
+
+  private runWriter(invocation: CodexExecInvocation, cwd: string): Promise<BufferedProcessResult | ExecutionResult> {
+    const execution = this.config.execution;
+    if (execution) {
+      return execution.backend.run(execution.profile, {
+        executable: invocation.executable,
+        args: invocation.args,
+        cwd,
+        input: invocation.stdin,
+        timeoutMs: this.timeoutMs,
+        maximumOutputBytes: this.maximumOutputBytes,
+        env: execution.environment,
+        shell: needsShellWrapper(invocation.executable)
+      });
+    }
+
+    return spawnBuffered(invocation.executable, invocation.args, {
+      cwd,
+      input: invocation.stdin,
+      maximumOutputBytes: this.maximumOutputBytes,
+      timeoutMs: this.timeoutMs,
+      shell: needsShellWrapper(invocation.executable)
+    });
+  }
+}
+
+function executionEnvironmentEvidence(
+  execution: ExecutionBackendBinding | undefined
+): { readonly executionEnvironment?: ReturnType<ExecutionBackendBinding["backend"]["probe"]> } {
+  return execution
+    ? { executionEnvironment: execution.backend.probe(execution.profile) }
+    : {};
 }
 
 export function parseCodexVersion(output: string): string | null {
@@ -452,7 +559,8 @@ function terminalEvents(
   request: CodexStartRequest,
   type: "execution.completed" | "execution.failed",
   payload: Record<string, unknown>,
-  registry: SchemaRegistry
+  registry: SchemaRegistry,
+  sandbox?: CodexSandboxDecision
 ): readonly EngineEvent[] {
   const events = [
     createEngineEvent({
@@ -460,7 +568,7 @@ function terminalEvents(
       sequence: 0,
       startedAt: request.startedAt,
       type: "execution.started",
-      payload: { engine: "codex" },
+      payload: { engine: "codex", ...(sandbox ? { sandbox } : {}) },
       registry
     }),
     createEngineEvent({
@@ -566,6 +674,9 @@ export function writeFakeCodexCli(
     /** Wraps the JSON result in prose, simulating a model that does not follow the
      *  "respond with ONLY the JSON object" instruction exactly. */
     readonly wrapResultInProse?: boolean;
+    /** Test-only control: fail a real task invocation when this host variable
+     * survives into the child. Doctor behavioral smoke calls are excluded. */
+    readonly failTaskIfEnvironmentVariablePresent?: string;
     /** Overrides the fake CLI's cumulative total_token_usage, matching the real
      *  event_msg/token_count shape. Defaults to a realistic non-zero sample so
      *  usage-parsing tests exercise real field extraction. Pass null to omit the
@@ -600,6 +711,15 @@ if (${JSON.stringify(supportsExecHelp)} && args[0] === "exec" && args.includes("
   try {
     request = JSON.parse(fs.readFileSync(0, "utf8"));
   } catch {}
+  const forbiddenEnvironmentVariable = ${JSON.stringify(options.failTaskIfEnvironmentVariablePresent ?? null)};
+  if (
+    request.runId !== "doctor-behavioral-smoke" &&
+    forbiddenEnvironmentVariable &&
+    process.env[forbiddenEnvironmentVariable] !== undefined
+  ) {
+    console.error("forbidden host environment variable reached the task process");
+    process.exit(86);
+  }
   const touchedFile = ${JSON.stringify(options.touchedFile ?? null)};
   const delayMs = ${JSON.stringify(options.delayMs ?? 0)};
   if (delayMs > 0) {

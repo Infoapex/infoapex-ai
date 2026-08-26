@@ -10,6 +10,7 @@ describe("schema registry", () => {
     ["project-config.schema.json", "templates/project/.ai-code-worker/config.json"],
     ["quality-gates.schema.json", "templates/project/.ai-code-worker/quality-gates.json"],
     ["execution-environment.schema.json", "templates/project/.ai-code-worker/execution-environment.example.json"],
+    ["execution-environment.schema.json", "templates/project/.ai-code-worker/execution-environment.trusted-local.example.json"],
     ["pilot-baseline.schema.json", "templates/project/.ai-code-worker/pilot-baseline.example.json"],
     ["event.schema.json", "templates/reports/event.example.json"],
     ["run-intent.schema.json", "templates/reports/run-intent.example.json"],

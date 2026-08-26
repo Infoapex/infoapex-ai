@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { after, describe, it } from "node:test";
 import { writeFakeClaudeCli } from "../../src/engines/claude-cli.js";
+import { writeFakeCodexCli } from "../../src/engines/codex-cli.js";
 import { runClaude } from "../../src/run/claude-run.js";
 import { SchemaRegistry } from "../../src/schema/json-schema.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
@@ -38,6 +39,7 @@ describe("claude run coordinator", () => {
       planPath: "Plan/RUN.md",
       runId: "run-claude",
       now: "2026-08-01T10:00:00Z",
+      trustedLocalAuthorization: trustedLocalAuthorization(),
       adapterConfig: {
         executable: process.execPath,
         baseArgs: [cli],
@@ -85,6 +87,7 @@ describe("claude run coordinator", () => {
       planPath: "Plan/RUN.md",
       runId: "run-claude-missing",
       now: "2026-08-01T10:00:00Z",
+      trustedLocalAuthorization: trustedLocalAuthorization(),
       adapterConfig: {
         executable: join(tmpdir(), "no-such-claude-binary-xyz"),
         testedVersionRanges: ["2.1.x"],
@@ -98,18 +101,112 @@ describe("claude run coordinator", () => {
     const afterHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
     assert.equal(afterHead, beforeHead);
   });
+
+  it("binds a routed Codex writer sandbox once and rejects changed recovery provenance", () => {
+    const repo = createGitRepository({ routeToCodex: true, codexSandboxMode: "danger-full-access" });
+    const claudeCli = fakeCli("2.1.177", "src/unused-claude-output.txt");
+    const codexCli = fakeCodexCli("0.146.0-alpha.3.1", "src/claude-output.txt");
+    const dangerApproval = {
+      approved: true as const,
+      authorizedBy: "external-routing-controller",
+      reason: "Explicit routed Codex writer fixture",
+      approvedAt: "2026-08-26T09:00:00.000Z",
+      source: "api" as const
+    };
+    const options = {
+      repositoryPath: repo,
+      planPath: "Plan/RUN.md",
+      runId: "run-claude-routed-codex",
+      now: "2026-08-26T09:00:00Z",
+      trustedLocalAuthorization: trustedLocalAuthorization(),
+      adapterConfig: {
+        executable: process.execPath,
+        baseArgs: [claudeCli],
+        testedVersionRanges: ["2.1.177"],
+        requiresCapabilitySmokeTest: true
+      },
+      codexAdapterConfig: {
+        executable: process.execPath,
+        baseArgs: [codexCli],
+        testedVersionRanges: ["0.146.0-alpha.3.1"],
+        requiresCapabilitySmokeTest: true,
+        dangerFullAccessApproval: dangerApproval
+      }
+    };
+
+    const first = runClaude(options);
+    assert.equal(first.status, "DONE");
+    const policyPath = join(first.state.runRoot!, "sandbox-policy.json");
+    const frozenPolicy = readFileSync(policyPath, "utf8");
+    const runReport = JSON.parse(readFileSync(join(first.state.runRoot!, "run-report.json"), "utf8"));
+    assert.equal(runReport.sandbox.mode, "danger-full-access");
+    assert.equal(runReport.sandbox.status, "AUTHORIZED");
+    assert.equal(runReport.sandbox.authorization.authorizedBy, "external-routing-controller");
+
+    const changedGrantRecovery = runClaude({
+      ...options,
+      codexAdapterConfig: {
+        ...options.codexAdapterConfig,
+        dangerFullAccessApproval: {
+          ...dangerApproval,
+          approvedAt: "2026-08-26T09:00:01.000Z"
+        }
+      }
+    });
+
+    assert.equal(changedGrantRecovery.status, "BLOCKED");
+    assert.equal(changedGrantRecovery.findings[0]?.code, "CODEX_SANDBOX_POLICY_CONFLICT");
+    assert.equal(readFileSync(policyPath, "utf8"), frozenPolicy);
+  });
 });
 
-function createGitRepository(): string {
+function createGitRepository(options: {
+  readonly routeToCodex?: boolean;
+  readonly codexSandboxMode?: "workspace-write" | "danger-full-access";
+} = {}): string {
   const repo = mkdtempSync(join(tmpdir(), "aicw-claude-run-"));
   tempRepos.push(repo);
   stateRoots.push(resolveStateRoot({ repoRoot: repo }).path);
 
   mkdirSync(join(repo, "Plan"), { recursive: true });
+  mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
   writeFileSync(join(repo, "README.md"), "# fixture\n", "utf8");
-  writeFileSync(join(repo, "Plan", "RUN.md"), acceptedPlan(), "utf8");
+  writeFileSync(join(repo, "Plan", "RUN.md"), acceptedPlan(options.routeToCodex ? "routed-codex" : undefined), "utf8");
+  writeFileSync(
+    join(repo, ".ai-code-worker", "config.json"),
+    JSON.stringify({
+      schemaVersion: "1.0",
+      executionEnvironment: { defaultProfile: "trusted-local", allowTrustedLocal: true },
+      ...(options.codexSandboxMode
+        ? { adapters: { codex: { sandboxMode: options.codexSandboxMode } } }
+        : {})
+    }),
+    "utf8"
+  );
+  if (options.routeToCodex) {
+    writeFileSync(
+      join(repo, ".ai-code-worker", "routing-policy.json"),
+      JSON.stringify({
+        schemaVersion: "1.0",
+        policyVersion: "test-1",
+        profiles: {
+          "routed-codex": {
+            candidates: [{ engine: "codex", model: null }],
+            reason: "Exercise a routed Codex writer from the Claude coordinator.",
+            confidence: "high"
+          }
+        }
+      }),
+      "utf8"
+    );
+  }
+  writeFileSync(
+    join(repo, ".ai-code-worker", "execution-environment.example.json"),
+    readFileSync("templates/project/.ai-code-worker/execution-environment.trusted-local.example.json", "utf8"),
+    "utf8"
+  );
   execFileSync("git", ["init"], { cwd: repo, stdio: "ignore" });
-  execFileSync("git", ["add", "README.md", "Plan/RUN.md"], { cwd: repo, stdio: "ignore" });
+  execFileSync("git", ["add", "."], { cwd: repo, stdio: "ignore" });
   execFileSync("git", ["-c", "user.name=ai-code-worker", "-c", "user.email=worker@example.test", "commit", "-m", "claude run fixture"], {
     cwd: repo,
     env: {
@@ -123,6 +220,16 @@ function createGitRepository(): string {
   return repo;
 }
 
+function trustedLocalAuthorization() {
+  return {
+    approved: true as const,
+    authorizedBy: "external-test-controller",
+    reason: "Explicit trusted-local test execution",
+    approvedAt: "2026-08-26T09:00:00.000Z",
+    source: "api" as const
+  };
+}
+
 function fakeCli(version: string, touchedFile: string): string {
   const root = mkdtempSync(join(tmpdir(), "aicw-fake-claude-run-"));
   tempRoots.push(root);
@@ -132,7 +239,16 @@ function fakeCli(version: string, touchedFile: string): string {
   return cli;
 }
 
-function acceptedPlan(): string {
+function fakeCodexCli(version: string, touchedFile: string): string {
+  const root = mkdtempSync(join(tmpdir(), "aicw-fake-codex-routed-run-"));
+  tempRoots.push(root);
+  const cli = join(root, "codex-fake.mjs");
+  writeFakeCodexCli(cli, { version, touchedFile });
+  chmodSync(cli, 0o755);
+  return cli;
+}
+
+function acceptedPlan(executionProfile?: string): string {
   return `---
 status: accepted
 ---
@@ -140,12 +256,12 @@ status: accepted
 # Claude run plan
 
 \`\`\`json ai-code-worker-plan
-${JSON.stringify(planBody(), null, 2)}
+${JSON.stringify(planBody(executionProfile), null, 2)}
 \`\`\`
 `;
 }
 
-function planBody(): unknown {
+function planBody(executionProfile?: string): unknown {
   return {
     goal: "Execute a Claude-backed single-writer task.",
     tasks: [
@@ -161,7 +277,8 @@ function planBody(): unknown {
         acceptanceCriteria: ["Claude writes the expected output file."],
         verify: ['node -e "process.exit(require(\'fs\').existsSync(\'src/claude-output.txt\') ? 0 : 1)"'],
         concurrencyKeys: ["claude-run"],
-        risk: "low"
+        risk: "low",
+        ...(executionProfile ? { executionProfile } : {})
       }
     ],
     globalGates: ['node -e "process.exit(0)"'],

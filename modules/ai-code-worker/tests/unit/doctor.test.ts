@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, describe, it } from "node:test";
@@ -16,6 +16,17 @@ after(() => {
 });
 
 describe("doctor preflight", () => {
+  it("fails closed for the default isolated profile when no isolated backend is installed", () => {
+    const repo = createGitRepository(false);
+    const report = runDoctor({ repositoryPath: repo });
+
+    assert.equal(report.status, "BLOCKED");
+    assert.equal(report.executionEnvironment?.backend, "isolated-unavailable");
+    assert.equal(report.executionEnvironment?.supported, false);
+    assert.deepEqual(report.executionEnvironment?.capabilities, []);
+    assert.ok(report.findings.some((finding) => finding.code === "ENVIRONMENT_UNAVAILABLE"));
+  });
+
   it("reads Git worktree/common-dir and returns a passing report for a clean fixture repo", () => {
     const repo = createGitRepository();
     const preflight = gitPreflight(repo);
@@ -23,7 +34,7 @@ describe("doctor preflight", () => {
     assert.equal(preflight.ok, true);
     assert.equal(preflight.requestedPath, repo);
 
-    const report = runDoctor({ repositoryPath: repo });
+    const report = runDoctor({ repositoryPath: repo, trustedLocalAuthorization: trustedLocalAuthorization() });
 
     assert.equal(report.status, "PASS");
     assert.equal(report.repository.ok, true);
@@ -34,7 +45,20 @@ describe("doctor preflight", () => {
 
   it("exposes doctor as a JSON CLI command", () => {
     const repo = createGitRepository();
-    const output = execFileSync(process.execPath, [resolve("dist/src/cli.js"), "doctor", "--repo", repo, "--json"], {
+    const output = execFileSync(process.execPath, [
+      resolve("dist/src/cli.js"),
+      "doctor",
+      "--repo",
+      repo,
+      "--allow-trusted-local",
+      "--trusted-local-authorized-by",
+      "test-owner",
+      "--trusted-local-reason",
+      "Explicit doctor fixture",
+      "--trusted-local-approved-at",
+      "2026-08-26T09:00:00.000Z",
+      "--json"
+    ], {
       cwd: tmpdir(),
       encoding: "utf8"
     });
@@ -45,7 +69,7 @@ describe("doctor preflight", () => {
 
   it("leaves engineDoctor null and status unchanged when no --engine is requested", () => {
     const repo = createGitRepository();
-    const report = runDoctor({ repositoryPath: repo });
+    const report = runDoctor({ repositoryPath: repo, trustedLocalAuthorization: trustedLocalAuthorization() });
 
     assert.equal(report.engineDoctor, null);
     assert.equal(report.status, "PASS");
@@ -53,7 +77,11 @@ describe("doctor preflight", () => {
 
   it("wires --engine claude to the Claude Code CLI doctor check", () => {
     const repo = createGitRepository();
-    const report = runDoctor({ repositoryPath: repo, engine: "claude" });
+    const report = runDoctor({
+      repositoryPath: repo,
+      engine: "claude",
+      trustedLocalAuthorization: trustedLocalAuthorization()
+    });
 
     assert.ok(report.engineDoctor !== null);
     // Fail-closed contract, independent of whether `claude` happens to be on this
@@ -69,7 +97,11 @@ describe("doctor preflight", () => {
 
   it("wires --engine codex to the Codex CLI doctor check and fails closed when it is missing", () => {
     const repo = createGitRepository();
-    const report = runDoctor({ repositoryPath: repo, engine: "codex" });
+    const report = runDoctor({
+      repositoryPath: repo,
+      engine: "codex",
+      trustedLocalAuthorization: trustedLocalAuthorization()
+    });
 
     assert.ok(report.engineDoctor !== null);
     if (!isOnPath("codex")) {
@@ -85,13 +117,43 @@ function isOnPath(executable: string): boolean {
   return probe.error === undefined;
 }
 
-function createGitRepository(): string {
+function trustedLocalAuthorization() {
+  return {
+    approved: true as const,
+    authorizedBy: "test-owner",
+    reason: "Explicit doctor fixture",
+    approvedAt: "2026-08-26T09:00:00.000Z",
+    source: "api" as const
+  };
+}
+
+function createGitRepository(trustedLocal = true): string {
   const repo = mkdtempSync(join(tmpdir(), "aicw-doctor-"));
   tempRepos.push(repo);
 
   execFileSync("git", ["init"], { cwd: repo, stdio: "ignore" });
   writeFileSync(join(repo, "README.md"), "# fixture\n");
-  execFileSync("git", ["add", "README.md"], { cwd: repo, stdio: "ignore" });
+  if (trustedLocal) {
+    mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
+    writeFileSync(
+      join(repo, ".ai-code-worker", "config.json"),
+      JSON.stringify({
+        schemaVersion: "1.0",
+        contextProvider: "none",
+        maximumParallelWriters: 1,
+        stateRoot: null,
+        syncRootPolicy: { sequentialWriter: "warn", parallelWriters: "block" },
+        executionEnvironment: { defaultProfile: "trusted-local", allowTrustedLocal: true }
+      }),
+      "utf8"
+    );
+    writeFileSync(
+      join(repo, ".ai-code-worker", "execution-environment.example.json"),
+      readFileSync(resolve("templates/project/.ai-code-worker/execution-environment.trusted-local.example.json"), "utf8"),
+      "utf8"
+    );
+  }
+  execFileSync("git", ["add", "."], { cwd: repo, stdio: "ignore" });
   execFileSync("git", ["-c", "user.name=ai-code-worker", "-c", "user.email=worker@example.test", "commit", "-m", "init"], {
     cwd: repo,
     stdio: "ignore"

@@ -14,14 +14,15 @@ The worker is independent from `ai-code-control`.
 - `.ai-code-worker/` in a consumer project contains only versioned local configuration.
 - Operational state such as runs, worktrees, logs, caches, and SQLite indexes lives under an OS-local external `stateRoot`.
 - `ai-code-control` is an optional context provider through CLI JSON and exit codes, never a code or SQLite dependency.
-- Autonomous writers require an immutable run authorization and an isolated execution profile by default.
+- Autonomous writers require an immutable run authorization and an isolated execution profile by default. The bundled runtime fails closed for that profile until a real capability-probed backend is installed; `trusted-local` requires both an explicit project opt-in and a separate CLI/API authorization frozen into the run.
+- Codex writers use `workspace-write` by default. `danger-full-access` requires a separate CLI/API approval, cannot be granted by repository config, is bound atomically write-once, and is never selected as an automatic fallback.
 - Every dependent task runs from a deterministic input snapshot built from its dependency closure.
 
 ## Repository Contents
 
 - `docs/IMPLEMENTATION-PLAN.md` - v1.2 implementation plan.
 - `docs/amendments/v1.2-safety-execution-and-recovery.md` - normative v1.2 amendment.
-- `docs/adr/` - accepted architecture decisions for hooks, isolation, authorization, snapshots, streaming adapters, and recovery.
+- `docs/adr/` - accepted architecture decisions for hooks, isolation, authorization, snapshots, streaming adapters, recovery, truthful local capabilities, and sandbox escalation.
 - `schemas/` - public JSON contracts for config, manifests, authorization, execution environments, task snapshots, engine/run events, evidence, review, and pilot baseline.
 - `templates/project/.ai-code-worker/` - files copied into consumer repositories by the future `init` command.
 - `templates/reports/` - evidence and report examples.
@@ -77,6 +78,6 @@ The demo creates a temporary fixture repository and executes `doctor -> compile 
 
 Status: Phase 1/2 MVP plus routing, fallback and optional Infoapex AI handoff implemented on `main`; production acceptance of live quota classification remains an explicit validation gate.
 
-Implemented runtime slices include schema validation, manifest freeze hashing, authorization binding, instruction trust policy, environment preflight, event replay, dependency snapshots, fake engine/gates, compile/status, deterministic fake runs, dynamically discovered Claude/Codex CLIs with behavioral compatibility checks, single-writer real-engine runs, worker-owned Git commits, real quality gates, read-only review coverage, terminal reports, bounded per-task `ai-code-control` context, and minimum local recovery checkpoints.
+Implemented runtime slices include schema validation, manifest freeze hashing, authorization binding, instruction trust policy, fail-closed environment preflight, truthful `trusted-local` capability reporting, explicit Codex sandbox approvals, event replay, dependency snapshots, test-only fake engine/gates, compile/status, deterministic fake runs, dynamically discovered Claude/Codex CLIs with behavioral compatibility checks, single-writer real-engine runs, worker-owned Git commits, real quality gates, read-only review coverage, terminal reports, bounded per-task `ai-code-control` context, and minimum local recovery checkpoints.
 
 See `docs/PHASE-1.md` for the current MVP milestone ledger and validation commands.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, describe, it } from "node:test";
@@ -32,7 +32,13 @@ interface RunCliReport {
 function invokeRunJson(args: readonly string[]): RunCliReport {
   let output: string;
   try {
-    output = execFileSync(process.execPath, [resolve("dist/src/cli.js"), "run", "--json", ...args], {
+    output = execFileSync(process.execPath, [
+      resolve("dist/src/cli.js"),
+      "run",
+      "--json",
+      ...trustedLocalCliAuthorization(),
+      ...args
+    ], {
       cwd: tmpdir(),
       encoding: "utf8"
     });
@@ -92,12 +98,27 @@ function unavailableExecutable(): string {
   return join(root, "does-not-exist-binary");
 }
 
-function createGitRepositoryWithPlan(planBody: unknown): string {
+function createGitRepositoryWithPlan(planBody: unknown, codexConfig: Record<string, unknown> = {}): string {
   const repo = mkdtempSync(join(tmpdir(), "aicw-cli-failover-repo-"));
   tempRepos.push(repo);
 
   mkdirSync(join(repo, "Plan"), { recursive: true });
+  mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
   writeFileSync(join(repo, "README.md"), "# fixture\n", "utf8");
+  writeFileSync(
+    join(repo, ".ai-code-worker", "config.json"),
+    JSON.stringify({
+      schemaVersion: "1.0",
+      executionEnvironment: { defaultProfile: "trusted-local", allowTrustedLocal: true },
+      adapters: { codex: codexConfig }
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    join(repo, ".ai-code-worker", "execution-environment.example.json"),
+    readFileSync("templates/project/.ai-code-worker/execution-environment.trusted-local.example.json", "utf8"),
+    "utf8"
+  );
   writeFileSync(
     join(repo, "Plan", "RUN.md"),
     `---
@@ -120,6 +141,18 @@ ${JSON.stringify(planBody, null, 2)}
   });
 
   return repo;
+}
+
+function trustedLocalCliAuthorization(): string[] {
+  return [
+    "--allow-trusted-local",
+    "--trusted-local-authorized-by",
+    "cli-failover-test",
+    "--trusted-local-reason",
+    "Explicit trusted-local CLI failover fixture",
+    "--trusted-local-approved-at",
+    "2026-08-26T09:00:00.000Z"
+  ];
 }
 
 function simplePlanBody(): unknown {
@@ -194,6 +227,48 @@ describe("cli run - engine failover and cross-engine review", () => {
     ]);
 
     assert.equal(report.status, "DONE");
+    assert.equal(report.engineProvenance.engineUsed, "codex");
+    assert.equal(report.engineProvenance.engineFallbackTriggered, false);
+  });
+
+  it("keeps an explicitly approved danger-full-access Codex primary instead of falsely triggering fallback", () => {
+    const repo = createGitRepositoryWithPlan(simplePlanBody(), { sandboxMode: "danger-full-access" });
+    const workingCodex = fakeCodexCli("src/output.txt");
+    const workingClaude = fakeClaudeCli("src/output.txt");
+
+    const report = invokeRunJson([
+      "--repo", repo,
+      "--plan", "Plan/RUN.md",
+      "--engine", "codex",
+      "--codex-executable", workingCodex,
+      "--fallback-engine", "claude",
+      "--claude-executable", workingClaude,
+      "--approve-danger-full-access",
+      "--danger-full-access-authorized-by", "cli-failover-test",
+      "--danger-full-access-reason", "Explicit elevated failover fixture",
+      "--danger-full-access-approved-at", "2026-08-26T09:00:00.000Z"
+    ]);
+
+    assert.equal(report.status, "DONE");
+    assert.equal(report.engineProvenance.engineUsed, "codex");
+    assert.equal(report.engineProvenance.engineFallbackTriggered, false);
+  });
+
+  it("does not bypass a missing danger-full-access approval through CLI engine fallback", () => {
+    const repo = createGitRepositoryWithPlan(simplePlanBody(), { sandboxMode: "danger-full-access" });
+    const workingCodex = fakeCodexCli("src/output.txt");
+    const workingClaude = fakeClaudeCli("src/output.txt");
+
+    const report = invokeRunJson([
+      "--repo", repo,
+      "--plan", "Plan/RUN.md",
+      "--engine", "codex",
+      "--codex-executable", workingCodex,
+      "--fallback-engine", "claude",
+      "--claude-executable", workingClaude
+    ]);
+
+    assert.equal(report.status, "BLOCKED");
     assert.equal(report.engineProvenance.engineUsed, "codex");
     assert.equal(report.engineProvenance.engineFallbackTriggered, false);
   });

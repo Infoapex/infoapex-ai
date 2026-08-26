@@ -83,7 +83,21 @@ function createReviewFailingRepository(): string {
   stateRoots.push(resolveStateRoot({ repoRoot: repo }).path);
 
   mkdirSync(join(repo, "Plan"), { recursive: true });
+  mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
   writeFileSync(join(repo, "README.md"), "# fixture\n", "utf8");
+  writeFileSync(
+    join(repo, ".ai-code-worker", "config.json"),
+    JSON.stringify({
+      schemaVersion: "1.0",
+      executionEnvironment: { defaultProfile: "trusted-local", allowTrustedLocal: true }
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    join(repo, ".ai-code-worker", "execution-environment.example.json"),
+    readFileSync("templates/project/.ai-code-worker/execution-environment.trusted-local.example.json", "utf8"),
+    "utf8"
+  );
   writeFileSync(
     join(repo, "Plan", "RUN.md"),
     `---
@@ -165,6 +179,7 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
       planPath: "Plan/RUN.md",
       runId,
       now: "2026-08-16T09:05:00Z",
+      trustedLocalAuthorization: trustedLocalAuthorization(),
       adapterConfig: {
         executable: process.execPath,
         baseArgs: [taskCli],
@@ -173,7 +188,7 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
       },
       independentReview: {
         reviewer: ({ runId: reviewedRunId }) => reviewWithFinding(reviewedRunId, EXISTENCE_VERIFY),
-        executeRepairCycle: (repairBaseCommit: string) =>
+        executeRepairCycle: (repairBaseCommit, execution) =>
           createClaudeRepairExecutor({
             repositoryPath: repo,
             stateRoot,
@@ -184,7 +199,8 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
               executable: process.execPath,
               baseArgs: [repairCli],
               testedVersionRanges: ["2.1.177"],
-              requiresCapabilitySmokeTest: true
+              requiresCapabilitySmokeTest: true,
+              execution
             },
             reviewer: ({ runId: reviewedRunId }) => reviewClean(reviewedRunId)
           })
@@ -223,6 +239,7 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
       planPath: "Plan/RUN.md",
       runId,
       now: "2026-08-16T09:05:00Z",
+      trustedLocalAuthorization: trustedLocalAuthorization(),
       adapterConfig: {
         executable: process.execPath,
         baseArgs: [taskCli],
@@ -231,7 +248,7 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
       },
       independentReview: {
         reviewer: ({ runId: reviewedRunId }) => reviewWithFinding(reviewedRunId, CONTENT_MARKER_VERIFY),
-        executeRepairCycle: (repairBaseCommit: string) =>
+        executeRepairCycle: (repairBaseCommit, execution) =>
           createClaudeRepairExecutor({
             repositoryPath: repo,
             stateRoot,
@@ -242,7 +259,8 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
               executable: process.execPath,
               baseArgs: [repairCli],
               testedVersionRanges: ["2.1.177"],
-              requiresCapabilitySmokeTest: true
+              requiresCapabilitySmokeTest: true,
+              execution
             },
             // Identical evidence every cycle - the bounded loop stops early
             // on repeated-failure-no-progress rather than spinning forever.
@@ -259,3 +277,13 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
     assert.equal(existsSync(join(repo, "target.txt")), false);
   });
 });
+
+function trustedLocalAuthorization() {
+  return {
+    approved: true as const,
+    authorizedBy: "external-repair-test-controller",
+    reason: "Explicit trusted-local real repair fixture",
+    approvedAt: "2026-08-26T09:00:00.000Z",
+    source: "api" as const
+  };
+}

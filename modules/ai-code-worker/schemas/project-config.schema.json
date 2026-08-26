@@ -54,7 +54,7 @@
       "minimum": 1
     },
     "executionEnvironment": {
-      "description": "Aspirational, not read from config.json today - doctor resolves the execution profile from .ai-code-worker/execution-environment.example.json (or the packaged template), not from this config.json field. See the defaultEngine property description.",
+      "description": "Active execution policy. trusted-local requires defaultProfile=trusted-local and allowTrustedLocal=true; isolated remains the fail-closed default.",
       "type": "object",
       "additionalProperties": false,
       "required": ["defaultProfile", "allowTrustedLocal"],

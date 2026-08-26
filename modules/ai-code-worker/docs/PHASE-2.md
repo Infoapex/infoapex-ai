@@ -119,10 +119,11 @@ implemented on 2026-08-12 before Phase 3:
 - Quality gates can declare `linkedDirectories` to link runtime dependencies such as
   `node_modules` from the repository checkout into task worktrees before running real
   build/test commands.
-- `LocalIsolatedExecutionEnvironment` replaced the fake backend in `doctor` and verifies
-  scrubbed environment execution, no-shell process launching, timeout/output limits and
-  cleanup. It still warns that local network-deny is policy-visible rather than a
-  kernel-level network sandbox.
+- The production resolver now identifies local process execution as `trusted-local`.
+  It reports only scrubbed environment execution, direct-child timeout and output
+  limits; it does not claim filesystem, network, process-count or process-tree
+  isolation. An `isolated` profile fails closed until a capability-probed backend is
+  available, and the fake isolated backend is test-only.
 - `.ai-code-worker/config.json` and CLI flags can configure common adapter settings
   without editing source code.
 
@@ -181,10 +182,10 @@ for tasks whose correctness can't be fully captured by a no-`node_modules` gate.
 
 Confirmed live against a real ChatGPT-subscription Codex install (`auth_mode: chatgpt`
 in `~/.codex/auth.json`, version `0.136.0-alpha.2`): `--ignore-user-config`/
-`--ignore-rules` do not break subscription auth, and `danger-full-access` (the existing
-Phase 1 default) genuinely writes files - `workspace-write` still reports read-only on
-Windows, the same pre-existing issue already documented for a different Codex version
-in `docs/PHASE-1.md`.
+`--ignore-rules` do not break subscription auth. A historical, explicitly privileged
+`danger-full-access` pilot wrote files while `workspace-write` reported read-only on
+Windows. This is compatibility evidence only: the current default is
+`workspace-write`, and privilege escalation requires a separate recorded approval.
 
 The orchestrated task itself failed four times before succeeding, each for a distinct,
 real reason:

@@ -78,6 +78,23 @@ describe("compile command", () => {
     assert.equal(existsSync(join(stateRoot, "runs", "run-proposed")), false);
   });
 
+  it("rejects unsafe run identifiers before deriving an external state path", () => {
+    const repo = createGitRepository();
+    writePlan(repo, "Plan/ACCEPTED.md", "accepted");
+
+    for (const runId of [".", "..", "run.", "CON", "x".repeat(129)]) {
+      const report = runCompile({
+        repositoryPath: repo,
+        planPath: "Plan/ACCEPTED.md",
+        runId,
+        now: "2026-08-01T10:00:00Z"
+      });
+      assert.equal(report.status, "BLOCKED", runId);
+      assert.equal(report.findings[0]?.code, "RUN_ID_INVALID", runId);
+      assert.equal(report.state.runRoot, null, runId);
+    }
+  });
+
   it("returns existing frozen run state without appending duplicate compile events", () => {
     const repo = createGitRepository();
     writePlan(repo, "Plan/ACCEPTED.md", "accepted");

@@ -8,6 +8,7 @@ import { needsShellWrapper } from "./spawn-shell.js";
 import { versionMatchesAny } from "./version-match.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
 import { discoverEngineExecutable } from "./discover-cli.js";
+import type { ExecutionBackendBinding, ExecutionResult } from "../execution/environment.js";
 
 const DEFAULT_ALLOWED_TOOLS: readonly string[] = ["Read", "Edit", "Write", "Grep", "Glob"];
 
@@ -55,6 +56,8 @@ export interface ClaudeCliAdapterConfig {
   readonly bareMode?: boolean;
   /** Explicit opt-in for a CLI session that is already externally sandboxed. */
   readonly dangerouslySkipPermissions?: boolean;
+  /** Worker-owned execution binding for real writer invocations. */
+  readonly execution?: ExecutionBackendBinding;
 }
 
 export interface ClaudeDoctorReport {
@@ -239,7 +242,11 @@ export class ClaudeCliAdapter {
       sequence: 0,
       startedAt: request.startedAt,
       type: "execution.started",
-      payload: { engine: "claude", executable: this.executable },
+      payload: {
+        engine: "claude",
+        executable: this.executable,
+        ...executionEnvironmentEvidence(this.config.execution)
+      },
       registry: this.registry
     });
     const session = createEngineEvent({
@@ -251,15 +258,7 @@ export class ClaudeCliAdapter {
       payload: { sessionId: request.sessionId },
       registry: this.registry
     });
-    const child = spawnSync(invocation.executable, invocation.args, {
-      cwd: request.worktreePath,
-      input: invocation.stdin,
-      encoding: "utf8",
-      maxBuffer: this.maximumOutputBytes,
-      timeout: this.timeoutMs,
-      windowsHide: true,
-      shell: needsShellWrapper(invocation.executable)
-    });
+    const child = this.runWriterSync(invocation, request.worktreePath);
     const result = readAgentResult(child, request, this.registry) ?? failedResult(request, childOutputMessage(child));
     const terminal = createEngineEvent({
       executionId: request.executionId,
@@ -303,7 +302,12 @@ export class ClaudeCliAdapter {
       sequence: 0,
       startedAt: request.startedAt,
       type: "execution.started",
-      payload: { engine: "claude", executable: this.executable, async: true },
+      payload: {
+        engine: "claude",
+        executable: this.executable,
+        async: true,
+        ...executionEnvironmentEvidence(this.config.execution)
+      },
       registry: this.registry
     });
     const session = createEngineEvent({
@@ -315,13 +319,7 @@ export class ClaudeCliAdapter {
       payload: { sessionId: request.sessionId },
       registry: this.registry
     });
-    const child = await spawnBuffered(invocation.executable, invocation.args, {
-      cwd: request.worktreePath,
-      input: invocation.stdin,
-      maximumOutputBytes: this.maximumOutputBytes,
-      timeoutMs: this.timeoutMs,
-      shell: needsShellWrapper(invocation.executable)
-    });
+    const child = await this.runWriter(invocation, request.worktreePath);
     const result = readAgentResult(child, request, this.registry) ?? failedResult(request, childOutputMessage(child));
     const terminal = createEngineEvent({
       executionId: request.executionId,
@@ -396,6 +394,67 @@ export class ClaudeCliAdapter {
 
     return "PASS";
   }
+
+  private runWriterSync(
+    invocation: ClaudeExecInvocation,
+    cwd: string
+  ): ReturnType<typeof spawnSync> | ExecutionResult {
+    const execution = this.config.execution;
+    if (execution) {
+      return execution.backend.runSync(execution.profile, {
+        executable: invocation.executable,
+        args: invocation.args,
+        cwd,
+        input: invocation.stdin,
+        timeoutMs: this.timeoutMs,
+        maximumOutputBytes: this.maximumOutputBytes,
+        env: execution.environment,
+        shell: needsShellWrapper(invocation.executable)
+      });
+    }
+
+    return spawnSync(invocation.executable, invocation.args, {
+      cwd,
+      input: invocation.stdin,
+      encoding: "utf8",
+      maxBuffer: this.maximumOutputBytes,
+      timeout: this.timeoutMs,
+      windowsHide: true,
+      shell: needsShellWrapper(invocation.executable)
+    });
+  }
+
+  private runWriter(invocation: ClaudeExecInvocation, cwd: string): Promise<BufferedProcessResult | ExecutionResult> {
+    const execution = this.config.execution;
+    if (execution) {
+      return execution.backend.run(execution.profile, {
+        executable: invocation.executable,
+        args: invocation.args,
+        cwd,
+        input: invocation.stdin,
+        timeoutMs: this.timeoutMs,
+        maximumOutputBytes: this.maximumOutputBytes,
+        env: execution.environment,
+        shell: needsShellWrapper(invocation.executable)
+      });
+    }
+
+    return spawnBuffered(invocation.executable, invocation.args, {
+      cwd,
+      input: invocation.stdin,
+      maximumOutputBytes: this.maximumOutputBytes,
+      timeoutMs: this.timeoutMs,
+      shell: needsShellWrapper(invocation.executable)
+    });
+  }
+}
+
+function executionEnvironmentEvidence(
+  execution: ExecutionBackendBinding | undefined
+): { readonly executionEnvironment?: ReturnType<ExecutionBackendBinding["backend"]["probe"]> } {
+  return execution
+    ? { executionEnvironment: execution.backend.probe(execution.profile) }
+    : {};
 }
 
 export function parseClaudeVersion(output: string): string | null {

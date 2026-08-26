@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:infoapex-ai:schemas:integration-config.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "mode", "handoffRoot"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "mode": { "enum": ["independent", "integrated"] },
+    "handoffRoot": { "type": "string", "minLength": 1 },
+    "planner": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } }
+    }
+  }
+}

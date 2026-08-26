@@ -49,6 +49,7 @@ describe("compatibility matrix data", () => {
     assert.ok(codex, "matrix must have a codex entry");
     assert.deepEqual(codex.testedVersionRanges, defaultCodexConfig().testedVersionRanges);
     assert.deepEqual(codex.requiredCapabilities, CODEX_REQUIRED_HELP_CAPABILITIES);
+    assert.equal(defaultCodexConfig().sandboxMode, "workspace-write");
   });
 
   it("claude entry matches the real defaultClaudeConfig() and REQUIRED_HELP_CAPABILITIES", () => {

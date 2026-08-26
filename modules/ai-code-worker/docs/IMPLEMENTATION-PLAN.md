@@ -1044,7 +1044,7 @@ Criteriu de ieșire: aceeași suită E2E rulează cu Codex și Claude, iar task-
 
 Se execută minimum opt task-uri și se țintește un eșantion de zece: cel puțin trei backend, trei frontend, două full-stack, unul cu migrare și unul care trebuie să ajungă legitim `BLOCKED`; categoriile se pot suprapune. Baseline-ul și pragurile sunt înghețate înaintea eșantionului. Un `BLOCKED` așteptat validează policy-ul, dar nu este numărat ca `DONE`. Rezultatul folosește aceleași verdicturi `PASS`, `FAIL`, `REVIEW_REQUIRED`; numai `PASS` permite afirmații de valoare și release readiness.
 
-**Status**: pe pauză, condiționat de ridicarea îngheței de review manual de pe consumer project (repo consumator țintă pentru task-urile reale ale eșantionului). Cele 5 itemuri de robustețe/design descoperite prin dogfooding real în Faza 2 (verificare comportamentală a capacităților CLI, paralelism real pentru motoarele reale, gate-uri de task cu build/test real, backend `isolated` real, configurare adaptor din CLI) au fost închise înainte de Faza 3; vezi [todo.md](../todo.md).
+**Status**: pe pauză, condiționat de ridicarea îngheței de review manual de pe consumer project (repo consumator țintă pentru task-urile reale ale eșantionului). Verificarea comportamentală a capacităților CLI, paralelismul motoarelor reale, gate-urile de task și configurarea adaptorului din CLI au fost închise înainte de Faza 3. Afirmația istorică despre un backend `isolated` real a fost retrasă prin [AICW-ADR-008](adr/0008-trusted-local-and-explicit-sandbox-escalation.md): backend-ul local este `trusted-local`, iar profilul `isolated` eșuează închis până la o implementare OS probată; vezi [todo.md](../todo.md).
 
 ### Faza 3 — repair, replanning și hardening avansat
 

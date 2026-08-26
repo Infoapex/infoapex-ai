@@ -74,10 +74,9 @@ direct la baza de date/starea internă a altui tool. Fiecare tool trebuie să fu
 ## Ce nu e decis încă
 
 - Ordinea de implementare pentru ai-code-architect / ai-code-review / ai-code-docs.
-- Dacă `consumer-project-ai-code-worker-integration`
-  (`C:\Users\enach\source\consumer-project-ai-code-worker-integration`, deja are
-  ai-code-worker + ai-code-control ca submodule-uri, dar fixat pe un commit vechi al
-  worker-ului) devine nucleul lui `infoapex-ai`, sau se pornește un repo nou separat.
+- Dacă repository-ul consumator de integrare existent (care are deja
+  ai-code-worker + ai-code-control ca submodule-uri, dar este fixat pe un commit vechi
+  al worker-ului) devine nucleul lui `infoapex-ai`, sau se pornește un repo nou separat.
 - Forma exactă a installer-ului/meniului CLI interactiv.
 - Task B din `ai-code-worker` (detecție dinamică de versiune Claude/Codex, vezi
   `todo.md` #10) — user a confirmat direcția arhitecturală (fără listă de versiuni

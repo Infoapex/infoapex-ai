@@ -32,6 +32,7 @@ const requiredFiles = [
   "schemas/superseded-run.schema.json",
   "templates/project/.ai-code-worker/config.json",
   "templates/project/.ai-code-worker/execution-environment.example.json",
+  "templates/project/.ai-code-worker/execution-environment.trusted-local.example.json",
   "templates/project/.ai-code-worker/pilot-baseline.example.json",
   "templates/reports/event.example.json",
   "templates/reports/evidence.example.json",

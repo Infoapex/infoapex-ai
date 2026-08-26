@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, describe, it } from "node:test";
@@ -23,11 +23,19 @@ describe("phase 0 e2e harness", () => {
   it("runs doctor -> compile -> status through the CLI without mutating the fixture repository", () => {
     const repo = createFixtureRepository();
     const beforeFiles = listRepositoryFiles(repo);
-    const doctor = runCliJson<DoctorCliReport>(["doctor", "--repo", repo, "--json"]);
+    const doctor = runCliJson<DoctorCliReport>(["doctor", "--repo", repo, "--json", ...trustedLocalCliAuthorization()]);
 
     assert.equal(doctor.status, "PASS");
 
-    const compile = runCliJson<CompileCliReport>(["compile", "--repo", repo, "--plan", "Plan/PHASE-0-E2E.md", "--json"]);
+    const compile = runCliJson<CompileCliReport>([
+      "compile",
+      "--repo",
+      repo,
+      "--plan",
+      "Plan/PHASE-0-E2E.md",
+      "--json",
+      ...trustedLocalCliAuthorization()
+    ]);
     const status = runCliJson<StatusCliReport>(["status", "--repo", repo, "--run-id", compile.runId, "--json"]);
 
     assert.equal(compile.status, "PASS");
@@ -43,8 +51,12 @@ describe("phase 0 e2e harness", () => {
     const first = createFixtureRepository();
     const second = createFixtureRepository();
 
-    const firstCompile = runCliJson<CompileCliReport>(["compile", "--repo", first, "--plan", "Plan/PHASE-0-E2E.md", "--json"]);
-    const secondCompile = runCliJson<CompileCliReport>(["compile", "--repo", second, "--plan", "Plan/PHASE-0-E2E.md", "--json"]);
+    const firstCompile = runCliJson<CompileCliReport>([
+      "compile", "--repo", first, "--plan", "Plan/PHASE-0-E2E.md", "--json", ...trustedLocalCliAuthorization()
+    ]);
+    const secondCompile = runCliJson<CompileCliReport>([
+      "compile", "--repo", second, "--plan", "Plan/PHASE-0-E2E.md", "--json", ...trustedLocalCliAuthorization()
+    ]);
 
     assert.equal(firstCompile.manifestSha256, secondCompile.manifestSha256);
     assert.equal(firstCompile.runId, secondCompile.runId);
@@ -89,8 +101,22 @@ function createFixtureRepository(): string {
   stateRoots.push(resolveStateRoot({ repoRoot: repo }).path);
 
   mkdirSync(join(repo, "Plan"), { recursive: true });
+  mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
   writeFileSync(join(repo, "README.md"), "# Phase 0 fixture\n", "utf8");
   writeFileSync(join(repo, "Plan", "PHASE-0-E2E.md"), acceptedPlan(), "utf8");
+  writeFileSync(
+    join(repo, ".ai-code-worker", "config.json"),
+    JSON.stringify({
+      schemaVersion: "1.0",
+      executionEnvironment: { defaultProfile: "trusted-local", allowTrustedLocal: true }
+    }),
+    "utf8"
+  );
+  writeFileSync(
+    join(repo, ".ai-code-worker", "execution-environment.example.json"),
+    readFileSync("templates/project/.ai-code-worker/execution-environment.trusted-local.example.json", "utf8"),
+    "utf8"
+  );
   execFileSync("git", ["init"], { cwd: repo, stdio: "ignore" });
   execFileSync("git", ["add", "README.md", "Plan/PHASE-0-E2E.md"], { cwd: repo, stdio: "ignore" });
   execFileSync("git", ["-c", "user.name=ai-code-worker", "-c", "user.email=worker@example.test", "commit", "-m", "phase0 fixture"], {
@@ -104,6 +130,18 @@ function createFixtureRepository(): string {
   });
 
   return repo;
+}
+
+function trustedLocalCliAuthorization(): string[] {
+  return [
+    "--allow-trusted-local",
+    "--trusted-local-authorized-by",
+    "phase0-e2e",
+    "--trusted-local-reason",
+    "Explicit trusted-local E2E fixture",
+    "--trusted-local-approved-at",
+    "2026-08-26T09:00:00.000Z"
+  ];
 }
 
 function acceptedPlan(): string {

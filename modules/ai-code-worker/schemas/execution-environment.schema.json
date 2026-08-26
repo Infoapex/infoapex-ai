@@ -59,7 +59,7 @@
       "required": ["repositoryProcesses", "adapterControlPlane"],
       "properties": {
         "repositoryProcesses": {
-          "enum": ["deny", "allowlist"]
+          "enum": ["deny", "allowlist", "unrestricted"]
         },
         "adapterControlPlane": {
           "enum": ["provider-only", "allowlist", "deny"]
@@ -98,7 +98,7 @@
           "minimum": 1
         },
         "maximumProcesses": {
-          "type": "integer",
+          "type": ["integer", "null"],
           "minimum": 1
         },
         "maximumMemoryBytes": {
@@ -111,5 +111,71 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": { "const": "isolated" }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "properties": {
+          "filesystem": {
+            "type": "object",
+            "properties": {
+              "hostReadDefault": { "const": "deny" },
+              "hostWriteDefault": { "const": "deny" }
+            }
+          },
+          "network": {
+            "type": "object",
+            "properties": {
+              "repositoryProcesses": { "const": "deny" }
+            }
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "maximumProcesses": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": { "const": "trusted-local" }
+        },
+        "required": ["kind"]
+      },
+      "then": {
+        "properties": {
+          "filesystem": {
+            "type": "object",
+            "properties": {
+              "hostReadDefault": { "const": "allow" },
+              "hostWriteDefault": { "const": "allow" }
+            }
+          },
+          "network": {
+            "type": "object",
+            "properties": {
+              "repositoryProcesses": { "const": "unrestricted" }
+            }
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "maximumProcesses": { "const": null },
+              "maximumMemoryBytes": { "const": null },
+              "maximumCpuUnits": { "const": null }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

@@ -368,7 +368,7 @@ depinde de compilare sau de o suită de teste, nu doar de prezența unui string.
 directoare runtime din checkout-ul principal în worktree (de exemplu `node_modules`)
 înainte de execuție, cu validare că sursa rămâne în repository și ținta în worktree.
 
-### 4. Backend `isolated` real (nu doar `FakeExecutionEnvironment`) — done 2026-08-12
+### 4. Backend `isolated` real (nu doar un backend de test) — deschis, reclasificat 2026-08-26
 
 Contractul de izolare (environment scrubbed, network deny, filesystem restricted,
 process-tree cancellation) există doar ca implementare fake, din Faza 0. Tot discursul
@@ -379,10 +379,18 @@ demonstrată.
 **Propunere**: implementarea unui backend `ExecutionEnvironment` real (per ADR-002),
 cu profilul de capabilități verificat efectiv, nu doar declarat.
 
-Închis prin `LocalIsolatedExecutionEnvironment`, folosit de `doctor`, plus test de rulare
-cu environment scrubbed, fără shell, timeout/output limits și process cleanup. Network
-deny rămâne policy-visible și raportat cu warning deoarece backend-ul local nu este un
-sandbox kernel-level.
+Închiderea istorică prin `LocalIsolatedExecutionEnvironment` a fost invalidată de
+[AICW-ADR-008](docs/adr/0008-trusted-local-and-explicit-sandbox-escalation.md): acea
+implementare nu aplica filesystem/network isolation, limite de procese sau anularea
+probată a întregului process tree. Ea a fost înlocuită cu
+`TrustedLocalExecutionBackend`, care raportează strict environment scrubbing,
+timeout-ul copilului direct și limitele de output, cu limita de securitate
+`host-process`.
+
+Un profil `isolated` eșuează acum închis prin
+`UnavailableIsolatedExecutionBackend`. Itemul rămâne deschis până când un backend
+OS/container/VM/remote probează efectiv toate capabilitățile cerute; această livrare
+viitoare este separată de hardening-ul P0-P3, care a eliminat garanția falsă.
 
 ### 5. Configurare adaptor din linia de comandă (model, permission-mode, sandbox) — done 2026-08-12
 

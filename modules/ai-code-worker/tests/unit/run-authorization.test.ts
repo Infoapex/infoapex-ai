@@ -102,10 +102,7 @@ describe("run authorization binding", () => {
   });
 
   it("rejects execution profile kind drift", () => {
-    const profile = {
-      ...(readJson("templates/project/.ai-code-worker/execution-environment.example.json") as Record<string, unknown>),
-      kind: "trusted-local"
-    };
+    const profile = readJson("templates/project/.ai-code-worker/execution-environment.trusted-local.example.json");
 
     assertBindingError(
       () =>

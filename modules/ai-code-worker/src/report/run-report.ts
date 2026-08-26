@@ -3,6 +3,14 @@ import { join } from "node:path";
 import type { CompileReport } from "../compile/compile.js";
 import type { QualityGateResult } from "../runner/quality-gate.js";
 import type { UsageTotals } from "../policy/usage-budget.js";
+import type { CodexSandboxDecision } from "../policy/codex-sandbox-policy.js";
+import { loadExecutionProfile } from "../compile/compile.js";
+import {
+  resolveExecutionBackend,
+  type EnvironmentCapabilityReport,
+  type TrustedLocalAuthorizationRecord
+} from "../execution/environment.js";
+import { SchemaRegistry } from "../schema/json-schema.js";
 
 export interface WriteRunReportInput {
   readonly compile: CompileReport;
@@ -21,6 +29,11 @@ export interface RunReport {
   readonly plan: string | null;
   readonly baseCommit: string | null;
   readonly engine: "fake" | "codex" | "claude";
+  readonly sandbox: CodexSandboxDecision | null;
+  readonly executionEnvironment: {
+    readonly capabilityReport: EnvironmentCapabilityReport;
+    readonly trustedLocalAuthorization: TrustedLocalAuthorizationRecord | null;
+  } | null;
   readonly taskCommits: Readonly<Record<string, string>>;
   readonly gates: readonly RunReportGate[];
   readonly usage: UsageTotals | null;
@@ -33,6 +46,7 @@ export interface RunReport {
   readonly artifacts: {
     readonly runEvidencePath: string | null;
     readonly reviewPath: string | null;
+    readonly sandboxPolicyPath: string | null;
   };
   readonly blockedReason: string | null;
 }
@@ -55,6 +69,9 @@ export function writeRunReports(input: WriteRunReportInput): { readonly jsonPath
   const reviewPath = join(runRoot, "review.json");
   const review = readJson(reviewPath);
   const runEvidencePath = join(runRoot, "run-evidence.json");
+  const sandboxPolicyPath = join(runRoot, "sandbox-policy.json");
+  const sandbox = readSandboxDecision(sandboxPolicyPath);
+  const executionEnvironment = readExecutionEnvironmentEvidence(input.compile);
   const report: RunReport = {
     schemaVersion: "1.0",
     runId: input.compile.runId,
@@ -62,6 +79,8 @@ export function writeRunReports(input: WriteRunReportInput): { readonly jsonPath
     plan: readString(manifest?.plan?.path),
     baseCommit: readString(manifest?.base?.commit),
     engine: input.engine,
+    sandbox,
+    executionEnvironment,
     taskCommits: input.taskCommits,
     gates: input.gateResults.map((gate) => ({
       id: gate.id,
@@ -79,7 +98,8 @@ export function writeRunReports(input: WriteRunReportInput): { readonly jsonPath
     },
     artifacts: {
       runEvidencePath: existsSync(runEvidencePath) ? runEvidencePath : null,
-      reviewPath: existsSync(reviewPath) ? reviewPath : null
+      reviewPath: existsSync(reviewPath) ? reviewPath : null,
+      sandboxPolicyPath: existsSync(sandboxPolicyPath) ? sandboxPolicyPath : null
     },
     blockedReason: input.blockedReason ?? null
   };
@@ -105,6 +125,9 @@ export function renderRunReportMarkdown(report: RunReport): string {
     : Object.entries(report.taskCommits)
         .map(([taskId, commit]) => `- ${taskId}: ${commit}`)
         .join("\n");
+  const environmentWarnings = report.executionEnvironment?.capabilityReport.warnings.length
+    ? report.executionEnvironment.capabilityReport.warnings.map((warning) => `- ${warning}`).join("\n")
+    : "- No execution-environment warnings recorded.";
 
   return `# ai-code-worker Run Report
 
@@ -112,8 +135,21 @@ export function renderRunReportMarkdown(report: RunReport): string {
 - Plan: ${report.plan ?? "null"}
 - Base commit: ${report.baseCommit ?? "null"}
 - Engine: ${report.engine}
+- Sandbox: ${report.sandbox?.mode ?? "not-applicable"} (${report.sandbox?.status ?? "not-applicable"})
+- Sandbox authorization source: ${report.sandbox?.authorization?.source ?? "null"}
+- Sandbox authorized by: ${report.sandbox?.authorization?.authorizedBy ?? "null"}
+- Sandbox authorization reason: ${report.sandbox?.authorization?.reason ?? "null"}
+- Execution backend: ${report.executionEnvironment?.capabilityReport.backend ?? "not-recorded"}
+- Execution profile: ${report.executionEnvironment?.capabilityReport.profileId ?? "not-recorded"} (${report.executionEnvironment?.capabilityReport.kind ?? "not-recorded"})
+- Security boundary: ${report.executionEnvironment?.capabilityReport.securityBoundary ?? "not-recorded"}
+- Trusted-local authorized by: ${report.executionEnvironment?.trustedLocalAuthorization?.authorizedBy ?? "null"}
+- Trusted-local authorization source: ${report.executionEnvironment?.trustedLocalAuthorization?.source ?? "null"}
 - Status: ${report.status}
 - Blocked reason: ${report.blockedReason ?? "null"}
+
+## Execution Environment Warnings
+
+${environmentWarnings}
 
 ## Task Commits
 
@@ -143,12 +179,49 @@ ${gates}
 `;
 }
 
+function readExecutionEnvironmentEvidence(
+  compile: CompileReport
+): RunReport["executionEnvironment"] {
+  if (!compile.repository.ok || !compile.authorization) return null;
+  try {
+    const profile = loadExecutionProfile(compile.repository.worktreeRoot);
+    const capabilityReport = resolveExecutionBackend(profile).probe(profile);
+    const expected = compile.authorization.executionEnvironment;
+    if (
+      capabilityReport.profileId !== expected.profileId ||
+      capabilityReport.kind !== expected.kind ||
+      capabilityReport.profileSha256 !== expected.profileSha256
+    ) {
+      return null;
+    }
+    return {
+      capabilityReport,
+      trustedLocalAuthorization: compile.authorization.trustedLocalAuthorization ?? null
+    };
+  } catch {
+    return null;
+  }
+}
+
 function readJson(path: string | null): any {
   if (!path || !existsSync(path)) {
     return null;
   }
 
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function readSandboxDecision(path: string): CodexSandboxDecision | null {
+  if (!existsSync(path)) return null;
+  try {
+    const value = JSON.parse(readFileSync(path, "utf8")) as unknown;
+    SchemaRegistry.load().assertValid("codex-sandbox-policy.schema.json", value);
+    return value as CodexSandboxDecision;
+  } catch {
+    // The run coordinator reports the immutable-state conflict. The report
+    // generator must not echo or trust malformed policy content.
+    return null;
+  }
 }
 
 function readString(value: unknown): string | null {

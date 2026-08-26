@@ -59,6 +59,16 @@ describe("status command", () => {
     assert.ok(report.findings.some((finding) => finding.code === "LEASE_ACTIVE"));
   });
 
+  it("rejects unsafe run identifiers without resolving a state path", () => {
+    const repo = createGitRepository();
+    for (const runId of [".", "..", "run.", "NUL", "x".repeat(129)]) {
+      const report = runStatus({ repositoryPath: repo, runId });
+      assert.equal(report.status, "BLOCKED", runId);
+      assert.equal(report.findings[0]?.code, "RUN_ID_INVALID", runId);
+      assert.equal(report.eventLog.path, "", runId);
+    }
+  });
+
   it("exposes status as a JSON CLI command", () => {
     const repo = createGitRepository();
     eventLogFor(repo, "run-status-3").append({

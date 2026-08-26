@@ -2,11 +2,19 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { bindRunAuthorization, type RunAuthorization, type RunIntent } from "../authorization/run-authorization.js";
+import { loadProjectConfig } from "../config/project-config.js";
+import {
+  inspectExecutionEnvironment,
+  type ExecutionEnvironmentKind,
+  type TrustedLocalAuthorizationInput,
+  type TrustedLocalAuthorizationRecord
+} from "../execution/environment.js";
 import { gitPreflight, type GitPreflightResult } from "../git/preflight.js";
 import { freezeManifest, sha256 } from "../manifest/normalize.js";
 import { EventLog } from "../persistence/event-log.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
 import { isPathInside, resolveStateRoot } from "../state/state-root.js";
+import { assertSafeWorkerRunId } from "../state/run-id.js";
 import { parsePlanMarkdown } from "./plan-parser.js";
 import { resolveRoutingProfile } from "../routing/routing-policy.js";
 
@@ -15,6 +23,10 @@ export interface CompileOptions {
   readonly planPath: string;
   readonly runId?: string;
   readonly now?: string;
+  readonly trustedLocalAuthorization?: TrustedLocalAuthorizationInput;
+  /** Real autonomous writers set this flag. Contract-only compile and the
+   * deterministic fake harness do not claim that an execution backend exists. */
+  readonly requireRunnableExecutionEnvironment?: boolean;
 }
 
 export interface CompileReport {
@@ -73,6 +85,11 @@ export function runCompile(options: CompileOptions): CompileReport {
 
   const now = options.now ?? new Date().toISOString();
   const runId = options.runId ?? `run-${sha256(`${planSha256}:${repository.headCommit}`).slice(0, 16)}`;
+  try {
+    assertSafeWorkerRunId(runId);
+  } catch (error) {
+    return blocked(repository, "RUN_ID_INVALID", error instanceof Error ? error.message : String(error));
+  }
   let routedTasks: readonly unknown[];
   try {
     routedTasks = parsedPlan.body.tasks.map((task) => {
@@ -109,6 +126,42 @@ export function runCompile(options: CompileOptions): CompileReport {
   const frozenManifest = freezeManifest(manifest, registry);
   const repositoryFingerprint = sha256(`${repository.worktreeRoot}:${repository.gitCommonDir}:${repository.headCommit}`);
   const executionProfile = loadExecutionProfile(repository.worktreeRoot);
+  const projectConfig = loadProjectConfig(repository.worktreeRoot);
+  const executionPolicy = projectConfig?.executionEnvironment ?? {
+    defaultProfile: "isolated" as const,
+    allowTrustedLocal: false
+  };
+  let executionEnvironmentKind: ExecutionEnvironmentKind;
+  let trustedLocalAuthorization: TrustedLocalAuthorizationRecord | null = null;
+
+  try {
+    const inspection = inspectExecutionEnvironment(
+      executionProfile,
+      executionPolicy,
+      options.trustedLocalAuthorization,
+      registry
+    );
+    executionEnvironmentKind = inspection.report.kind;
+    trustedLocalAuthorization = inspection.authorization;
+
+    const policyMismatch = inspection.findings.find(
+      (finding) => finding.code === "EXECUTION_PROFILE_KIND_MISMATCH" || finding.code === "TRUSTED_LOCAL_NOT_AUTHORIZED"
+    );
+    if (policyMismatch || (options.requireRunnableExecutionEnvironment && !inspection.runnable)) {
+      const finding = inspection.findings[0];
+      return blocked(
+        repository,
+        finding?.code ?? "ENVIRONMENT_UNAVAILABLE",
+        finding?.message ?? "The configured execution environment is unavailable."
+      );
+    }
+  } catch (error) {
+    return blocked(
+      repository,
+      "EXECUTION_PROFILE_INVALID",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
   const intent = buildRunIntent({
     runId,
     planPath: manifest.plan.path,
@@ -116,6 +169,8 @@ export function runCompile(options: CompileOptions): CompileReport {
     baseCommit: repository.headCommit,
     repositoryFingerprint,
     budgets: manifest.budgets,
+    executionEnvironmentKind,
+    trustedLocalAuthorization,
     now
   });
   const authorization = bindRunAuthorization({
@@ -142,7 +197,8 @@ export function runCompile(options: CompileOptions): CompileReport {
     manifestPath,
     authorizationPath,
     intentPath,
-    eventLogPath: eventLog.path
+    eventLogPath: eventLog.path,
+    registry
   });
 
   if (existing) {
@@ -213,6 +269,8 @@ function buildRunIntent(input: {
   readonly baseCommit: string;
   readonly repositoryFingerprint: string;
   readonly budgets: Record<string, unknown>;
+  readonly executionEnvironmentKind: ExecutionEnvironmentKind;
+  readonly trustedLocalAuthorization: TrustedLocalAuthorizationRecord | null;
   readonly now: string;
 }): RunIntent {
   const maximumRunMinutes = Number(input.budgets.maximumRunMinutes);
@@ -226,10 +284,17 @@ function buildRunIntent(input: {
     baseRef: "HEAD",
     baseCommit: input.baseCommit,
     repositoryFingerprint: input.repositoryFingerprint,
-    requestedCapabilities: ["write-worktree", "run-isolated-tests", "create-local-commits"],
+    requestedCapabilities: [
+      "write-worktree",
+      input.executionEnvironmentKind === "isolated" ? "run-isolated-tests" : "run-trusted-local-tests",
+      "create-local-commits"
+    ],
     forbiddenCapabilities: ["push", "deploy", "network-write"],
     approvalMode: "never",
-    executionEnvironmentKind: "isolated",
+    executionEnvironmentKind: input.executionEnvironmentKind,
+    ...(input.trustedLocalAuthorization !== null
+      ? { trustedLocalAuthorization: input.trustedLocalAuthorization }
+      : {}),
     limits: {
       maximumRunMinutes,
       maximumAgentInvocations: Number(input.budgets.maximumAgentInvocations),
@@ -244,7 +309,7 @@ function buildRunIntent(input: {
   };
 }
 
-function loadExecutionProfile(worktreeRoot: string): unknown {
+export function loadExecutionProfile(worktreeRoot: string): unknown {
   const localPath = join(worktreeRoot, ".ai-code-worker", "execution-environment.example.json");
   const fallbackPath = join(packageRoot(), "templates", "project", ".ai-code-worker", "execution-environment.example.json");
 
@@ -274,6 +339,7 @@ function readExistingRun(input: {
   readonly authorizationPath: string;
   readonly intentPath: string;
   readonly eventLogPath: string;
+  readonly registry: SchemaRegistry;
 }): CompileReport | null {
   if (!existsSync(input.eventLogPath)) {
     return null;
@@ -283,11 +349,29 @@ function readExistingRun(input: {
     return blocked(input.repository, "RUN_STATE_CONFLICT", `Run ${input.runId} has an event log but missing frozen state files.`);
   }
 
-  const existingManifest = JSON.parse(readFileSync(input.manifestPath, "utf8"));
-  const existingAuthorization = JSON.parse(readFileSync(input.authorizationPath, "utf8")) as RunAuthorization;
-  const existingManifestSha256 = freezeManifest(existingManifest).sha256;
+  let existingManifest: unknown;
+  let existingAuthorization: RunAuthorization;
+  try {
+    existingManifest = JSON.parse(readFileSync(input.manifestPath, "utf8")) as unknown;
+    existingAuthorization = JSON.parse(readFileSync(input.authorizationPath, "utf8")) as RunAuthorization;
+    const existingIntent = JSON.parse(readFileSync(input.intentPath, "utf8")) as unknown;
+    input.registry.assertValid("manifest.schema.json", existingManifest);
+    input.registry.assertValid("run-authorization.schema.json", existingAuthorization);
+    input.registry.assertValid("run-intent.schema.json", existingIntent);
+  } catch (error) {
+    return blocked(
+      input.repository,
+      "RUN_STATE_CONFLICT",
+      `Run ${input.runId} has unreadable or schema-invalid frozen state: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  const existingManifestSha256 = freezeManifest(existingManifest, input.registry).sha256;
 
-  if (existingManifestSha256 !== input.manifestSha256 || existingAuthorization.manifestSha256 !== input.manifestSha256) {
+  if (
+    existingManifestSha256 !== input.manifestSha256 ||
+    existingAuthorization.manifestSha256 !== input.manifestSha256 ||
+    canonicalAuthorizationBinding(existingAuthorization) !== canonicalAuthorizationBinding(input.authorization)
+  ) {
     return blocked(input.repository, "RUN_STATE_CONFLICT", `Run ${input.runId} already exists with different frozen state.`);
   }
 
@@ -306,6 +390,25 @@ function readExistingRun(input: {
     },
     findings: []
   };
+}
+
+function canonicalAuthorizationBinding(authorization: RunAuthorization): string {
+  return JSON.stringify({
+    schemaVersion: authorization.schemaVersion,
+    authorizationId: authorization.authorizationId,
+    runId: authorization.runId,
+    repositoryFingerprint: authorization.repositoryFingerprint,
+    planSha256: authorization.planSha256,
+    manifestSha256: authorization.manifestSha256,
+    baseCommit: authorization.baseCommit,
+    graphVersion: authorization.graphVersion,
+    executionEnvironment: authorization.executionEnvironment,
+    trustedLocalAuthorization: authorization.trustedLocalAuthorization ?? null,
+    allowedCapabilities: authorization.allowedCapabilities,
+    forbiddenCapabilities: authorization.forbiddenCapabilities,
+    approvalMode: authorization.approvalMode,
+    limits: authorization.limits
+  });
 }
 
 function blocked(repository: GitPreflightResult, code: string, message: string): CompileReport {

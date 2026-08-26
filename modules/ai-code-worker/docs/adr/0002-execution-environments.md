@@ -1,6 +1,6 @@
 # AICW-ADR-002: Medii de execuție și izolarea proceselor
 
-- Status: acceptat
+- Status: acceptat, amendat de [AICW-ADR-008](0008-trusted-local-and-explicit-sandbox-escalation.md)
 - Data: 2026-08-01
 - Owner: developer experience
 - Plan asociat: [planul de implementare v1.2](../IMPLEMENTATION-PLAN.md)
@@ -55,10 +55,12 @@ Este permis numai când:
 
 - repository-ul este declarat controlat de utilizator;
 - grantul îl permite explicit;
-- env allowlist, output limits, timeout și process-tree cancellation rămân active;
+- env allowlist, limita de output și timeout-ul procesului copil direct rămân active;
 - raportul final marchează clar că nu a existat izolare completă față de host.
 
 Nu poate fi selectat implicit numai pentru că un worktree este curat.
+Implementarea locală curentă nu probează și nu raportează anularea întregului process
+tree, limite CPU/memorie/procese, restricții de filesystem sau blocarea rețelei.
 
 ### Separarea control-plane/data-plane
 
@@ -79,7 +81,8 @@ Un hook nu este considerat sigur doar pentru că este versionat în repository.
 ## Consecințe
 
 - Faza 0 trebuie să definească capability reports și un fake backend.
-- Faza 1 trebuie să ofere cel puțin un backend `isolated` utilizabil pentru pilot.
+- Ținta pentru pilotul izolat rămâne un backend `isolated` probat; distribuția curentă
+  eșuează închis până când acel backend există.
 - Compatibilitatea Windows/Linux se testează pe proprietăți, nu pe presupuneri despre containere.
 - `BLOCKED/ENVIRONMENT_UNAVAILABLE` este rezultatul corect când profilul autorizat nu poate fi satisfăcut.
 

@@ -4,6 +4,7 @@ import { EventLog } from "../persistence/event-log.js";
 import { evaluateLease, type LeaseStatus } from "../persistence/lease.js";
 import { replayRun, type RunReplay } from "../persistence/replay.js";
 import { resolveStateRoot } from "../state/state-root.js";
+import { assertSafeWorkerRunId } from "../state/run-id.js";
 
 export interface StatusOptions {
   readonly repositoryPath: string;
@@ -31,6 +32,16 @@ export interface StatusFinding {
 }
 
 export function runStatus(options: StatusOptions): StatusReport {
+  try {
+    assertSafeWorkerRunId(options.runId);
+  } catch (error) {
+    return blockedStatus(
+      options.runId,
+      "RUN_ID_INVALID",
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+
   const repository = gitPreflight(options.repositoryPath);
 
   if (!repository.ok) {

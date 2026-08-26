@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:codex-sandbox-policy.schema.json",
+  "title": "ai-code-worker Codex sandbox decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "mode",
+    "status",
+    "elevated",
+    "authorization",
+    "blockedReason"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "mode": { "enum": ["workspace-write", "danger-full-access"] },
+    "status": { "enum": ["RESTRICTED", "AUTHORIZED", "BLOCKED"] },
+    "elevated": { "type": "boolean" },
+    "authorization": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authorizedBy",
+            "reason",
+            "reasonRedacted",
+            "reasonSha256",
+            "approvedAt",
+            "source"
+          ],
+          "properties": {
+            "authorizedBy": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "reason": { "type": "string", "minLength": 1 },
+            "reasonRedacted": { "type": "boolean" },
+            "reasonSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+            "approvedAt": { "type": "string", "format": "date-time" },
+            "source": { "enum": ["cli", "api"] }
+          }
+        }
+      ]
+    },
+    "blockedReason": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "workspace-write" } }, "required": ["mode"] },
+      "then": {
+        "properties": {
+          "status": { "const": "RESTRICTED" },
+          "elevated": { "const": false },
+          "authorization": { "type": "null" },
+          "blockedReason": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "AUTHORIZED" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "mode": { "const": "danger-full-access" },
+          "elevated": { "const": true },
+          "authorization": { "type": "object" },
+          "blockedReason": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "RESTRICTED" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "mode": { "const": "workspace-write" },
+          "elevated": { "const": false },
+          "authorization": { "type": "null" },
+          "blockedReason": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "danger-full-access" } }, "required": ["mode"] },
+      "then": {
+        "properties": {
+          "status": { "enum": ["AUTHORIZED", "BLOCKED"] },
+          "elevated": { "const": true }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "BLOCKED" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "mode": { "const": "danger-full-access" },
+          "elevated": { "const": true },
+          "authorization": { "type": "null" },
+          "blockedReason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  ]
+}

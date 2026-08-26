@@ -1,4 +1,8 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  writeFileSync
+} from "node:fs";
 import { dirname, join } from "node:path";
 import {
   resolveUsageCheckpointLogPath,
@@ -23,6 +27,9 @@ import {
   evaluateUsageBudget,
   type UsageTotals
 } from "../policy/usage-budget.js";
+import {
+  bindCodexSandboxDecision
+} from "../policy/codex-sandbox-policy.js";
 import { writeRunReports } from "../report/run-report.js";
 import { writeBlockedReport, writeRepairEvidenceReport } from "../report/export-artifacts.js";
 import { resolveQualityGate } from "../runner/quality-gate-config.js";
@@ -36,12 +43,15 @@ import { integrateTaskCommits } from "./integration.js";
 import type { TaskContext } from "../context-provider/task-context.js";
 import { executeTaskWithFallback, type RoutedEngine } from "../routing/task-execution.js";
 import type { FrozenRoutingSnapshot } from "../routing/routing-policy.js";
+import type { ExecutionBackendBinding, TrustedLocalAuthorizationInput } from "../execution/environment.js";
+import { loadAuthorizedExecutionBinding } from "../execution/runtime-binding.js";
 
 export interface CodexRunOptions {
   readonly repositoryPath: string;
   readonly planPath: string;
   readonly runId?: string;
   readonly now?: string;
+  readonly trustedLocalAuthorization?: TrustedLocalAuthorizationInput;
   readonly adapterConfig?: Partial<CodexCliAdapterConfig>;
   readonly taskContexts?: Readonly<Record<string, TaskContext>>;
   /** Optional hook: when the structural coverage review fails, run an
@@ -57,7 +67,10 @@ export interface CodexIndependentReviewIntegration {
   /** A factory, not a fixed executor - see the identical comment on
    *  ClaudeIndependentReviewIntegration.executeRepairCycle in claude-run.ts;
    *  the reasoning is the same for both engines. */
-  readonly executeRepairCycle: (repairBaseCommit: string) => RepairCycleExecutor;
+  readonly executeRepairCycle: (
+    repairBaseCommit: string,
+    execution: ExecutionBackendBinding
+  ) => RepairCycleExecutor;
   readonly maximumAttemptsPerTask?: number;
 }
 
@@ -85,21 +98,33 @@ export interface CodexRunFinding {
 
 export function runCodex(options: CodexRunOptions): CodexRunReport {
   const registry = SchemaRegistry.load();
-  const compile = runCompile(options);
+  const compile = runCompile({ ...options, requireRunnableExecutionEnvironment: true });
 
-  if (compile.status === "BLOCKED" || !compile.runId || !compile.state.runRoot || !compile.state.manifestPath || !compile.state.eventLogPath) {
+  if (compile.status === "BLOCKED" || !compile.runId || !compile.authorization || !compile.state.runRoot || !compile.state.manifestPath || !compile.state.eventLogPath) {
     return blocked(compile, "COMPILE_BLOCKED", compile.findings[0]?.message ?? "Compile did not pass.");
+  }
+
+  const repositoryRoot = compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath;
+  let executionBinding: ExecutionBackendBinding;
+  try {
+    executionBinding = loadAuthorizedExecutionBinding(repositoryRoot, compile.authorization, registry);
+  } catch (error) {
+    return blocked(compile, "ENVIRONMENT_UNAVAILABLE", error instanceof Error ? error.message : String(error));
   }
 
   const eventLog = new EventLog(compile.state.eventLogPath, registry);
   const currentEvents = eventLog.read().events;
   const manifest = JSON.parse(readFileSync(compile.state.manifestPath, "utf8")) as RunManifest;
-  const projectConfig = loadProjectConfig(compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath);
+  const projectConfig = loadProjectConfig(repositoryRoot);
+  const effectiveAdapterConfig: Partial<CodexCliAdapterConfig> = {
+    ...options.adapterConfig,
+    execution: executionBinding
+  };
   const adapter = new CodexCliAdapter(
     codexConfig({
       ...codexAdapterConfigFromProject(projectConfig),
       timeoutMs: Number(manifest.budgets.maximumTaskMinutes) * 60_000,
-      ...options.adapterConfig
+      ...effectiveAdapterConfig
     }),
     registry
   );
@@ -118,6 +143,34 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
   );
   let usageTotals = emptyUsageTotals;
   let tick = 0;
+
+  const sandboxBinding = bindCodexSandboxDecision(compile.state.runRoot, doctor.sandbox, registry);
+  if (sandboxBinding.status === "BLOCKED") {
+    if (recovery.terminal !== null) {
+      return {
+        ...recoveredTerminalRun(compile, graph.topologicalOrder, recovery, "BLOCKED"),
+        findings: [
+          {
+            severity: "blocker",
+            code: "CODEX_SANDBOX_POLICY_CONFLICT",
+            message: sandboxBinding.message
+          }
+        ]
+      };
+    }
+
+    return blockRunningRun({
+      compile,
+      eventLog,
+      code: "CODEX_SANDBOX_POLICY_CONFLICT",
+      message: sandboxBinding.message,
+      executedTasks,
+      taskCommits,
+      gateResults,
+      usageTotals,
+      now: options.now ?? new Date().toISOString()
+    });
+  }
 
   if (recovery.terminal === "DONE") {
     return recoveredTerminalRun(compile, graph.topologicalOrder, recovery, "DONE");
@@ -226,7 +279,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
 
     const expectedHead = currentHead(worktree.worktree.path);
 
-    const candidates = task.routing?.candidates ?? [{ engine: "codex" as const, model: options.adapterConfig?.defaultModel ?? null }];
+    const candidates = task.routing?.candidates ?? [{ engine: "codex" as const, model: effectiveAdapterConfig.defaultModel ?? null }];
     const taskExecution = executeTaskWithFallback({
       candidates,
       projectConfig,
@@ -239,7 +292,8 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
         prompt: codexPrompt({ manifest, task, taskId, snapshot, context: options.taskContexts?.[taskId] }),
         startedAt: timestamp
       },
-      codexOverrides: options.adapterConfig
+      codexOverrides: effectiveAdapterConfig,
+      execution: executionBinding
     });
     const execution = taskExecution.execution;
     const activeEngine = taskExecution.candidate.engine;
@@ -579,7 +633,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
       maximumRepairCycles: Number(manifest.budgets.maximumRepairCycles ?? 0),
       maximumAttemptsPerTask: options.independentReview.maximumAttemptsPerTask ?? 1,
       reviewer: options.independentReview.reviewer,
-      executeRepairCycle: options.independentReview.executeRepairCycle(repairBaseCommit),
+      executeRepairCycle: options.independentReview.executeRepairCycle(repairBaseCommit, executionBinding),
       registry,
       now: timestampAt(options.now ?? new Date().toISOString(), tick)
     });
@@ -694,10 +748,10 @@ interface RunManifestTask extends ManifestTask {
 export function codexConfig(overrides: Partial<CodexCliAdapterConfig> = {}): CodexCliAdapterConfig {
   return {
     requiresCapabilitySmokeTest: true,
-    // Local Windows pilot note: codex-cli 0.146.0-alpha.3.1 currently reports
-    // workspace-write as read-only for exec file writes. The worker still enforces
-    // allowedPaths/forbiddenPaths before creating the worker-owned commit.
-    sandboxMode: "danger-full-access",
+    // Writer executions are restricted by default. A provider/platform that cannot
+    // write under workspace-write blocks the run; it never triggers an automatic
+    // retry with danger-full-access.
+    sandboxMode: "workspace-write",
     ...overrides
   };
 }

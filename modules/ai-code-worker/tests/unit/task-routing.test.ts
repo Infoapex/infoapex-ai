@@ -152,3 +152,100 @@ test("does not fail over when the task itself fails deterministically", () => {
   assert.equal(result.attempts.length, 1);
   assert.equal(result.attempts[0]?.availabilityFailure, false);
 });
+
+test("does not bypass a Codex sandbox policy blocker through engine fallback", () => {
+  const started: string[] = [];
+  const result = executeTaskWithFallback({
+    candidates: [
+      { engine: "codex", model: "primary-model" },
+      { engine: "claude", model: "fallback-model" }
+    ],
+    projectConfig: null,
+    request: {
+      runId: "run-routing-policy",
+      taskId: "TASK-3",
+      executionId: "execution-3",
+      sessionId: "session-3",
+      worktreePath: ".",
+      prompt: "Implement the task",
+      startedAt: new Date(0).toISOString()
+    },
+    adapterFactory: (candidate) => ({
+      doctor: () => candidate.engine === "codex"
+        ? {
+            status: "BLOCKED",
+            findings: [{
+              code: "CODEX_DANGER_FULL_ACCESS_UNAUTHORIZED",
+              message: "Explicit elevation approval is missing."
+            }]
+          }
+        : { status: "PASS", findings: [] },
+      start: (request) => {
+        started.push(candidate.engine);
+        return successfulExecution(request) as never;
+      }
+    })
+  });
+
+  assert.deepEqual(started, []);
+  assert.equal(result.candidate.engine, "codex");
+  assert.equal(result.attempts.length, 1);
+  assert.equal(result.attempts[0]?.availabilityFailure, false);
+  assert.equal(result.execution.result.failures[0]?.class, "policy");
+});
+
+test("does not start or fail over when immutable candidate binding conflicts", () => {
+  const started: string[] = [];
+  const result = executeTaskWithFallback({
+    candidates: [
+      { engine: "codex", model: "primary-model" },
+      { engine: "claude", model: "fallback-model" }
+    ],
+    projectConfig: null,
+    request: {
+      runId: "run-routing-binding",
+      taskId: "TASK-4",
+      executionId: "execution-4",
+      sessionId: "session-4",
+      worktreePath: ".",
+      prompt: "Implement the task",
+      startedAt: new Date(0).toISOString()
+    },
+    adapterFactory: (candidate) => ({
+      doctor: () => ({ status: "PASS", findings: [] }),
+      start: (request) => {
+        started.push(candidate.engine);
+        return successfulExecution(request) as never;
+      }
+    }),
+    beforeStart: () => ({ status: "BLOCKED", message: "Immutable sandbox decision changed." })
+  });
+
+  assert.deepEqual(started, []);
+  assert.equal(result.candidate.engine, "codex");
+  assert.equal(result.attempts.length, 1);
+  assert.equal(result.execution.result.failures[0]?.class, "policy");
+});
+
+function successfulExecution(request: {
+  readonly runId: string;
+  readonly taskId: string;
+  readonly executionId: string;
+  readonly sessionId: string;
+}) {
+  return {
+    executionId: request.executionId,
+    sessionId: request.sessionId,
+    events: [],
+    usage: { inputUncachedTokens: null, cacheReadTokens: null, cacheWriteTokens: null, outputTokens: null, costUsd: null },
+    result: {
+      schemaVersion: "1.0",
+      runId: request.runId,
+      taskId: request.taskId,
+      status: "DONE",
+      summary: "completed",
+      touchedFiles: [],
+      failures: []
+    }
+  };
+}

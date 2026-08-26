@@ -47,3 +47,46 @@ portable business plan.
 Fallback is bounded to that frozen list and is permitted only for classified
 provider availability signals. Scope violations, policy failures and deterministic
 verification failures remain hard failures.
+
+## Trust and security boundaries
+
+Repository files, prompts, model output, command output and handoff payloads are
+untrusted data. They can narrow a task or provide evidence, but they cannot grant a
+new capability. Installed policy, versioned schemas, the immutable run authorization
+and capability-probed execution backends form the enforcement boundary.
+
+The integrated handoff channel is constrained to the canonical repository root.
+Runtime code validates the config and complete handoff envelope, accepts only a
+bounded single-segment `runId`, rejects absolute/traversing paths and symlink or
+junction escapes, and publishes each message atomically as create-new. Reads apply
+the same containment checks and verify both the requested run and direction. The
+normative decision is [ADR-0001](adr/0001-safe-handoff-boundary.md).
+
+A Git worktree and post-run scope verification are integrity controls, not an OS
+sandbox. The bundled local process backend is therefore named `trusted-local` and
+reports only controls it actually enforces. It does not claim host-filesystem,
+network, process-count or process-tree isolation. An autonomous run that requires an
+`isolated` profile remains `BLOCKED/ENVIRONMENT_UNAVAILABLE` until a probed backend
+satisfies every required capability. The fake isolated backend is test-only.
+
+Codex writers use `workspace-write` by default. `danger-full-access` is never an
+automatic fallback: it requires a separate CLI/API approval with `authorizedBy`,
+reason, timestamp and source, bound write-once to the run and represented in evidence.
+Repository configuration may request the mode but cannot grant host privilege. The
+same separation applies to `trusted-local`: project configuration requests
+eligibility, while an external authorization is frozen into the run authorization.
+A workspace-write permission failure blocks or follows the already-authorized engine
+routing policy without increasing sandbox privileges.
+
+```mermaid
+flowchart TD
+    I[Untrusted request / repository / model output] --> V{Schema + path + policy validation}
+    V -->|invalid| B[BLOCKED or ignored as invalid input]
+    V -->|valid data| A{Immutable authorization permits it?}
+    A -->|no| B
+    A -->|yes| E{Backend proves required capabilities?}
+    E -->|no| B
+    E -->|yes| X[Execute within frozen scope]
+    X --> G[Git scope, gates and evidence]
+    G --> R[Terminal report]
+```

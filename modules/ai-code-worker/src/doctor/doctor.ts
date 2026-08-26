@@ -4,10 +4,16 @@ import { fileURLToPath } from "node:url";
 import { loadProjectConfig, type ProjectConfig } from "../config/project-config.js";
 import { ClaudeCliAdapter, type ClaudeCliAdapterConfig, type ClaudeDoctorReport } from "../engines/claude-cli.js";
 import { CodexCliAdapter, type CodexCliAdapterConfig, type CodexDoctorReport } from "../engines/codex-cli.js";
-import { LocalIsolatedExecutionEnvironment, type EnvironmentCapabilityReport } from "../execution/environment.js";
+import {
+  inspectExecutionEnvironment,
+  type EnvironmentCapabilityReport,
+  type ExecutionEnvironmentFinding,
+  type TrustedLocalAuthorizationInput
+} from "../execution/environment.js";
 import { gitPreflight, type GitPreflightResult } from "../git/preflight.js";
 import { evaluateSyncRootPolicy, type SyncRootPolicyResult } from "../git/sync-root.js";
 import { resolveStateRoot, type ResolvedStateRoot } from "../state/state-root.js";
+import type { CodexDangerFullAccessApproval } from "../policy/codex-sandbox-policy.js";
 
 export interface DoctorOptions {
   readonly repositoryPath: string;
@@ -20,6 +26,8 @@ export interface DoctorOptions {
   readonly claudeBareMode?: boolean;
   readonly claudeDangerouslySkipPermissions?: boolean;
   readonly codexSandboxMode?: "workspace-write" | "danger-full-access";
+  readonly codexDangerFullAccessApproval?: CodexDangerFullAccessApproval;
+  readonly trustedLocalAuthorization?: TrustedLocalAuthorizationInput;
 }
 
 export interface DoctorReport {
@@ -75,14 +83,35 @@ export function runDoctor(options: DoctorOptions): DoctorReport {
     maximumParallelWriters,
     policy: syncRootPolicy
   });
-  const executionEnvironment = executionProfile ? new LocalIsolatedExecutionEnvironment().doctor(executionProfile) : null;
+  let executionEnvironment: EnvironmentCapabilityReport | null = null;
+  let executionEnvironmentFindings: readonly ExecutionEnvironmentFinding[] = [];
+  if (executionProfile) {
+    try {
+      const inspection = inspectExecutionEnvironment(
+        executionProfile,
+        config?.executionEnvironment ?? { defaultProfile: "isolated", allowTrustedLocal: false },
+        options.trustedLocalAuthorization
+      );
+      executionEnvironment = inspection.report;
+      executionEnvironmentFindings = inspection.findings;
+    } catch (error) {
+      findings.push({
+        severity: "blocker",
+        code: "EXECUTION_PROFILE_INVALID",
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
   const engineDoctor = options.engine === "codex"
     ? new CodexCliAdapter({
         ...defaultCodexConfig(),
         ...codexAdapterConfigFromProject(config),
         ...(options.codexExecutable !== undefined ? { executable: options.codexExecutable } : {}),
         ...(options.codexModel !== undefined ? { defaultModel: options.codexModel } : {}),
-        ...(options.codexSandboxMode !== undefined ? { sandboxMode: options.codexSandboxMode } : {})
+        ...(options.codexSandboxMode !== undefined ? { sandboxMode: options.codexSandboxMode } : {}),
+        ...(options.codexDangerFullAccessApproval !== undefined
+          ? { dangerFullAccessApproval: options.codexDangerFullAccessApproval }
+          : {})
       }).doctor()
     : options.engine === "claude"
     ? new ClaudeCliAdapter({
@@ -118,12 +147,20 @@ export function runDoctor(options: DoctorOptions): DoctorReport {
     });
   }
 
-  if (!executionEnvironment?.supported) {
+  if (!executionProfile) {
     findings.push({
       severity: "blocker",
       code: "ENVIRONMENT_UNAVAILABLE",
-      message: "The configured execution environment does not satisfy isolated writer requirements."
+      message: "No execution environment profile is available."
     });
+  } else {
+    for (const finding of executionEnvironmentFindings) {
+      findings.push({
+        severity: "blocker",
+        code: finding.code,
+        message: finding.message
+      });
+    }
   }
 
   if (engineDoctor?.status === "BLOCKED") {
@@ -155,7 +192,7 @@ export function defaultCodexConfig(): CodexCliAdapterConfig {
     // are the fail-closed compatibility gate; projects may still opt into an explicit
     // testedVersionRanges override when they need a narrower policy.
     requiresCapabilitySmokeTest: true,
-    sandboxMode: "danger-full-access"
+    sandboxMode: "workspace-write"
   };
 }
 

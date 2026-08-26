@@ -9,7 +9,7 @@
       "lastVerified": "2026-08-10",
       "notes": [
         "0.136.0-alpha.2 verified live 2026-08-10 against a real ChatGPT-subscription (auth_mode: chatgpt) install: --ignore-user-config/--ignore-rules do not break subscription auth, --output-schema is honored correctly.",
-        "--sandbox workspace-write reports read-only on Windows for both tested versions (pre-existing upstream issue, see docs/PHASE-1.md) - danger-full-access is the correct default until that is fixed upstream.",
+        "--sandbox workspace-write reported read-only on Windows for both tested versions (see docs/PHASE-1.md). workspace-write remains the secure default; a run blocks on this failure unless danger-full-access was separately and explicitly approved, and no automatic sandbox escalation is allowed.",
         "The codex binary is not always a global PATH install - on at least one verified machine it ships bundled inside the VS Code openai.chatgpt extension.",
         "Usage is read from the token_count event's total_token_usage in the --json JSONL stream (cumulative, not per-turn) - see src/engines/codex-cli.ts parseCodexUsage()."
       ]

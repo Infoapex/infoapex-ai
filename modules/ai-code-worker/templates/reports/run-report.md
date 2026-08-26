@@ -4,8 +4,21 @@
 - Plan:
 - Base commit:
 - Engine:
+- Sandbox: workspace-write (RESTRICTED) | danger-full-access (AUTHORIZED | BLOCKED) | not-applicable
+- Sandbox authorization source: cli | api | null
+- Sandbox authorized by:
+- Sandbox authorization reason:
+- Execution backend: trusted-local | isolated-unavailable | other-probed-backend
+- Execution profile: profile-id (trusted-local | isolated)
+- Security boundary: host-process | os-isolated
+- Trusted-local authorized by:
+- Trusted-local authorization source: cli | api | null
 - Status: DONE | BLOCKED
 - Blocked reason:
+
+## Execution Environment Warnings
+
+- Record every capability warning; never describe a worktree as host isolation.
 
 ## Task Commits
 

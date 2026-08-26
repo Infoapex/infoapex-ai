@@ -2,6 +2,8 @@ import type { ProjectConfig } from "../config/project-config.js";
 import { ClaudeCliAdapter, type ClaudeCliAdapterConfig, type ClaudeExecution } from "../engines/claude-cli.js";
 import { CodexCliAdapter, type CodexCliAdapterConfig, type CodexExecution } from "../engines/codex-cli.js";
 import type { RoutingCandidate } from "./routing-policy.js";
+import type { ExecutionBackendBinding } from "../execution/environment.js";
+import type { CodexSandboxDecision } from "../policy/codex-sandbox-policy.js";
 
 export type RoutedExecution = ClaudeExecution | CodexExecution;
 export type RoutedEngine = "codex" | "claude";
@@ -29,9 +31,17 @@ export interface RoutedTaskExecution {
 }
 
 export interface RoutedAdapter {
-  readonly doctor: () => { readonly status: "PASS" | "BLOCKED"; readonly findings: readonly { readonly message: string }[] };
+  readonly doctor: () => {
+    readonly status: "PASS" | "BLOCKED";
+    readonly findings: readonly { readonly code?: string; readonly message: string }[];
+    readonly sandbox?: CodexSandboxDecision;
+  };
   readonly start: (request: TaskExecutionRequest) => RoutedExecution;
 }
+
+export type CandidateStartPolicyResult =
+  | { readonly status: "PASS" }
+  | { readonly status: "BLOCKED"; readonly message: string };
 
 export function executeTaskWithFallback(input: {
   readonly candidates: readonly RoutingCandidate[];
@@ -39,19 +49,45 @@ export function executeTaskWithFallback(input: {
   readonly request: TaskExecutionRequest;
   readonly codexOverrides?: Partial<CodexCliAdapterConfig>;
   readonly claudeOverrides?: Partial<ClaudeCliAdapterConfig>;
+  readonly execution?: ExecutionBackendBinding;
   readonly adapterFactory?: (candidate: RoutingCandidate) => RoutedAdapter;
+  /** Runs after provider preflight but before the writer process. Policy
+   * blockers are terminal for the task and are never treated as failover
+   * signals. */
+  readonly beforeStart?: (
+    candidate: RoutingCandidate,
+    doctor: ReturnType<RoutedAdapter["doctor"]>
+  ) => CandidateStartPolicyResult;
 }): RoutedTaskExecution {
   const attempts: TaskExecutionAttempt[] = [];
 
   for (let index = 0; index < input.candidates.length; index += 1) {
     const candidate = input.candidates[index]!;
-    const adapter = input.adapterFactory?.(candidate) ?? createAdapter(candidate, input.projectConfig, input.codexOverrides, input.claudeOverrides) as unknown as RoutedAdapter;
+    const adapter = input.adapterFactory?.(candidate) ?? createAdapter(
+      candidate,
+      input.projectConfig,
+      input.codexOverrides,
+      input.claudeOverrides,
+      input.execution
+    ) as unknown as RoutedAdapter;
     const doctor = adapter.doctor();
     if (doctor.status === "BLOCKED") {
-      const execution = failedExecution(input.request, candidate, doctor.findings[0]?.message ?? `${candidate.engine} is unavailable.`);
-      const attempt = { candidate, execution, availabilityFailure: true };
+      const message = doctor.findings[0]?.message ?? `${candidate.engine} is unavailable.`;
+      const policyBlocked = doctor.findings.some((finding) => finding.code === "CODEX_DANGER_FULL_ACCESS_UNAUTHORIZED");
+      const execution = failedExecution(input.request, candidate, message, policyBlocked ? "policy" : "engine");
+      const attempt = { candidate, execution, availabilityFailure: !policyBlocked };
       attempts.push(attempt);
+      if (policyBlocked) {
+        return { candidate, execution, attempts };
+      }
       continue;
+    }
+
+    const policy = input.beforeStart?.(candidate, doctor) ?? { status: "PASS" as const };
+    if (policy.status === "BLOCKED") {
+      const execution = failedExecution(input.request, candidate, policy.message, "policy");
+      attempts.push({ candidate, execution, availabilityFailure: false });
+      return { candidate, execution, attempts };
     }
 
     const execution = adapter.start({
@@ -83,21 +119,24 @@ function createAdapter(
   candidate: RoutingCandidate,
   projectConfig: ProjectConfig | null,
   codexOverrides: Partial<CodexCliAdapterConfig> | undefined,
-  claudeOverrides: Partial<ClaudeCliAdapterConfig> | undefined
+  claudeOverrides: Partial<ClaudeCliAdapterConfig> | undefined,
+  execution: ExecutionBackendBinding | undefined
 ): ClaudeCliAdapter | CodexCliAdapter {
   if (candidate.engine === "codex") {
     return new CodexCliAdapter({
       requiresCapabilitySmokeTest: true,
       ...codexProjectConfig(projectConfig),
       ...(candidate.model !== null ? { defaultModel: candidate.model } : {}),
-      ...codexOverrides
+      ...codexOverrides,
+      ...(execution ? { execution } : {})
     });
   }
   return new ClaudeCliAdapter({
     requiresCapabilitySmokeTest: true,
     ...claudeProjectConfig(projectConfig),
     ...(candidate.model !== null ? { defaultModel: candidate.model } : {}),
-    ...claudeOverrides
+    ...claudeOverrides,
+    ...(execution ? { execution } : {})
   });
 }
 
@@ -126,7 +165,12 @@ function claudeProjectConfig(config: ProjectConfig | null): Partial<ClaudeCliAda
   };
 }
 
-function failedExecution(request: TaskExecutionRequest, candidate: RoutingCandidate, message: string): RoutedExecution {
+function failedExecution(
+  request: TaskExecutionRequest,
+  candidate: RoutingCandidate,
+  message: string,
+  failureClass: "engine" | "policy" = "engine"
+): RoutedExecution {
   const result = {
     schemaVersion: "1.0" as const,
     runId: request.runId,
@@ -134,7 +178,7 @@ function failedExecution(request: TaskExecutionRequest, candidate: RoutingCandid
     status: "FAILED" as const,
     summary: `${candidate.engine} is unavailable.`,
     touchedFiles: [],
-    failures: [{ class: "engine" as const, message }]
+    failures: [{ class: failureClass, message }]
   };
   return {
     executionId: request.executionId,

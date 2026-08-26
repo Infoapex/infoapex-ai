@@ -202,6 +202,41 @@ node modules/ai-code-worker/dist/src/cli.js doctor \
   --engine codex
 ```
 
+Profilul generat implicit este `isolated`. Distribuția curentă nu include încă un
+backend OS/container/VM probat, astfel încât `doctor` va răspunde intenționat
+`BLOCKED/ENVIRONMENT_UNAVAILABLE` pentru un writer real. Pentru un pilot local într-un
+repository controlat, copiază explicit profilul `trusted-local` peste profilul activ:
+
+```bash
+cp modules/ai-code-worker/templates/project/.ai-code-worker/execution-environment.trusted-local.example.json \
+  /cale/catre/proiect/.ai-code-worker/execution-environment.example.json
+```
+
+În configurația proiectului setează simultan:
+
+```json
+{
+  "executionEnvironment": {
+    "defaultProfile": "trusted-local",
+    "allowTrustedLocal": true
+  }
+}
+```
+
+Configurația solicită eligibilitatea, dar nu acordă singură acces la host. Furnizează
+o autorizație externă și păstrează același `approvedAt` la `doctor`, `compile`, `run`
+și `resume` pentru aceeași rulare:
+
+```bash
+node modules/ai-code-worker/dist/src/cli.js doctor \
+  --repo /cale/catre/proiect \
+  --engine codex \
+  --allow-trusted-local \
+  --trusted-local-authorized-by "operator" \
+  --trusted-local-reason "Pilot local în repository controlat" \
+  --trusted-local-approved-at "2026-08-26T09:00:00.000Z"
+```
+
 Propune, inspectează și compilează un plan:
 
 ```bash
@@ -226,10 +261,20 @@ node modules/ai-code-worker/dist/src/cli.js run \
   --plan Plan/FEATURE-X.md \
   --engine codex \
   --fallback-engine claude \
+  --allow-trusted-local \
+  --trusted-local-authorized-by "operator" \
+  --trusted-local-reason "Pilot local în repository controlat" \
+  --trusted-local-approved-at "2026-08-26T09:00:00.000Z" \
   --json
 ```
 
-Înainte de o execuție autonomă, verifică raportul `doctor`, configurația generată, permisiunile motorului și comenzile gate-urilor. Un plan acceptat poate determina executarea de procese locale în repository-ul țintă.
+Înainte de o execuție autonomă, verifică raportul `doctor`, configurația generată,
+permisiunile motorului și comenzile gate-urilor. Un plan acceptat poate determina
+executarea de procese locale în repository-ul țintă. Pentru Codex,
+`danger-full-access` necesită suplimentar flag-ul `--approve-danger-full-access` și
+proveniența completă `--danger-full-access-authorized-by`,
+`--danger-full-access-reason`, `--danger-full-access-approved-at`; configurația
+repository-ului nu poate furniza această aprobare.
 
 ## Verificare și porți de release
 
@@ -276,7 +321,9 @@ Folosește direct CLI-ul sau extensia IDE pentru explorare, depanare și schimb�
 - Nu înlocuiește Codex, Claude sau un alt motor de raționament.
 - Nu garantează calitatea unei cerințe ambigue; criteriile de acceptare rămân esențiale.
 - Motorul `fake` verifică orchestration wiring, nu calitatea unui provider real.
-- Worktree-urile și verificarea scope-ului nu echivalează singure cu un sandbox de sistem de operare.
+- Worktree-urile și verificarea scope-ului nu echivalează singure cu un sandbox de sistem de operare. Backend-ul local este raportat ca `trusted-local`; un profil `isolated` este blocat până la instalarea unui backend real cu capabilități probate.
+- Writer-ul Codex folosește implicit `workspace-write`; `danger-full-access` cere o aprobare separată, înregistrată, și nu este folosit ca fallback automat.
+- Canalul integrat validează schemele și identitatea mesajului, limitează path-urile la repository și publică handoff-uri atomice, fără suprascriere.
 - Configurarea greșită a comenzilor de validare poate executa procese locale nedorite.
 - Interfața root `infoapex-ai` este în prezent un bootstrap subțire, nu încă un CLI unificat.
 - Integrarea live, securizarea distribuției și măsurarea A/B față de agenții direcți necesită validare suplimentară înaintea unui release de producție.
@@ -290,7 +337,7 @@ Folosește direct CLI-ul sau extensia IDE pentru explorare, depanare și schimb�
 - benchmark A/B pe aceleași task-uri: direct Codex/Claude versus flux orchestrat;
 - adaptoare pentru motoare suplimentare fără a cupla contractele de un provider;
 - UI local pentru DAG, bugete, evenimente, dovezi și aprobări umane;
-- politici de echipă și aprobări explicite înaintea execuțiilor cu privilegii ridicate.
+- UI și politici de echipă peste aprobările runtime deja explicite pentru execuțiile cu privilegii ridicate.
 
 ## Structura repository-ului
 
@@ -312,7 +359,7 @@ infoapex-ai/
 
 ## Securitate și contribuții
 
-Nu introduce în planuri, rapoarte, fixture-uri sau memoria indexată secrete, token-uri, credențiale, date personale ori conversații brute. Rulează mai întâi motorul `fake`, inspectează planul și folosește cel mai restrictiv profil compatibil cu task-ul.
+Nu introduce în planuri, rapoarte, fixture-uri sau memoria indexată secrete, token-uri, credențiale, date personale ori conversații brute. Rulează mai întâi motorul `fake`, inspectează planul și folosește cel mai restrictiv profil compatibil cu task-ul. Detaliile limitelor aplicate sunt în [arhitectură](docs/ARCHITECTURE.md#trust-and-security-boundaries) și în [baseline-ul P0–P3](docs/HARDENING-P0-P3.md).
 
 Orice contribuție ar trebui să păstreze compatibilitatea contractelor sau să introducă o versiune nouă de schemă, să adauge teste negative și să actualizeze documentația și porțile de release.
 

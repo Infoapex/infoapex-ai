@@ -119,7 +119,7 @@ describe("codex cli adapter", () => {
     assert.ok(!invocation.args.includes("--output-last-message"));
   });
 
-  it("can build a danger-full-access invocation for the local pilot fallback", () => {
+  it("blocks a danger-full-access invocation without explicit authorization", () => {
     const cli = fakeCli("0.146.0-alpha.3.1");
     const adapter = new CodexCliAdapter({
       executable: process.execPath,
@@ -127,6 +127,28 @@ describe("codex cli adapter", () => {
       testedVersionRanges: ["0.146.0-alpha.3.1"],
       requiresCapabilitySmokeTest: false,
       sandboxMode: "danger-full-access"
+    });
+
+    assert.equal(adapter.doctor().status, "BLOCKED");
+    assert.equal(adapter.doctor().findings[0]?.code, "CODEX_DANGER_FULL_ACCESS_UNAUTHORIZED");
+    assert.throws(() => adapter.buildExecInvocation(startRequest("exec-danger", "TASK-01")));
+  });
+
+  it("builds a danger-full-access invocation only with explicit authorization", () => {
+    const cli = fakeCli("0.146.0-alpha.3.1");
+    const adapter = new CodexCliAdapter({
+      executable: process.execPath,
+      baseArgs: [cli],
+      testedVersionRanges: ["0.146.0-alpha.3.1"],
+      requiresCapabilitySmokeTest: false,
+      sandboxMode: "danger-full-access",
+      dangerFullAccessApproval: {
+        approved: true,
+        authorizedBy: "test-owner",
+        reason: "Explicit unit-test elevation",
+        approvedAt: "2026-08-26T09:00:00.000Z",
+        source: "api"
+      }
     });
     const invocation = adapter.buildExecInvocation({
       runId: "run-codex",
@@ -140,6 +162,7 @@ describe("codex cli adapter", () => {
 
     assert.ok(invocation.args.includes("--sandbox"));
     assert.ok(invocation.args.includes("danger-full-access"));
+    assert.equal(adapter.doctor().sandbox.authorization?.authorizedBy, "test-owner");
   });
 
   it("keeps the agent result schema compatible with Codex response_format", () => {

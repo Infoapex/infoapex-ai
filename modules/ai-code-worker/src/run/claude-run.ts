@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   resolveUsageCheckpointLogPath,
@@ -9,6 +9,7 @@ import {
 import { loadProjectConfig, type ProjectConfig } from "../config/project-config.js";
 import { runCompile, type CompileReport } from "../compile/compile.js";
 import { ClaudeCliAdapter, type ClaudeCliAdapterConfig } from "../engines/claude-cli.js";
+import type { CodexCliAdapterConfig } from "../engines/codex-cli.js";
 import type { EngineUsage } from "../engines/engine-event.js";
 import { createWorkerCommit } from "../git/commit.js";
 import { currentHead, git } from "../git/diff.js";
@@ -36,13 +37,22 @@ import { integrateTaskCommits } from "./integration.js";
 import type { TaskContext } from "../context-provider/task-context.js";
 import { executeTaskWithFallback, type RoutedEngine } from "../routing/task-execution.js";
 import type { FrozenRoutingSnapshot } from "../routing/routing-policy.js";
+import type { ExecutionBackendBinding, TrustedLocalAuthorizationInput } from "../execution/environment.js";
+import { loadAuthorizedExecutionBinding } from "../execution/runtime-binding.js";
+import {
+  bindCodexSandboxDecision,
+  evaluateCodexSandboxPolicy
+} from "../policy/codex-sandbox-policy.js";
 
 export interface ClaudeRunOptions {
   readonly repositoryPath: string;
   readonly planPath: string;
   readonly runId?: string;
   readonly now?: string;
+  readonly trustedLocalAuthorization?: TrustedLocalAuthorizationInput;
   readonly adapterConfig?: Partial<ClaudeCliAdapterConfig>;
+  /** Used only when per-task routing selects a Codex writer. */
+  readonly codexAdapterConfig?: Partial<CodexCliAdapterConfig>;
   readonly taskContexts?: Readonly<Record<string, TaskContext>>;
   /** Optional hook: when the structural coverage review fails, run an
    *  independent review and, if it has blocking findings, attempt bounded
@@ -60,7 +70,10 @@ export interface ClaudeIndependentReviewIntegration {
    *  does - each task lands on its own isolated commit), and that combined
    *  commit only exists once runClaude integrates it right before calling
    *  this, so it cannot be known by the caller ahead of time. */
-  readonly executeRepairCycle: (repairBaseCommit: string) => RepairCycleExecutor;
+  readonly executeRepairCycle: (
+    repairBaseCommit: string,
+    execution: ExecutionBackendBinding
+  ) => RepairCycleExecutor;
   readonly maximumAttemptsPerTask?: number;
 }
 
@@ -88,21 +101,37 @@ export interface ClaudeRunFinding {
 
 export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
   const registry = SchemaRegistry.load();
-  const compile = runCompile(options);
+  const compile = runCompile({ ...options, requireRunnableExecutionEnvironment: true });
 
-  if (compile.status === "BLOCKED" || !compile.runId || !compile.state.runRoot || !compile.state.manifestPath || !compile.state.eventLogPath) {
+  if (compile.status === "BLOCKED" || !compile.runId || !compile.authorization || !compile.state.runRoot || !compile.state.manifestPath || !compile.state.eventLogPath) {
     return blocked(compile, "COMPILE_BLOCKED", compile.findings[0]?.message ?? "Compile did not pass.");
+  }
+
+  const repositoryRoot = compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath;
+  let executionBinding: ExecutionBackendBinding;
+  try {
+    executionBinding = loadAuthorizedExecutionBinding(repositoryRoot, compile.authorization, registry);
+  } catch (error) {
+    return blocked(compile, "ENVIRONMENT_UNAVAILABLE", error instanceof Error ? error.message : String(error));
   }
 
   const eventLog = new EventLog(compile.state.eventLogPath, registry);
   const currentEvents = eventLog.read().events;
   const manifest = JSON.parse(readFileSync(compile.state.manifestPath, "utf8")) as RunManifest;
-  const projectConfig = loadProjectConfig(compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath);
+  const projectConfig = loadProjectConfig(repositoryRoot);
+  const effectiveAdapterConfig: Partial<ClaudeCliAdapterConfig> = {
+    ...options.adapterConfig,
+    execution: executionBinding
+  };
+  const effectiveCodexAdapterConfig: Partial<CodexCliAdapterConfig> = {
+    ...options.codexAdapterConfig,
+    execution: executionBinding
+  };
   const adapter = new ClaudeCliAdapter(
     claudeConfig({
       ...claudeAdapterConfigFromProject(projectConfig),
       timeoutMs: Number(manifest.budgets.maximumTaskMinutes) * 60_000,
-      ...options.adapterConfig
+      ...effectiveAdapterConfig
     }),
     registry
   );
@@ -121,6 +150,42 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
   );
   let usageTotals = emptyUsageTotals;
   let tick = 0;
+
+  const sandboxPolicyPath = join(compile.state.runRoot, "sandbox-policy.json");
+  if (existsSync(sandboxPolicyPath)) {
+    const sandboxBinding = bindCodexSandboxDecision(
+      compile.state.runRoot,
+      evaluateCodexSandboxPolicy({
+        sandboxMode: effectiveCodexAdapterConfig.sandboxMode ?? projectConfig?.adapters?.codex?.sandboxMode,
+        dangerFullAccessApproval: effectiveCodexAdapterConfig.dangerFullAccessApproval
+      }),
+      registry
+    );
+    if (sandboxBinding.status === "BLOCKED") {
+      if (recovery.terminal !== null) {
+        return {
+          ...recoveredTerminalRun(compile, graph.topologicalOrder, recovery, "BLOCKED"),
+          findings: [{
+            severity: "blocker",
+            code: "CODEX_SANDBOX_POLICY_CONFLICT",
+            message: sandboxBinding.message
+          }]
+        };
+      }
+
+      return blockRunningRun({
+        compile,
+        eventLog,
+        code: "CODEX_SANDBOX_POLICY_CONFLICT",
+        message: sandboxBinding.message,
+        executedTasks,
+        taskCommits,
+        gateResults,
+        usageTotals,
+        now: options.now ?? new Date().toISOString()
+      });
+    }
+  }
 
   if (recovery.terminal === "DONE") {
     return recoveredTerminalRun(compile, graph.topologicalOrder, recovery, "DONE");
@@ -229,7 +294,7 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
 
     const expectedHead = currentHead(worktree.worktree.path);
 
-    const candidates = task.routing?.candidates ?? [{ engine: "claude" as const, model: options.adapterConfig?.defaultModel ?? null }];
+    const candidates = task.routing?.candidates ?? [{ engine: "claude" as const, model: effectiveAdapterConfig.defaultModel ?? null }];
     const taskExecution = executeTaskWithFallback({
       candidates,
       projectConfig,
@@ -242,7 +307,19 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
         prompt: claudePrompt({ manifest, task, taskId, snapshot, context: options.taskContexts?.[taskId] }),
         startedAt: timestamp
       },
-      claudeOverrides: options.adapterConfig
+      codexOverrides: effectiveCodexAdapterConfig,
+      claudeOverrides: effectiveAdapterConfig,
+      execution: executionBinding,
+      beforeStart: (candidate, candidateDoctor) => {
+        if (candidate.engine !== "codex") return { status: "PASS" };
+        if (!candidateDoctor.sandbox) {
+          return {
+            status: "BLOCKED",
+            message: "Codex writer preflight did not return a sandbox decision."
+          };
+        }
+        return bindCodexSandboxDecision(compile.state.runRoot!, candidateDoctor.sandbox, registry);
+      }
     });
     const execution = taskExecution.execution;
     const activeEngine = taskExecution.candidate.engine;
@@ -588,7 +665,7 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
       maximumRepairCycles: Number(manifest.budgets.maximumRepairCycles ?? 0),
       maximumAttemptsPerTask: options.independentReview.maximumAttemptsPerTask ?? 1,
       reviewer: options.independentReview.reviewer,
-      executeRepairCycle: options.independentReview.executeRepairCycle(repairBaseCommit),
+      executeRepairCycle: options.independentReview.executeRepairCycle(repairBaseCommit, executionBinding),
       registry,
       now: timestampAt(options.now ?? new Date().toISOString(), tick)
     });

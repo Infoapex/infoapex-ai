@@ -31,7 +31,9 @@
     },
     "runId": {
       "type": "string",
-      "pattern": "^[A-Za-z0-9._-]+$"
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?!\\.{1,2}$)(?!.*\\.$)[A-Za-z0-9._-]+$"
     },
     "planPath": {
       "type": "string",
@@ -61,6 +63,9 @@
     },
     "executionEnvironmentKind": {
       "enum": ["isolated", "trusted-local"]
+    },
+    "trustedLocalAuthorization": {
+      "$ref": "#/$defs/trustedLocalAuthorization"
     },
     "limits": {
       "type": "object",
@@ -130,6 +135,28 @@
     "nullableCount": {
       "type": ["integer", "null"],
       "minimum": 0
+    },
+    "trustedLocalAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approved",
+        "authorizedBy",
+        "reason",
+        "reasonRedacted",
+        "reasonSha256",
+        "approvedAt",
+        "source"
+      ],
+      "properties": {
+        "approved": { "const": true },
+        "authorizedBy": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "reason": { "type": "string", "minLength": 1 },
+        "reasonRedacted": { "type": "boolean" },
+        "reasonSha256": { "$ref": "#/$defs/sha256" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "source": { "enum": ["cli", "api"] }
+      }
     }
   }
 }

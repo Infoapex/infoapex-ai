@@ -28,6 +28,11 @@ import type { ProjectConfig } from "./config/project-config.js";
 import { runStatus } from "./status/status.js";
 import { findPlannerHandoffRunId, publishWorkerFeedback } from "./integration/apex-handoff.js";
 import { runReadOnlyReview } from "./review/review-command.js";
+import {
+  evaluateCodexSandboxPolicy,
+  type CodexDangerFullAccessApproval
+} from "./policy/codex-sandbox-policy.js";
+import type { ExecutionBackendBinding, TrustedLocalAuthorizationInput } from "./execution/environment.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -128,6 +133,8 @@ if (command === "review") {
   const codexModel = readOption("--codex-model") ?? undefined;
   const claudePermissionMode = readOption("--claude-permission-mode") ?? undefined;
   const codexSandboxMode = readOption("--codex-sandbox") ?? undefined;
+  const codexDangerFullAccessApproval = readCodexDangerFullAccessApproval();
+  const trustedLocalAuthorization = readTrustedLocalAuthorization();
   const claudeBareMode = args.includes("--claude-bare") ? true : undefined;
   const claudeDangerouslySkipPermissions = args.includes("--claude-dangerously-skip-permissions") ? true : undefined;
   const asJson = args.includes("--json");
@@ -146,7 +153,9 @@ if (command === "review") {
       claudeBareMode,
       claudeDangerouslySkipPermissions,
       claudePermissionMode: isClaudePermissionMode(claudePermissionMode) ? claudePermissionMode : undefined,
-      codexSandboxMode: isCodexSandboxMode(codexSandboxMode) ? codexSandboxMode : undefined
+      codexSandboxMode: isCodexSandboxMode(codexSandboxMode) ? codexSandboxMode : undefined,
+      codexDangerFullAccessApproval,
+      trustedLocalAuthorization
     });
 
     if (asJson) {
@@ -187,13 +196,14 @@ if (command === "review") {
   const repositoryPath = readOption("--repo") ?? process.cwd();
   const planPath = readOption("--plan");
   const runId = readOption("--run-id") ?? undefined;
+  const trustedLocalAuthorization = readTrustedLocalAuthorization();
   const asJson = args.includes("--json");
 
   if (!planPath) {
     console.error("Missing required option: --plan <path>");
     process.exitCode = 1;
   } else {
-    const report = runCompile({ repositoryPath, planPath, runId });
+    const report = runCompile({ repositoryPath, planPath, runId, trustedLocalAuthorization });
 
     if (asJson) {
       console.log(JSON.stringify(report, null, 2));
@@ -222,6 +232,8 @@ if (command === "review") {
   const codexModel = readOption("--codex-model") ?? undefined;
   const claudePermissionMode = readOption("--claude-permission-mode") ?? undefined;
   const codexSandboxMode = readOption("--codex-sandbox") ?? undefined;
+  const codexDangerFullAccessApproval = readCodexDangerFullAccessApproval();
+  const trustedLocalAuthorization = readTrustedLocalAuthorization();
   const claudeBareMode = args.includes("--claude-bare") ? true : undefined;
   const claudeDangerouslySkipPermissions = args.includes("--claude-dangerously-skip-permissions") ? true : undefined;
   const asJson = args.includes("--json");
@@ -295,12 +307,21 @@ if (command === "review") {
     let engineFallbackTriggered = false;
     if ((engine === "codex" || engine === "claude") && fallbackEngine && fallbackEngine !== engine) {
       const primaryAvailable = checkEngineAvailable(engine, projectConfig, {
-        executable: engine === "codex" ? codexExecutable : claudeExecutable
+        executable: engine === "codex" ? codexExecutable : claudeExecutable,
+        codexSandboxMode: isCodexSandboxMode(codexSandboxMode) ? codexSandboxMode : undefined,
+        codexDangerFullAccessApproval
       });
+      const primaryPolicyBlocked = engine === "codex" && isCodexSandboxPolicyBlocked(
+        projectConfig,
+        isCodexSandboxMode(codexSandboxMode) ? codexSandboxMode : undefined,
+        codexDangerFullAccessApproval
+      );
 
-      if (!primaryAvailable) {
+      if (!primaryAvailable && !primaryPolicyBlocked) {
         const fallbackAvailable = checkEngineAvailable(fallbackEngine, projectConfig, {
-          executable: fallbackEngine === "codex" ? codexExecutable : claudeExecutable
+          executable: fallbackEngine === "codex" ? codexExecutable : claudeExecutable,
+          codexSandboxMode: isCodexSandboxMode(codexSandboxMode) ? codexSandboxMode : undefined,
+          codexDangerFullAccessApproval
         });
 
         if (fallbackAvailable) {
@@ -326,7 +347,7 @@ if (command === "review") {
     // call), so previewing it here to get the manifest/runId for the estimate and
     // run-level checkpoints is safe - runFake/runClaude/runCodex below compile again
     // internally and land on the identical run.
-    const preview = runCompile({ repositoryPath, planPath, runId });
+    const preview = runCompile({ repositoryPath, planPath, runId, trustedLocalAuthorization });
     const effectiveRunId = preview.runId ?? runId ?? null;
 
     // Flow item 3 (deferred in stage 2 of Part B / Phase 4 - see docs/BENCHMARKS.md):
@@ -396,7 +417,9 @@ if (command === "review") {
     if (args.includes("--independent-review") && independentReviewBase && (engine === "codex" || engine === "claude")) {
       const otherEngine = engine === "codex" ? "claude" : "codex";
       const otherAvailable = checkEngineAvailable(otherEngine, projectConfig, {
-        executable: otherEngine === "codex" ? codexExecutable : claudeExecutable
+        executable: otherEngine === "codex" ? codexExecutable : claudeExecutable,
+        codexSandboxMode: isCodexSandboxMode(codexSandboxMode) ? codexSandboxMode : undefined,
+        codexDangerFullAccessApproval
       });
 
       if (otherAvailable) {
@@ -434,7 +457,7 @@ if (command === "review") {
       args.includes("--independent-review") && engine === "codex" && independentReviewBase && chosenReviewer
         ? {
             reviewer: chosenReviewer,
-            executeRepairCycle: (repairBaseCommit: string) =>
+            executeRepairCycle: (repairBaseCommit: string, execution: ExecutionBackendBinding) =>
               createCodexRepairExecutor({
                 repositoryPath,
                 stateRoot: repairStateRoot,
@@ -442,7 +465,12 @@ if (command === "review") {
                 manifestSha256: preview.manifestSha256 ?? "",
                 baseCommit: repairBaseCommit,
                 projectConfig,
-                adapterConfig: { ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}) },
+                adapterConfig: {
+                  ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}),
+                  ...(isCodexSandboxMode(codexSandboxMode) ? { sandboxMode: codexSandboxMode } : {}),
+                  ...(codexDangerFullAccessApproval ? { dangerFullAccessApproval: codexDangerFullAccessApproval } : {}),
+                  execution
+                },
                 reviewer: chosenReviewer
               })
           }
@@ -451,7 +479,7 @@ if (command === "review") {
       args.includes("--independent-review") && engine === "claude" && independentReviewBase && chosenReviewer
         ? {
             reviewer: chosenReviewer,
-            executeRepairCycle: (repairBaseCommit: string) =>
+            executeRepairCycle: (repairBaseCommit: string, execution: ExecutionBackendBinding) =>
               createClaudeRepairExecutor({
                 repositoryPath,
                 stateRoot: repairStateRoot,
@@ -459,7 +487,10 @@ if (command === "review") {
                 manifestSha256: preview.manifestSha256 ?? "",
                 baseCommit: repairBaseCommit,
                 projectConfig,
-                adapterConfig: { ...(claudeExecutable !== undefined ? { executable: claudeExecutable } : {}) },
+                adapterConfig: {
+                  ...(claudeExecutable !== undefined ? { executable: claudeExecutable } : {}),
+                  execution
+                },
                 reviewer: chosenReviewer
               })
           }
@@ -470,10 +501,12 @@ if (command === "review") {
           repositoryPath,
           planPath,
           runId,
+          trustedLocalAuthorization,
           adapterConfig: {
             ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}),
             ...(codexModel !== undefined ? { defaultModel: codexModel } : {}),
-            ...(isCodexSandboxMode(codexSandboxMode) ? { sandboxMode: codexSandboxMode } : {})
+            ...(isCodexSandboxMode(codexSandboxMode) ? { sandboxMode: codexSandboxMode } : {}),
+            ...(codexDangerFullAccessApproval ? { dangerFullAccessApproval: codexDangerFullAccessApproval } : {})
           },
           ...(independentReviewCodex ? { independentReview: independentReviewCodex } : {}),
           ...(taskContexts ? { taskContexts } : {})
@@ -483,12 +516,19 @@ if (command === "review") {
           repositoryPath,
           planPath,
           runId,
+          trustedLocalAuthorization,
           adapterConfig: {
             ...(claudeExecutable !== undefined ? { executable: claudeExecutable } : {}),
             ...(claudeModel !== undefined ? { defaultModel: claudeModel } : {}),
             ...(isClaudePermissionMode(claudePermissionMode) ? { permissionMode: claudePermissionMode } : {}),
             ...(claudeBareMode !== undefined ? { bareMode: claudeBareMode } : {}),
             ...(claudeDangerouslySkipPermissions !== undefined ? { dangerouslySkipPermissions: claudeDangerouslySkipPermissions } : {})
+          },
+          codexAdapterConfig: {
+            ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}),
+            ...(codexModel !== undefined ? { defaultModel: codexModel } : {}),
+            ...(isCodexSandboxMode(codexSandboxMode) ? { sandboxMode: codexSandboxMode } : {}),
+            ...(codexDangerFullAccessApproval ? { dangerFullAccessApproval: codexDangerFullAccessApproval } : {})
           },
           ...(independentReviewClaude ? { independentReview: independentReviewClaude } : {}),
           ...(taskContexts ? { taskContexts } : {})
@@ -627,14 +667,43 @@ if (command === "review") {
  *  failure signal that is reliably distinguishable from "the task itself
  *  failed" today. See the --fallback-engine resolution comment in the run
  *  command for why this is deliberately not extended to mid-run failures. */
-function checkEngineAvailable(kind: "codex" | "claude", projectConfig: ProjectConfig | null, overrides: { readonly executable?: string }): boolean {
+function checkEngineAvailable(
+  kind: "codex" | "claude",
+  projectConfig: ProjectConfig | null,
+  overrides: {
+    readonly executable?: string;
+    readonly codexSandboxMode?: "workspace-write" | "danger-full-access";
+    readonly codexDangerFullAccessApproval?: CodexDangerFullAccessApproval;
+  }
+): boolean {
   if (kind === "codex") {
-    const adapter = new CodexCliAdapter(codexConfig({ ...codexAdapterConfigFromProject(projectConfig), ...overrides }));
+    const adapter = new CodexCliAdapter(codexConfig({
+      ...codexAdapterConfigFromProject(projectConfig),
+      ...(overrides.executable !== undefined ? { executable: overrides.executable } : {}),
+      ...(overrides.codexSandboxMode !== undefined ? { sandboxMode: overrides.codexSandboxMode } : {}),
+      ...(overrides.codexDangerFullAccessApproval !== undefined
+        ? { dangerFullAccessApproval: overrides.codexDangerFullAccessApproval }
+        : {})
+    }));
     return adapter.doctor().status === "PASS";
   }
 
-  const adapter = new ClaudeCliAdapter(claudeConfig({ ...claudeAdapterConfigFromProject(projectConfig), ...overrides }));
+  const adapter = new ClaudeCliAdapter(claudeConfig({
+    ...claudeAdapterConfigFromProject(projectConfig),
+    ...(overrides.executable !== undefined ? { executable: overrides.executable } : {})
+  }));
   return adapter.doctor().status === "PASS";
+}
+
+function isCodexSandboxPolicyBlocked(
+  projectConfig: ProjectConfig | null,
+  sandboxMode: "workspace-write" | "danger-full-access" | undefined,
+  approval: CodexDangerFullAccessApproval | undefined
+): boolean {
+  return evaluateCodexSandboxPolicy({
+    sandboxMode: sandboxMode ?? projectConfig?.adapters?.codex?.sandboxMode,
+    dangerFullAccessApproval: approval
+  }).status === "BLOCKED";
 }
 
 function readOption(name: string): string | null {
@@ -649,6 +718,34 @@ function readOption(name: string): string | null {
 
 function isCodexSandboxMode(value: string | undefined): value is "workspace-write" | "danger-full-access" {
   return value === "workspace-write" || value === "danger-full-access";
+}
+
+function readCodexDangerFullAccessApproval(): CodexDangerFullAccessApproval | undefined {
+  if (!args.includes("--approve-danger-full-access")) {
+    return undefined;
+  }
+
+  return {
+    approved: true,
+    authorizedBy: readOption("--danger-full-access-authorized-by") ?? "",
+    reason: readOption("--danger-full-access-reason") ?? "",
+    approvedAt: readOption("--danger-full-access-approved-at") ?? "",
+    source: "cli"
+  };
+}
+
+function readTrustedLocalAuthorization(): TrustedLocalAuthorizationInput | undefined {
+  if (!args.includes("--allow-trusted-local")) {
+    return undefined;
+  }
+
+  return {
+    approved: true,
+    authorizedBy: readOption("--trusted-local-authorized-by") ?? "",
+    reason: readOption("--trusted-local-reason") ?? "",
+    approvedAt: readOption("--trusted-local-approved-at") ?? "",
+    source: "cli"
+  };
 }
 
 function isClaudePermissionMode(value: string | undefined): value is "default" | "auto" | "plan" | "acceptEdits" | "bypassPermissions" | "dontAsk" {

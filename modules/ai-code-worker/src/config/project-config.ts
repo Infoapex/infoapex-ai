@@ -35,6 +35,15 @@ export interface ProjectConfig {
    * always explicit opt-in, never automatic just because a provider is configured.
    */
   readonly handoffExport?: boolean;
+  /**
+   * Selects the required execution profile. trusted-local is accepted only
+   * when both fields explicitly opt in; the default remains fail-closed
+   * isolated execution.
+   */
+  readonly executionEnvironment?: {
+    readonly defaultProfile: "isolated" | "trusted-local";
+    readonly allowTrustedLocal: boolean;
+  };
   readonly syncRootPolicy?: {
     readonly sequentialWriter: "warn" | "block";
     readonly parallelWriters: "warn" | "block";
