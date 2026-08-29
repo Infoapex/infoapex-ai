@@ -17,6 +17,8 @@ describe("schema registry", () => {
     ["task-input-snapshot.schema.json", "templates/reports/task-input.example.json"],
     ["engine-event.schema.json", "templates/reports/engine-event.example.json"],
     ["evidence.schema.json", "templates/reports/evidence.example.json"],
+    ["context-package.schema.json", "templates/reports/context-package.example.json"],
+    ["source-map.schema.json", "templates/reports/source-map.example.json"],
     ["review.schema.json", "templates/reports/review.example.json"],
     ["manifest.schema.json", "tests/fixtures/manifest/valid-minimal.json"],
     ["review-finding.schema.json", "templates/reports/review-finding.example.json"],

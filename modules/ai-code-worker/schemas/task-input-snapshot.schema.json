@@ -15,11 +15,17 @@
     "inputCommit",
     "inputTree",
     "compositionAlgorithm",
+    "contextDigest",
+    "contextCompilerVersion",
+    "contractHashes",
+    "qualityGateConfigHash",
+    "policyHash",
+    "toolchainConfigHash",
     "snapshotMetadataSha256"
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0"
+      "const": "1.1"
     },
     "runId": {
       "type": "string",
@@ -52,12 +58,39 @@
       "type": "string",
       "minLength": 1
     },
-    "snapshotMetadataSha256": {
-      "type": "string",
+    "contextDigest": {
+      "type": ["string", "null"],
       "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "contextCompilerVersion": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "contractHashes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/semanticHash" }
+    },
+    "qualityGateConfigHash": { "$ref": "#/$defs/sha256" },
+    "policyHash": { "$ref": "#/$defs/sha256" },
+    "toolchainConfigHash": { "$ref": "#/$defs/sha256" },
+    "snapshotMetadataSha256": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "semanticHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalRef", "sha256"],
+      "properties": {
+        "canonicalRef": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
     "gitOid": {
       "type": "string",
       "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"

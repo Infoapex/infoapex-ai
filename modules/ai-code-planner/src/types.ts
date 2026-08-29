@@ -7,6 +7,7 @@ export interface Gate {
   gateId: string;
   command: string;
   evidenceContract: string;
+  criterionIds: string[];
 }
 
 export interface Scope {
@@ -81,6 +82,15 @@ export interface WorkerManifestTask {
   risk: 'low' | 'medium' | 'high';
   relevantSymbols?: string[];
   executionProfile?: string;
+}
+
+export interface WorkerTaskTraceability {
+  acceptanceCriteria: AcceptanceCriterion[];
+  gates: Gate[];
+}
+
+export interface WorkerManifestTaskV1_1 extends WorkerManifestTask {
+  traceability: WorkerTaskTraceability;
 }
 
 export interface ProjectionWarning {

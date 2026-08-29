@@ -22,7 +22,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0"
+      "enum": ["1.0", "1.1"]
     },
     "checkpointId": {
       "type": "string",
@@ -37,7 +37,7 @@
       "minLength": 1
     },
     "scope": {
-      "enum": ["run", "task"]
+      "enum": ["run", "task", "development"]
     },
     "engine": {
       "enum": ["fake", "claude", "codex"]
@@ -75,6 +75,86 @@
     },
     "percentUsedEstimated": {
       "type": ["number", "null"]
+    },
+    "model": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "reasoningEffort": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "modelContextWindow": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "rateLimitWindowMinutes": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "rateLimitResetsAt": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "calibrationProfileId": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "sessionFingerprint": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{16}$"
+    },
+    "parallelSessionCount": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "prediction": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lowTokens", "medianTokens", "highTokens", "source"],
+          "properties": {
+            "lowTokens": { "type": "number", "minimum": 0 },
+            "medianTokens": { "type": "number", "minimum": 0 },
+            "highTokens": { "type": "number", "minimum": 0 },
+            "source": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.1" } },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "model": {},
+          "reasoningEffort": {},
+          "modelContextWindow": {},
+          "rateLimitWindowMinutes": {},
+          "rateLimitResetsAt": {},
+          "calibrationProfileId": {},
+          "sessionFingerprint": {},
+          "parallelSessionCount": {},
+          "prediction": {}
+        },
+        "required": [
+          "model",
+          "reasoningEffort",
+          "modelContextWindow",
+          "rateLimitWindowMinutes",
+          "rateLimitResetsAt",
+          "calibrationProfileId",
+          "sessionFingerprint",
+          "parallelSessionCount",
+          "prediction"
+        ]
+      }
+    }
+  ]
 }

@@ -11,7 +11,8 @@
         {
           "gateId": "AC-999",
           "command": "verify-a",
-          "evidenceContract": "Exit code 0 and no stderr."
+          "evidenceContract": "Exit code 0 and no stderr.",
+          "criterionIds": ["AC-999"]
         }
       ],
       "dependsOn": [],

@@ -21,6 +21,14 @@ must not block a planner or worker run.
 worker and review through their CLI/JSON contracts; worker remains the only
 component allowed to invoke a writing provider.
 
+## Source and bundle ownership
+
+Standalone repositories own reusable module source. This repository owns the
+integrated, installable projection and pins every extracted module by full Git
+commit in `modules/provenance.json`. The permitted packaging differences and the
+source-first synchronization workflow are documented in
+`docs/MODULE-PROVENANCE.md`.
+
 ## Optional bidirectional channel
 
 The installer creates `.infoapex-ai/config.json`. In `independent` mode, the

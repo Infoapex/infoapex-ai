@@ -36,6 +36,29 @@ describe("read-codex-session", () => {
     assert.equal(summary.usedPercent, null);
   });
 
+  it("extracts model, effort, context window, session id, and reset metadata without retaining transcript content", () => {
+    const summary = parseCodexSessionLog(
+      [
+        JSON.stringify({ type: "session_meta", payload: { session_id: "session-123", context_window: 1_050_000 } }),
+        JSON.stringify({ type: "turn_context", payload: { model: "gpt-5.6-sol", effort: "high" } }),
+        JSON.stringify({
+          type: "event_msg",
+          payload: {
+            type: "token_count",
+            info: { total_token_usage: { input_tokens: 1000, cached_input_tokens: 800, output_tokens: 50, total_tokens: 1050 } },
+            rate_limits: { primary: { used_percent: 12, window_minutes: 300, resets_at: 123456 }, plan_type: "plus" }
+          }
+        })
+      ].join("\n")
+    );
+
+    assert.equal(summary.sessionId, "session-123");
+    assert.equal(summary.model, "gpt-5.6-sol");
+    assert.equal(summary.reasoningEffort, "high");
+    assert.equal(summary.modelContextWindow, 1_050_000);
+    assert.equal(summary.resetsAt, 123456);
+  });
+
   it("returns null best-effort when the rollout file does not exist", () => {
     const missing = join(tmpdir(), "aicw-no-such-codex-rollout-xyz.jsonl");
 

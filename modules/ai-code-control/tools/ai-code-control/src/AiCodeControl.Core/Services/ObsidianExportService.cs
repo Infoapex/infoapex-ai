@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using AiCodeControl.Core.Models;
 using Microsoft.Data.Sqlite;
 
 namespace AiCodeControl.Core.Services;
@@ -13,6 +14,10 @@ namespace AiCodeControl.Core.Services;
 public sealed class ObsidianExportService
 {
     private static readonly Regex UnsafeSlugCharacters = new("[^a-z0-9]+", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly HashSet<string> ProjectedTraceTypes = new(StringComparer.Ordinal)
+    {
+        "adr", "rule", "contract", "criterion", "task", "gate", "evidence"
+    };
 
     public ObsidianExportResult Export(ObsidianExportOptions options)
     {
@@ -24,15 +29,22 @@ public sealed class ObsidianExportService
         if (!Directory.Exists(scopeRoot))
             throw new DirectoryNotFoundException($"Scope path does not exist: {options.ScopePath}");
 
-        var outputRoot = Path.GetFullPath(Path.Combine(repositoryRoot, options.OutputPath));
-        Directory.CreateDirectory(outputRoot);
+        var outputRoot = Path.GetFullPath(Path.IsPathRooted(options.OutputPath)
+            ? options.OutputPath
+            : Path.Combine(repositoryRoot, options.OutputPath));
+        if (string.Equals(outputRoot.TrimEnd(Path.DirectorySeparatorChar),
+                repositoryRoot.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Output path cannot be the repository root.");
         var databasePath = Path.GetFullPath(options.DatabasePath);
         if (!File.Exists(databasePath))
             throw new FileNotFoundException("Code graph database was not found. Run index-code or refresh first.", databasePath);
 
         var graph = ReadGraph(databasePath, repositoryRoot, scopeRoot);
+        var traceState = new TraceGraphRepository().ReadCurrent(databasePath);
+        var trace = BuildTraceProjection(traceState, options.IncludeAdvisory, options.IncludeSuperseded);
         var generatedAt = DateTimeOffset.UtcNow;
-        var exportRoot = new ExportContext(repositoryRoot, outputRoot, graph, generatedAt,
+        var stagingRoot = outputRoot + $".staging-{Guid.NewGuid():N}";
+        var exportRoot = new ExportContext(repositoryRoot, stagingRoot, graph, trace, generatedAt,
             options.IncludeSymbols, Math.Clamp(options.MaxSymbols, 1, 10_000));
         var selectedSymbols = options.IncludeSymbols
             ? graph.Symbols
@@ -44,20 +56,37 @@ public sealed class ObsidianExportService
                 .Take(exportRoot.MaxSymbols)
                 .ToList()
             : new List<CodeSymbol>();
+        foreach (var symbolName in trace.CodeSymbolRefs)
+        {
+            var linked = graph.Symbols
+                .Where(symbol => string.Equals(symbol.FullName, symbolName, StringComparison.Ordinal))
+                .OrderBy(symbol => symbol.FileId).ThenBy(symbol => symbol.StartLine).FirstOrDefault();
+            if (linked is not null && selectedSymbols.All(symbol => symbol.FullName != linked.FullName) &&
+                selectedSymbols.Count < exportRoot.MaxSymbols)
+                selectedSymbols.Add(linked);
+        }
         foreach (var symbol in selectedSymbols)
             exportRoot.IncludedSymbolNames.Add(symbol.FullName);
 
-        WriteIndex(exportRoot);
-        foreach (var module in graph.Modules)
-            WriteModule(exportRoot, module);
-        foreach (var file in graph.Files)
-            WriteFileNote(exportRoot, file);
-
-        foreach (var symbol in selectedSymbols)
-            WriteSymbol(exportRoot, symbol);
-
-        WriteCanvas(exportRoot);
-        WriteManifest(exportRoot);
+        try
+        {
+            WriteIndex(exportRoot);
+            foreach (var module in graph.Modules)
+                WriteModule(exportRoot, module);
+            foreach (var file in graph.Files)
+                WriteFileNote(exportRoot, file);
+            foreach (var symbol in selectedSymbols.OrderBy(item => item.FullName, StringComparer.Ordinal))
+                WriteSymbol(exportRoot, symbol);
+            WriteCodeCanvas(exportRoot);
+            WriteTraceProjection(exportRoot);
+            WriteManifest(exportRoot);
+            SwapGeneratedDirectory(stagingRoot, outputRoot);
+        }
+        catch
+        {
+            DeleteDirectoryIfPresent(stagingRoot);
+            throw;
+        }
 
         return new ObsidianExportResult(
             "ok",
@@ -69,7 +98,10 @@ public sealed class ObsidianExportService
             graph.Branch,
             graph.Commit,
             graph.WorkingTreeDirty,
-            generatedAt);
+            generatedAt,
+            trace.Nodes.Count,
+            trace.Edges.Count,
+            traceState.Digest);
     }
 
     private static CodeGraph ReadGraph(string databasePath, string repositoryRoot, string scopeRoot)
@@ -193,6 +225,7 @@ LIMIT 1;";
         builder.AppendLine($"- Fișiere: **{context.Graph.Files.Count}**");
         builder.AppendLine($"- Module/domenii: **{context.Graph.Modules.Count}**");
         builder.AppendLine($"- Muchii de cod: **{context.Graph.Edges.Count}**");
+        builder.AppendLine($"- Trace graph: [[trace-index|{context.Trace.Nodes.Count} noduri / {context.Trace.Edges.Count} muchii proiectate]]");
         builder.AppendLine();
         builder.AppendLine("## Module și domenii");
         builder.AppendLine();
@@ -347,7 +380,221 @@ LIMIT 1;";
             ? $"[[symbols/{Slug(fullName)}|{fullName}]]"
             : $"`{fullName}`";
 
-    private static void WriteCanvas(ExportContext context)
+    private static TraceProjection BuildTraceProjection(
+        TraceGraphState state,
+        bool includeAdvisory,
+        bool includeSuperseded)
+    {
+        var supersededIds = state.Edges
+            .Where(edge => edge.EdgeType == "supersedes" && (includeAdvisory || edge.TrustTier != "T2"))
+            .Select(edge => edge.ToNodeId)
+            .ToHashSet(StringComparer.Ordinal);
+        var nodes = state.Nodes
+            .Where(node => ProjectedTraceTypes.Contains(node.NodeType))
+            .Where(node => includeAdvisory || node.TrustTier != "T2")
+            .Where(node => includeSuperseded || !supersededIds.Contains(node.NodeId))
+            .OrderBy(node => node.NodeType, StringComparer.Ordinal)
+            .ThenBy(node => node.CanonicalRef, StringComparer.Ordinal)
+            .ThenBy(node => node.NodeId, StringComparer.Ordinal)
+            .ToList();
+        var projectedIds = nodes.Select(node => node.NodeId).ToHashSet(StringComparer.Ordinal);
+        var visibleIds = state.Nodes
+            .Where(node => includeAdvisory || node.TrustTier != "T2")
+            .Where(node => includeSuperseded || !supersededIds.Contains(node.NodeId))
+            .Select(node => node.NodeId)
+            .ToHashSet(StringComparer.Ordinal);
+        var edges = state.Edges
+            .Where(edge => includeAdvisory || edge.TrustTier != "T2")
+            .Where(edge => visibleIds.Contains(edge.FromNodeId) && visibleIds.Contains(edge.ToNodeId))
+            .Where(edge => projectedIds.Contains(edge.FromNodeId) || projectedIds.Contains(edge.ToNodeId))
+            .OrderBy(edge => edge.EdgeType, StringComparer.Ordinal)
+            .ThenBy(edge => edge.FromNodeId, StringComparer.Ordinal)
+            .ThenBy(edge => edge.ToNodeId, StringComparer.Ordinal)
+            .ThenBy(edge => edge.EdgeId, StringComparer.Ordinal)
+            .ToList();
+        var allNodes = state.Nodes.ToDictionary(node => node.NodeId, StringComparer.Ordinal);
+        var codeSymbolRefs = edges.SelectMany(edge => new[] { edge.FromNodeId, edge.ToNodeId })
+            .Distinct(StringComparer.Ordinal)
+            .Where(allNodes.ContainsKey)
+            .Select(id => allNodes[id])
+            .Where(node => node.NodeType == "symbol")
+            .Select(node => node.CanonicalRef)
+            .ToHashSet(StringComparer.Ordinal);
+        return new TraceProjection(state, nodes, edges, allNodes, supersededIds, codeSymbolRefs,
+            includeAdvisory, includeSuperseded);
+    }
+
+    private static void WriteTraceProjection(ExportContext context)
+    {
+        WriteTraceIndex(context);
+        foreach (var node in context.Trace.Nodes)
+            WriteTraceNode(context, node);
+        WriteTraceCanvas(context);
+        WriteTraceProjectionManifest(context);
+    }
+
+    private static void WriteTraceIndex(ExportContext context)
+    {
+        var builder = new StringBuilder();
+        AppendFrontmatter(builder, new Dictionary<string, string?>
+        {
+            ["type"] = "trace-map",
+            ["source_of_truth"] = "canonical-sources-and-sqlite-index",
+            ["graph_digest"] = context.Trace.State.Digest,
+            ["source_commit"] = RepositoryCommit(context),
+            ["generated_at"] = context.GeneratedAt.ToString("O"),
+            ["include_t2"] = context.Trace.IncludeAdvisory.ToString().ToLowerInvariant(),
+            ["include_superseded"] = context.Trace.IncludeSuperseded.ToString().ToLowerInvariant()
+        });
+        builder.AppendLine("# Trace map");
+        builder.AppendLine();
+        builder.AppendLine("> Generated navigation projection. Canonical contracts, ADRs, rules, and evidence remain authoritative; this vault is disposable.");
+        builder.AppendLine();
+        builder.AppendLine($"- Graph digest: `{context.Trace.State.Digest}`");
+        builder.AppendLine($"- Projected nodes: **{context.Trace.Nodes.Count}**");
+        builder.AppendLine($"- Projected edges: **{context.Trace.Edges.Count}**");
+        builder.AppendLine($"- Tiers: **{(context.Trace.IncludeAdvisory ? "T0/T1/T2" : "T0/T1")}**");
+        builder.AppendLine($"- Lifecycle: **{(context.Trace.IncludeSuperseded ? "current + superseded" : "current only")}**");
+        builder.AppendLine("- Canvas: [[canvases/trace-map.canvas|trace overview]]");
+        builder.AppendLine("- Code overview: [[index|code map]]");
+        builder.AppendLine();
+        foreach (var group in context.Trace.Nodes.GroupBy(node => node.NodeType, StringComparer.Ordinal))
+        {
+            builder.AppendLine($"## {group.Key}");
+            builder.AppendLine();
+            foreach (var node in group)
+                builder.AppendLine($"- {TraceNodeLink(node)} — `{node.TrustTier}`, `{node.Authority}`");
+            builder.AppendLine();
+        }
+        WriteText(Path.Combine(context.OutputRoot, "trace-index.md"), builder.ToString());
+    }
+
+    private static void WriteTraceNode(ExportContext context, TraceNodeVersion node)
+    {
+        var builder = new StringBuilder();
+        AppendFrontmatter(builder, new Dictionary<string, string?>
+        {
+            ["type"] = "trace-node",
+            ["entity_type"] = node.NodeType,
+            ["trace_id"] = node.NodeId,
+            ["canonical_ref"] = node.CanonicalRef,
+            ["trust_tier"] = node.TrustTier,
+            ["authority"] = node.Authority,
+            ["lifecycle"] = context.Trace.SupersededIds.Contains(node.NodeId) ? "superseded" : "current",
+            ["source_namespace"] = node.SourceNamespace,
+            ["source_hash"] = node.SourceHash,
+            ["source_commit"] = node.SourceCommit,
+            ["generated_at"] = context.GeneratedAt.ToString("O")
+        });
+        builder.AppendLine($"# {node.Title}");
+        builder.AppendLine();
+        builder.AppendLine($"- Canonical ref: `{node.CanonicalRef}`");
+        builder.AppendLine($"- Type: `{node.NodeType}`; trust: `{node.TrustTier}`; authority: `{node.Authority}`");
+        builder.AppendLine($"- Provenance: `{node.SourceNamespace}` / `{node.SourceHash}` / `{node.SourceCommit}`");
+        builder.AppendLine("- [[trace-index|Back to trace map]]");
+        AppendTraceRelations(builder, context, node, outgoing: true);
+        AppendTraceRelations(builder, context, node, outgoing: false);
+        WriteText(TraceNodePath(context.OutputRoot, node), builder.ToString());
+    }
+
+    private static void AppendTraceRelations(StringBuilder builder, ExportContext context, TraceNodeVersion node, bool outgoing)
+    {
+        var edges = context.Trace.Edges
+            .Where(edge => outgoing ? edge.FromNodeId == node.NodeId : edge.ToNodeId == node.NodeId)
+            .OrderBy(edge => edge.EdgeType, StringComparer.Ordinal)
+            .ThenBy(edge => outgoing ? edge.ToNodeId : edge.FromNodeId, StringComparer.Ordinal)
+            .ToList();
+        builder.AppendLine();
+        builder.AppendLine(outgoing ? "## Outgoing relations" : "## Incoming relations");
+        builder.AppendLine();
+        foreach (var edge in edges)
+        {
+            var targetId = outgoing ? edge.ToNodeId : edge.FromNodeId;
+            var target = context.Trace.AllNodes[targetId];
+            builder.AppendLine($"- `{edge.EdgeType}` {(outgoing ? "→" : "←")} {TraceEndpointLink(context, target)} — `{edge.TrustTier}/{edge.Confidence}`; evidence `{edge.EvidenceRef}`");
+        }
+        if (edges.Count == 0)
+            builder.AppendLine("- None in the selected projection.");
+    }
+
+    private static string TraceEndpointLink(ExportContext context, TraceNodeVersion node)
+    {
+        if (ProjectedTraceTypes.Contains(node.NodeType) && context.Trace.Nodes.Any(item => item.NodeId == node.NodeId))
+            return TraceNodeLink(node);
+        if (node.NodeType == "file" && context.Graph.Files.Any(file => string.Equals(file.Path, node.CanonicalRef, StringComparison.OrdinalIgnoreCase)))
+            return $"[[files/{Slug(node.CanonicalRef)}|{node.CanonicalRef}]]";
+        if (node.NodeType == "symbol" && context.IncludedSymbolNames.Contains(node.CanonicalRef))
+            return $"[[symbols/{Slug(node.CanonicalRef)}|{node.CanonicalRef}]]";
+        return $"`{node.NodeType}:{node.CanonicalRef}`";
+    }
+
+    private static string TraceNodeLink(TraceNodeVersion node)
+        => $"[[trace/{node.NodeType}/{TraceNodeSlug(node)}|{node.Title}]]";
+
+    private static string TraceNodePath(string outputRoot, TraceNodeVersion node)
+        => Path.Combine(outputRoot, "trace", node.NodeType, $"{TraceNodeSlug(node)}.md");
+
+    private static string TraceNodeSlug(TraceNodeVersion node)
+        => $"{Slug(node.CanonicalRef)}-{node.NodeId[^8..]}";
+
+    private static void WriteTraceCanvas(ExportContext context)
+    {
+        var nodes = new List<object>
+        {
+            new { id = "trace-index", type = "file", file = "trace-index.md", x = 0, y = 0, width = 360, height = 220 }
+        };
+        var edges = new List<object>();
+        var positions = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var index = 0; index < context.Trace.Nodes.Count; index++)
+        {
+            var node = context.Trace.Nodes[index];
+            var id = $"trace-{index}";
+            positions[node.NodeId] = id;
+            nodes.Add(new { id, type = "file", file = $"trace/{node.NodeType}/{TraceNodeSlug(node)}.md",
+                x = 460 + (index % 4) * 400, y = (index / 4) * 240, width = 340, height = 180 });
+            edges.Add(new { id = $"index-{id}", fromNode = "trace-index", toNode = id, label = node.NodeType });
+        }
+        foreach (var (edge, index) in context.Trace.Edges.Select((value, index) => (value, index)))
+            if (positions.TryGetValue(edge.FromNodeId, out var from) && positions.TryGetValue(edge.ToNodeId, out var to))
+                edges.Add(new { id = $"trace-edge-{index}", fromNode = from, toNode = to, label = edge.EdgeType });
+        WriteText(Path.Combine(context.OutputRoot, "canvases", "trace-map.canvas"),
+            JsonSerializer.Serialize(new { nodes, edges }, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private static void WriteTraceProjectionManifest(ExportContext context)
+    {
+        var authoritativeIds = context.Trace.State.Nodes
+            .Where(IsAuthoritative)
+            .Select(node => node.NodeId)
+            .ToHashSet(StringComparer.Ordinal);
+        var hashes = context.Trace.State.Nodes.Where(IsAuthoritative)
+            .Select(node => new ProjectionSourceHash(node.SourceNamespace, node.SourceHash))
+            .Concat(context.Trace.State.Edges
+                .Where(edge => edge.TrustTier != "T2" && authoritativeIds.Contains(edge.FromNodeId) && authoritativeIds.Contains(edge.ToNodeId))
+                .Select(edge => new ProjectionSourceHash(edge.SourceNamespace, edge.SourceHash)))
+            .Distinct()
+            .OrderBy(item => item.SourceNamespace, StringComparer.Ordinal)
+            .ThenBy(item => item.SourceHash, StringComparer.Ordinal)
+            .Select(item => new { sourceNamespace = item.SourceNamespace, sourceHash = item.SourceHash })
+            .ToList();
+        var manifest = new
+        {
+            schemaVersion = "1.0",
+            graphDigest = context.Trace.State.Digest,
+            sourceCommit = RepositoryCommit(context),
+            sourceHashes = hashes
+        };
+        WriteText(Path.Combine(context.OutputRoot, ".trace-projection-manifest.json"),
+            JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private static bool IsAuthoritative(TraceNodeVersion node)
+        => node.TrustTier != "T2" && node.Authority is not ("advisory" or "proposed");
+
+    private static string RepositoryCommit(ExportContext context)
+        => RunGit(context.RepositoryRoot, "rev-parse", "HEAD") ?? context.Graph.Commit ?? "unknown";
+
+    private static void WriteCodeCanvas(ExportContext context)
     {
         var nodes = new List<object>
         {
@@ -387,7 +634,10 @@ LIMIT 1;";
             maxSymbols = context.MaxSymbols,
             files = context.Graph.Files.Select(file => new { path = file.Path, hash = file.Hash, language = file.Language }).ToList(),
             modules = context.Graph.Modules.Select(module => module.Key).ToList(),
-            symbols = context.IncludedSymbolNames.OrderBy(name => name, StringComparer.Ordinal).ToList()
+            symbols = context.IncludedSymbolNames.OrderBy(name => name, StringComparer.Ordinal).ToList(),
+            traceGraphDigest = context.Trace.State.Digest,
+            traceNodes = context.Trace.Nodes.Select(node => node.NodeId).ToList(),
+            traceEdges = context.Trace.Edges.Select(edge => edge.EdgeId).ToList()
         };
         WriteText(Path.Combine(context.OutputRoot, ".export-manifest.json"), JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true }));
     }
@@ -459,6 +709,32 @@ LIMIT 1;";
         File.WriteAllText(path, content.EndsWith('\n') ? content : content + Environment.NewLine, new UTF8Encoding(false));
     }
 
+    private static void SwapGeneratedDirectory(string stagingRoot, string outputRoot)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(outputRoot)!);
+        var backupRoot = outputRoot + $".backup-{Guid.NewGuid():N}";
+        var hadExisting = Directory.Exists(outputRoot);
+        try
+        {
+            if (hadExisting)
+                Directory.Move(outputRoot, backupRoot);
+            Directory.Move(stagingRoot, outputRoot);
+            DeleteDirectoryIfPresent(backupRoot);
+        }
+        catch
+        {
+            if (!Directory.Exists(outputRoot) && Directory.Exists(backupRoot))
+                Directory.Move(backupRoot, outputRoot);
+            throw;
+        }
+    }
+
+    private static void DeleteDirectoryIfPresent(string path)
+    {
+        if (Directory.Exists(path))
+            Directory.Delete(path, recursive: true);
+    }
+
     private static string? RunGit(string repositoryRoot, params string[] arguments)
     {
         try
@@ -504,12 +780,24 @@ LIMIT 1;";
     private sealed record CodeEdge(string From, string To, string EdgeType, long FromFileId, long ToFileId);
     private sealed record CodeModule(string Key, List<CodeFile> Files);
     private sealed record ModuleDependency(string From, string To, int Count);
+    private sealed record ProjectionSourceHash(string SourceNamespace, string SourceHash);
+    private sealed record TraceProjection(
+        TraceGraphState State,
+        List<TraceNodeVersion> Nodes,
+        List<TraceEdgeVersion> Edges,
+        Dictionary<string, TraceNodeVersion> AllNodes,
+        HashSet<string> SupersededIds,
+        HashSet<string> CodeSymbolRefs,
+        bool IncludeAdvisory,
+        bool IncludeSuperseded);
 
-    private sealed class ExportContext(string repositoryRoot, string outputRoot, CodeGraph graph, DateTimeOffset generatedAt, bool includeSymbols, int maxSymbols)
+    private sealed class ExportContext(string repositoryRoot, string outputRoot, CodeGraph graph,
+        TraceProjection trace, DateTimeOffset generatedAt, bool includeSymbols, int maxSymbols)
     {
         public string RepositoryRoot { get; } = repositoryRoot;
         public string OutputRoot { get; } = outputRoot;
         public CodeGraph Graph { get; } = graph;
+        public TraceProjection Trace { get; } = trace;
         public DateTimeOffset GeneratedAt { get; } = generatedAt;
         public bool IncludeSymbols { get; } = includeSymbols;
         public int MaxSymbols { get; } = maxSymbols;
@@ -525,6 +813,8 @@ public sealed record ObsidianExportOptions
     public string OutputPath { get; init; } = "docs/code-map/generated";
     public bool IncludeSymbols { get; init; }
     public int MaxSymbols { get; init; } = 250;
+    public bool IncludeAdvisory { get; init; }
+    public bool IncludeSuperseded { get; init; }
 }
 
 public sealed record ObsidianExportResult(
@@ -537,4 +827,7 @@ public sealed record ObsidianExportResult(
     string? Branch,
     string? Commit,
     bool WorkingTreeDirty,
-    DateTimeOffset GeneratedAt);
+    DateTimeOffset GeneratedAt,
+    int TraceNodes,
+    int TraceEdges,
+    string TraceGraphDigest);

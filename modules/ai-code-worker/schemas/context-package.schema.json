@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:context-package.schema.json",
+  "title": "AI Code Control context-package.v1 consumer contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "packageId",
+    "runId",
+    "taskId",
+    "manifestSha256",
+    "compilerVersion",
+    "sources",
+    "budget",
+    "diagnostics",
+    "contextDigest",
+    "createdAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "packageId": { "$ref": "#/$defs/identifier" },
+    "runId": { "$ref": "#/$defs/identifier" },
+    "taskId": { "$ref": "#/$defs/identifier" },
+    "manifestSha256": { "$ref": "#/$defs/sha256" },
+    "compilerVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } },
+    "budget": { "$ref": "#/$defs/budget" },
+    "diagnostics": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } },
+    "contextDigest": { "$ref": "#/$defs/sha256" },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "sourceType", "canonicalRef", "sourceHash", "sourceCommit", "authority", "selectionReason"],
+      "properties": {
+        "sourceId": { "$ref": "#/$defs/identifier" },
+        "sourceType": { "enum": ["file", "symbol", "contract", "decision", "memory", "external", "generated"] },
+        "canonicalRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^(?![A-Za-z]:/)(?!/)(?!file:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+        },
+        "sourceHash": { "$ref": "#/$defs/sha256" },
+        "sourceCommit": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^[0-9a-f]{7,64}$" }
+          ]
+        },
+        "authority": { "enum": ["canonical", "advisory", "proposed", "generated"] },
+        "selectionReason": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "contentRange": { "$ref": "#/$defs/contentRange" },
+        "renderedContent": { "type": "string" }
+      }
+    },
+    "contentRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startLine", "endLine"],
+      "properties": {
+        "startLine": { "type": "integer", "minimum": 1 },
+        "endLine": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["measurement", "maximumTokens", "estimatedTokens", "omittedSources"],
+      "properties": {
+        "measurement": { "enum": ["tokenizer", "characters-fallback"] },
+        "maximumTokens": { "type": "integer", "minimum": 1 },
+        "estimatedTokens": { "type": "integer", "minimum": 0 },
+        "maximumCharacters": { "type": "integer", "minimum": 1 },
+        "estimatedCharacters": { "type": "integer", "minimum": 0 },
+        "omittedSources": { "type": "array", "items": { "$ref": "#/$defs/omittedSource" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "measurement": { "const": "characters-fallback" } } },
+          "then": {
+            "properties": {
+              "maximumCharacters": { "type": "integer", "minimum": 1 },
+              "estimatedCharacters": { "type": "integer", "minimum": 0 }
+            },
+            "required": ["maximumCharacters", "estimatedCharacters"]
+          },
+          "else": {
+            "properties": {
+              "maximumCharacters": false,
+              "estimatedCharacters": false
+            }
+          }
+        }
+      ]
+    },
+    "omittedSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "reason", "estimatedTokens"],
+      "properties": {
+        "sourceId": { "$ref": "#/$defs/identifier" },
+        "reason": { "enum": ["budget", "policy", "unavailable", "invalid"] },
+        "estimatedTokens": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "$ref": "#/$defs/identifier" },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "message": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "sourceId": { "$ref": "#/$defs/identifier" }
+      }
+    }
+  }
+}

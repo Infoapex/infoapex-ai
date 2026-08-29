@@ -78,6 +78,47 @@ describe("compile command", () => {
     assert.equal(existsSync(join(stateRoot, "runs", "run-proposed")), false);
   });
 
+  it("compiles a v1.1 plan without losing criterion, gate, or evidence-contract identifiers", () => {
+    const repo = createGitRepository();
+    writePlan(repo, "Plan/TRACEABLE.md", "accepted", traceablePlanBody());
+    const report = runCompile({
+      repositoryPath: repo,
+      planPath: "Plan/TRACEABLE.md",
+      runId: "run-traceable",
+      now: "2026-08-01T10:00:00Z"
+    });
+
+    assert.equal(report.status, "PASS");
+    const manifest = JSON.parse(readFileSync(report.state.manifestPath!, "utf8"));
+    assert.equal(manifest.schemaVersion, "1.1");
+    assert.deepEqual(manifest.tasks[0].traceability, {
+      acceptanceCriteria: [{ criterionId: "AC-T1-01", text: "Compile writes manifest and authorization outside the repository." }],
+      gates: [{
+        gateId: "G-T1-01",
+        command: "npm test",
+        evidenceContract: "The command exits with code zero.",
+        criterionIds: ["AC-T1-01"]
+      }]
+    });
+  });
+
+  it("blocks a v1.1 manifest when executable strings drift from traceability", () => {
+    const repo = createGitRepository();
+    const body = traceablePlanBody();
+    body.tasks[0]!.acceptanceCriteria = ["A different criterion text."];
+    writePlan(repo, "Plan/TRACE-DRIFT.md", "accepted", body);
+    const report = runCompile({
+      repositoryPath: repo,
+      planPath: "Plan/TRACE-DRIFT.md",
+      runId: "run-trace-drift",
+      now: "2026-08-01T10:00:00Z"
+    });
+
+    assert.equal(report.status, "BLOCKED");
+    assert.equal(report.findings[0]?.code, "MANIFEST_TRACEABILITY_INVALID");
+    assert.match(report.findings[0]?.message ?? "", /acceptance criteria do not match/);
+  });
+
   it("returns existing frozen run state without appending duplicate compile events", () => {
     const repo = createGitRepository();
     writePlan(repo, "Plan/ACCEPTED.md", "accepted");
@@ -131,18 +172,28 @@ function createGitRepository(): string {
   return repo;
 }
 
-function writePlan(repo: string, path: string, status: "accepted" | "proposed"): void {
+function writePlan(
+  repo: string,
+  path: string,
+  status: "accepted" | "proposed",
+  body: ReturnType<typeof planBody> = planBody()
+): void {
   const fullPath = join(repo, ...path.split("/"));
   execFileSync("git", ["checkout", "-B", "main"], { cwd: repo, stdio: "ignore" });
   mkdirSync(dirname(fullPath), { recursive: true });
   writeFileSync(
     fullPath,
-    `---\nstatus: ${status}\n---\n\n# Test plan\n\n\`\`\`json ai-code-worker-plan\n${JSON.stringify(planBody(), null, 2)}\n\`\`\`\n`,
+    `---\nstatus: ${status}\n---\n\n# Test plan\n\n\`\`\`json ai-code-worker-plan\n${JSON.stringify(body, null, 2)}\n\`\`\`\n`,
     "utf8"
   );
 }
 
-function planBody(): unknown {
+function planBody(): {
+  goal: string;
+  tasks: Array<Record<string, unknown>>;
+  globalGates: string[];
+  budgets: Record<string, unknown>;
+} {
   return {
     goal: "Compile a deterministic Phase 0 fixture.",
     tasks: [
@@ -175,6 +226,29 @@ function planBody(): unknown {
       maximumRunCostUsd: null,
       onUnknownUsage: "block"
     }
+  };
+}
+
+function traceablePlanBody(): ReturnType<typeof planBody> & { workerContractVersion: "1.1" } {
+  const body = planBody();
+  return {
+    workerContractVersion: "1.1",
+    ...body,
+    tasks: body.tasks.map((task) => ({
+      ...task,
+      traceability: {
+        acceptanceCriteria: [{
+          criterionId: "AC-T1-01",
+          text: "Compile writes manifest and authorization outside the repository."
+        }],
+        gates: [{
+          gateId: "G-T1-01",
+          command: "npm test",
+          evidenceContract: "The command exits with code zero.",
+          criterionIds: ["AC-T1-01"]
+        }]
+      }
+    }))
   };
 }
 

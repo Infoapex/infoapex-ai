@@ -81,7 +81,7 @@
           "description": "Verification gates that must pass before this task is considered complete.",
           "items": {
             "type": "object",
-            "required": ["gateId", "command", "evidenceContract"],
+            "required": ["gateId", "command", "evidenceContract", "criterionIds"],
             "additionalProperties": false,
             "properties": {
               "gateId": {
@@ -98,6 +98,13 @@
                 "type": "string",
                 "description": "Human-readable description of what constitutes passing evidence for this gate.",
                 "minLength": 1
+              },
+              "criterionIds": {
+                "type": "array",
+                "description": "Acceptance criterion IDs verified by this gate.",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1 }
               }
             }
           }

@@ -21,6 +21,7 @@ export interface CodexCliAdapterConfig {
   readonly sandboxMode?: "workspace-write" | "danger-full-access";
   readonly adapterVersion?: string;
   readonly defaultModel?: string | null;
+  readonly reasoningEffort?: "none" | "low" | "medium" | "high" | "xhigh" | "max";
   readonly timeoutMs?: number;
   readonly maximumOutputBytes?: number;
 }
@@ -161,6 +162,10 @@ export class CodexCliAdapter {
 
     if (this.config.defaultModel) {
       args.splice(this.baseArgs.length + 1, 0, "--model", this.config.defaultModel);
+    }
+
+    if (this.config.reasoningEffort) {
+      args.splice(this.baseArgs.length + 1, 0, "-c", `model_reasoning_effort="${this.config.reasoningEffort}"`);
     }
 
     return {
@@ -563,6 +568,7 @@ export function writeFakeCodexCli(
     readonly supportsExecHelp?: boolean;
     readonly touchedFile?: string;
     readonly delayMs?: number;
+    readonly capturePromptPath?: string;
     /** Wraps the JSON result in prose, simulating a model that does not follow the
      *  "respond with ONLY the JSON object" instruction exactly. */
     readonly wrapResultInProse?: boolean;
@@ -601,6 +607,11 @@ if (${JSON.stringify(supportsExecHelp)} && args[0] === "exec" && args.includes("
     request = JSON.parse(fs.readFileSync(0, "utf8"));
   } catch {}
   const touchedFile = ${JSON.stringify(options.touchedFile ?? null)};
+  const capturePromptPath = ${JSON.stringify(options.capturePromptPath ?? null)};
+  if (capturePromptPath) {
+    fs.mkdirSync(path.dirname(capturePromptPath), { recursive: true });
+    fs.writeFileSync(capturePromptPath, JSON.stringify(request, null, 2));
+  }
   const delayMs = ${JSON.stringify(options.delayMs ?? 0)};
   if (delayMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, delayMs));

@@ -48,6 +48,7 @@ describe("usage checkpoint log", () => {
     assert.equal(checkpoints.length, 2);
     assert.equal(ignoredTailLines.length, 0);
     assert.equal(checkpoints[0]?.phase, "start");
+    assert.equal(checkpoints[0]?.schemaVersion, "1.1");
     assert.deepEqual(checkpoints[0]?.tokens, {
       inputUncachedTokens: null,
       cacheReadTokens: null,
@@ -59,6 +60,71 @@ describe("usage checkpoint log", () => {
     assert.equal(checkpoints[1]?.tokens.outputTokens, 300);
     assert.equal(checkpoints[1]?.taskKind, "backend");
     assert.equal(checkpoints[1]?.taskRisk, "medium");
+  });
+
+  it("persists a profiled v1.1 checkpoint while continuing to read legacy v1.0 lines", () => {
+    const root = mkdtempSync(join(tmpdir(), "aicw-usage-checkpoints-versioned-"));
+    tempRoots.push(root);
+    const path = join(root, "usage-checkpoints.jsonl");
+    const log = new UsageCheckpointLog(path);
+    const legacy = {
+      schemaVersion: "1.0",
+      checkpointId: "legacy",
+      runId: "run-legacy",
+      taskId: "TASK-A",
+      scope: "task",
+      engine: "codex",
+      phase: "end",
+      createdAt: "2026-08-14T10:00:00Z",
+      taskKind: "backend",
+      taskRisk: "medium",
+      tokens: { inputUncachedTokens: 1, cacheReadTokens: 2, cacheWriteTokens: null, outputTokens: 3, costUsd: null },
+      contextEstimateTokens: null,
+      percentUsedReported: null,
+      percentUsedEstimated: null
+    };
+    writeFileSync(path, `${JSON.stringify(legacy)}\n`, "utf8");
+
+    const appended = log.append({
+      checkpointId: "profiled",
+      runId: "run-profiled",
+      taskId: "TASK-B",
+      scope: "task",
+      engine: "codex",
+      phase: "end",
+      createdAt: "2026-08-15T10:00:00Z",
+      taskKind: "backend",
+      taskRisk: "high",
+      model: "gpt-5.6-sol",
+      reasoningEffort: "high",
+      calibrationProfileId: "codex:gpt-5.6-sol:high"
+    });
+    const result = log.read();
+
+    assert.equal(result.checkpoints[0]?.schemaVersion, "1.0");
+    assert.equal(result.checkpoints[1]?.schemaVersion, "1.1");
+    assert.equal(appended.model, "gpt-5.6-sol");
+    assert.equal(appended.reasoningEffort, "high");
+  });
+
+  it("rejects an inverted prediction interval before it is appended", () => {
+    const root = mkdtempSync(join(tmpdir(), "aicw-usage-checkpoints-prediction-"));
+    tempRoots.push(root);
+    const log = new UsageCheckpointLog(join(root, "usage-checkpoints.jsonl"));
+
+    assert.throws(
+      () =>
+        log.append({
+          checkpointId: "bad-prediction",
+          runId: "run-1",
+          scope: "development",
+          engine: "codex",
+          phase: "start",
+          createdAt: "2026-08-15T10:00:00Z",
+          prediction: { lowTokens: 20, medianTokens: 10, highTokens: 30, source: "test" }
+        }),
+      /lowTokens <= medianTokens <= highTokens/
+    );
   });
 
   it("returns an empty result when the log file does not exist yet", () => {

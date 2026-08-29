@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "graphDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "sourceCommit": "0123456789abcdef",
+  "sourceHashes": [
+    {
+      "sourceNamespace": "project",
+      "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}

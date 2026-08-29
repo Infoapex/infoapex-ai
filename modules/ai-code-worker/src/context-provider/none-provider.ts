@@ -4,6 +4,8 @@ import type {
   ContextProviderCallResult,
   ContextProviderHealth,
   ContextProviderImpact,
+  ContextPackage,
+  ContextPackageCompileRequest,
   ContextProviderRefreshResult,
   ContextProviderSymbolMatch
 } from "./types.js";
@@ -33,6 +35,10 @@ export class NoneContextProvider implements ContextProvider {
   }
 
   impact(_symbol: string): Promise<ContextProviderCallResult<ContextProviderImpact>> {
+    return Promise.resolve(UNAVAILABLE);
+  }
+
+  compileContext(_request: ContextPackageCompileRequest): Promise<ContextProviderCallResult<ContextPackage>> {
     return Promise.resolve(UNAVAILABLE);
   }
 

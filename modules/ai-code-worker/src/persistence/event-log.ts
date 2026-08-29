@@ -11,6 +11,7 @@ export type RunEventType =
   | "run.recovering"
   | "run.superseded"
   | "task.input-frozen"
+  | "task.context-compiled"
   | "task.stale"
   | "task.worktree-created"
   | "run.wave-dispatched"
@@ -27,6 +28,7 @@ export type RunEventType =
   | "repair.attempt-finished"
   | "repair.cycle-exhausted"
   | "graph.revision-created"
+  | "source-map.generated"
   | "run.done"
   | "run.blocked";
 

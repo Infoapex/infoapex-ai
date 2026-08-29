@@ -14,7 +14,8 @@
         {
           "gateId": "G-E2E-01",
           "command": "node --version",
-          "evidenceContract": "Node exits successfully."
+          "evidenceContract": "Node exits successfully.",
+          "criterionIds": ["AC-E2E-01"]
         }
       ],
       "dependsOn": [],

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infoapex.dev/contracts/trace-sources.v1.schema.json",
+  "title": "Declared canonical trace sources v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "sources"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nodeType", "canonicalRef", "required"],
+        "properties": {
+          "nodeType": {
+            "enum": ["adr", "rule", "contract", "criterion", "task", "run", "gate", "evidence", "commit", "file", "symbol", "context-package"]
+          },
+          "canonicalRef": { "type": "string", "minLength": 1 },
+          "required": { "type": "boolean" },
+          "sourceHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    }
+  }
+}

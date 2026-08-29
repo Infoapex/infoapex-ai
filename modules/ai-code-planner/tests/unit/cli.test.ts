@@ -63,7 +63,7 @@ const VALID_PLAN: Plan = {
       id: 'T-01',
       goal: 'Do something useful',
       acceptanceCriteria: [{ criterionId: 'AC-001', text: 'Something is done correctly' }],
-      gates: [{ gateId: 'G-001', command: 'npm test', evidenceContract: 'Tests pass with exit 0' }],
+      gates: [{ gateId: 'G-001', command: 'npm test', evidenceContract: 'Tests pass with exit 0', criterionIds: ['AC-001'] }],
       dependsOn: [],
       scope: { allowedPaths: ['src/test.ts'], forbiddenPaths: [] },
       requiredInputs: [{ kind: 'file', ref: 'src/test.ts' }]
@@ -128,14 +128,15 @@ test('compile on a valid draft produces a Plan markdown file with required task 
     const match = content.match(/```ai-code-worker-plan\n([\s\S]*?)\n```/);
     assert.ok(match, 'No ai-code-worker-plan block found in compiled plan');
 
-    const planData = JSON.parse(match[1] as string) as { goal: string; tasks: Record<string, unknown>[] };
+    const planData = JSON.parse(match[1] as string) as { workerContractVersion: string; goal: string; tasks: Record<string, unknown>[] };
+    assert.strictEqual(planData.workerContractVersion, '1.1');
     assert.ok(Array.isArray(planData.tasks), 'tasks should be an array');
     assert.ok(planData.tasks.length > 0, 'tasks array should not be empty');
 
     const requiredFields = [
       'id', 'kind', 'role', 'dependsOn', 'requiredInputs',
       'allowedPaths', 'forbiddenPaths', 'expectedArtifacts',
-      'acceptanceCriteria', 'verify', 'concurrencyKeys', 'risk'
+      'acceptanceCriteria', 'verify', 'concurrencyKeys', 'risk', 'traceability'
     ];
     for (const task of planData.tasks) {
       for (const field of requiredFields) {

@@ -1,10 +1,28 @@
 using Microsoft.Data.Sqlite;
+using AiCodeControl.Core.Models;
 
 namespace AiCodeControl.Core.Services;
 
 public sealed class SymbolQueryService
 {
     public object FindSymbol(string dbPath, string query, int limit = 50)
+    {
+        var matches = FindSymbolMatches(dbPath, query, limit);
+        var items = matches.Select(match => new
+        {
+            name = match.Name,
+            fullName = match.FullName,
+            kind = match.Kind,
+            language = match.Language,
+            file = match.File,
+            startLine = match.StartLine,
+            endLine = match.EndLine
+        });
+
+        return new { query, count = matches.Count, symbols = items };
+    }
+
+    public IReadOnlyList<SymbolQueryMatch> FindSymbolMatches(string dbPath, string query, int limit = 50)
     {
         using var connection = new SqliteConnection($"Data Source={dbPath}");
         connection.Open();
@@ -23,23 +41,21 @@ LIMIT $limit;";
         command.Parameters.AddWithValue("$exact", query);
         command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 500));
 
-        var items = new List<object>();
+        var items = new List<SymbolQueryMatch>();
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            items.Add(new
-            {
-                name = reader.GetString(0),
-                fullName = reader.GetString(1),
-                kind = reader.GetString(2),
-                language = reader.GetString(3),
-                file = reader.GetString(4),
-                startLine = reader.GetInt32(5),
-                endLine = reader.GetInt32(6)
-            });
+            items.Add(new SymbolQueryMatch(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetInt32(5),
+                reader.GetInt32(6)));
         }
 
-        return new { query, count = items.Count, symbols = items };
+        return items;
     }
 
     public object ImpactAnalysis(string dbPath, string symbolInput, int maxDepth = 5)

@@ -82,19 +82,41 @@ HIGH_RISK_NO_GATES: task <id> has risk 'high' but gates is empty
 
 ---
 
-### 7. GATE_CRITERION_REF — Every criterionId referenced by a gate exists on that task
+### 7. GATE_CRITERION_REF — Gate-to-criterion links are complete and unambiguous
 
-**What it checks:** When a gate references a `criterionId` — either explicitly via a future schema field or by the naming convention `gateId = criterionId` — that identifier must correspond to an entry in the same task's `acceptanceCriteria` array. The invariant to enforce is: for every gate, the criterionId it is meant to discharge must be declared on that same task. This enforces the `criterionId → gateId → evidenceContract` chain from _FINAL.md decision 7b.
+**What it checks:** Every gate declares a non-empty `criterionIds` array. Every
+reference resolves to a criterion on the same task, every criterion is covered by at
+least one gate, and criterion/gate IDs are globally unique within the plan. The
+linter never infers a relationship from naming or array position.
 
 **Failure mode:**
 
 ```
 UNKNOWN_CRITERION: task <id> gate '<gateId>' references criterionId '<criterionId>' which does not exist on this task
+UNCOVERED_CRITERION: task <id> criterion '<criterionId>' is not covered by any gate
+DUPLICATE_CRITERION_ID: criterionId '<criterionId>' is duplicated across the plan
+DUPLICATE_GATE_ID: gateId '<gateId>' is duplicated across the plan
 ```
 
 ---
 
-## Projection to worker v1.0
+## Projection to worker v1.1 (current)
+
+Planner compile emits `workerContractVersion: "1.1"`. The worker freezes a manifest
+with a per-task `traceability` object containing the original structured acceptance
+criteria and gates, including `criterionIds` and `evidenceContract`.
+
+The flat `acceptanceCriteria` and `verify` arrays remain temporarily for execution
+compatibility. Both planner and worker validate exact value/order equivalence between
+the flat arrays and traceability; drift blocks compilation. Consequently
+`criterionId`, `gateId`, and `evidenceContract` no longer appear in `lostFields`.
+
+`requiredInputs.kind` is still projected to a flat reference and remains an explicit
+projection warning.
+
+---
+
+## Projection to worker v1.0 (legacy compatibility)
 
 The planner's internal rich plan (`schemas/plan.schema.json`) is not the format `ai-code-worker` consumes. The `compile` step projects a subset of the plan into the worker v1.0 manifest format. This projection is **intentionally lossy**, and the loss must be **validated and reported explicitly** by the compile step — not silently dropped.
 

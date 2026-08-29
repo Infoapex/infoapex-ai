@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { projectToWorkerV1 } from '../../src/projection/project-to-worker-v1.js';
-import { validateWorkerTaskExport } from '../../src/projection/validate-worker-export.js';
+import { projectToWorkerV1, projectToWorkerV1_1 } from '../../src/projection/project-to-worker-v1.js';
+import { validateWorkerTaskExport, validateWorkerTaskExportV1_1 } from '../../src/projection/validate-worker-export.js';
 import type { Plan } from '../../src/types.js';
 
 const testPlan: Plan = {
@@ -15,7 +15,7 @@ const testPlan: Plan = {
         { criterionId: 'AC-002', text: 'No errors in stderr.' },
       ],
       gates: [
-        { gateId: 'G-001', command: 'verify-schema', evidenceContract: 'Exit code 0.' },
+        { gateId: 'G-001', command: 'verify-schema', evidenceContract: 'Exit code 0.', criterionIds: ['AC-001', 'AC-002'] },
       ],
       dependsOn: [],
       scope: { allowedPaths: ['src/'], forbiddenPaths: ['docs/'] },
@@ -29,8 +29,8 @@ const testPlan: Plan = {
         { criterionId: 'AC-003', text: 'File exists.' },
       ],
       gates: [
-        { gateId: 'G-002', command: 'build', evidenceContract: 'Build succeeds.' },
-        { gateId: 'G-003', command: 'test', evidenceContract: 'All tests pass.' },
+        { gateId: 'G-002', command: 'build', evidenceContract: 'Build succeeds.', criterionIds: ['AC-003'] },
+        { gateId: 'G-003', command: 'test', evidenceContract: 'All tests pass.', criterionIds: ['AC-003'] },
       ],
       dependsOn: ['TASK-001'],
       scope: { allowedPaths: ['tests/'], forbiddenPaths: [] },
@@ -102,5 +102,32 @@ test('worker export rejects task ids that the worker manifest schema cannot acce
   const { manifestTasks } = projectToWorkerV1(lowerCasePlan);
   assert.deepStrictEqual(validateWorkerTaskExport(manifestTasks), [
     'task-001: task id must match ^[A-Z0-9][A-Z0-9._-]*$'
+  ]);
+});
+
+test('v1.1 projection preserves criterion, gate, evidence contract, and gate-to-criterion links', () => {
+  const { manifestTasks, projectionWarnings } = projectToWorkerV1_1(testPlan);
+
+  assert.deepStrictEqual(manifestTasks[0].traceability, {
+    acceptanceCriteria: testPlan.tasks[0].acceptanceCriteria,
+    gates: testPlan.tasks[0].gates,
+  });
+  assert.deepStrictEqual(manifestTasks[0].acceptanceCriteria, testPlan.tasks[0].acceptanceCriteria.map(item => item.text));
+  assert.deepStrictEqual(manifestTasks[0].verify, testPlan.tasks[0].gates.map(item => item.command));
+  assert.deepStrictEqual(projectionWarnings, [
+    { taskId: 'TASK-001', lostFields: ['requiredInputs[0].kind'] }
+  ]);
+  assert.deepStrictEqual(validateWorkerTaskExportV1_1(manifestTasks), []);
+});
+
+test('v1.1 export rejects dangling and uncovered criterion links deterministically', () => {
+  const { manifestTasks } = projectToWorkerV1_1(testPlan);
+  const invalid = structuredClone(manifestTasks);
+  invalid[0]!.traceability.gates[0]!.criterionIds = ['AC-DOES-NOT-EXIST'];
+
+  assert.deepStrictEqual(validateWorkerTaskExportV1_1(invalid), [
+    'TASK-001: gate G-001 references unknown criterion AC-DOES-NOT-EXIST',
+    'TASK-001: criterion AC-001 is not covered by a gate',
+    'TASK-001: criterion AC-002 is not covered by a gate'
   ]);
 });

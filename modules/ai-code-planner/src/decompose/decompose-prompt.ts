@@ -60,7 +60,7 @@ Produce a JSON object with exactly this shape:
         { "criterionId": "<stable id>", "text": "<human-readable criterion>" }
       ],
       "gates": [
-        { "gateId": "<stable id>", "command": "<command to run>", "evidenceContract": "<what constitutes passing>" }
+        { "gateId": "<stable id>", "command": "<command to run>", "evidenceContract": "<what constitutes passing>", "criterionIds": ["<criterion id verified by this gate>"] }
       ],
       "dependsOn": [],
       "scope": {
@@ -82,7 +82,7 @@ Required fields:
   - id: non-empty string (unique within this plan)
   - goal: non-empty string describing what this task accomplishes
   - acceptanceCriteria: array of objects with criterionId (string) and text (string)
-  - gates: array of objects with gateId (string), command (string), and evidenceContract (string)
+  - gates: array of objects with gateId, command, evidenceContract, and non-empty criterionIds; every criterion must be covered and references must resolve within the task
   - id and every dependsOn entry must match ^[A-Z0-9][A-Z0-9._-]*$ (uppercase worker-compatible identifiers)
   - dependsOn: array of task id strings (empty array if no dependencies)
   - scope: object with allowedPaths (string array) and forbiddenPaths (string array)
@@ -121,7 +121,7 @@ Produce a corrected JSON object with exactly this shape:
         { "criterionId": "<stable id>", "text": "<human-readable criterion>" }
       ],
       "gates": [
-        { "gateId": "<stable id>", "command": "<command to run>", "evidenceContract": "<what constitutes passing>" }
+        { "gateId": "<stable id>", "command": "<command to run>", "evidenceContract": "<what constitutes passing>", "criterionIds": ["<criterion id verified by this gate>"] }
       ],
       "dependsOn": [],
       "scope": {
@@ -143,7 +143,7 @@ Required fields:
   - id: non-empty string (unique within this plan)
   - goal: non-empty string describing what this task accomplishes
   - acceptanceCriteria: array of objects with criterionId (string) and text (string)
-  - gates: array of objects with gateId (string), command (string), and evidenceContract (string)
+  - gates: array of objects with gateId, command, evidenceContract, and non-empty criterionIds; every criterion must be covered and references must resolve within the task
   - id and every dependsOn entry must match ^[A-Z0-9][A-Z0-9._-]*$ (uppercase worker-compatible identifiers)
   - dependsOn: array of task id strings (empty array if no dependencies)
   - scope: object with allowedPaths (string array) and forbiddenPaths (string array)

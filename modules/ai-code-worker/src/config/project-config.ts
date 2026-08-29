@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 export interface AdapterProjectConfig {
   readonly executable?: string;
+  readonly baseArgs?: readonly string[];
   readonly model?: string | null;
   readonly timeoutSeconds?: number;
   readonly maximumOutputBytes?: number;
@@ -11,6 +12,7 @@ export interface AdapterProjectConfig {
 
 export interface CodexProjectAdapterConfig extends AdapterProjectConfig {
   readonly sandboxMode?: "workspace-write" | "danger-full-access";
+  readonly reasoningEffort?: "none" | "low" | "medium" | "high" | "xhigh" | "max";
 }
 
 export interface ClaudeProjectAdapterConfig extends AdapterProjectConfig {
@@ -29,6 +31,10 @@ export interface ProjectConfig {
    * adapter only, never a direct dependency.
    */
   readonly contextProvider?: "none" | "ai-code-control";
+  readonly contextPackage?: {
+    readonly mode: "off" | "observe" | "enforce";
+    readonly maximumTokens: number;
+  };
   /**
    * "Regula configurată" gate for the redacted handoff export (AICW-ADR-001 / plan
    * §13 invariant). Default false - exporting into `.ai-code-control/handoffs/` is

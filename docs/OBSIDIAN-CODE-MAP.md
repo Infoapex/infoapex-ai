@@ -1,14 +1,14 @@
 # Code map Obsidian
 
-`ai-code-control obsidian-export` proiectează graful de cod SQLite în note Markdown și un fișier Canvas compatibil cu Obsidian. Este o vedere pentru oameni, nu un nou index semantic și nu o sursă de adevăr.
+`ai-code-control obsidian-export` proiectează grafurile SQLite de cod și trasabilitate în note Markdown și Canvas compatibile cu Obsidian. Este o vedere pentru oameni, nu un nou index semantic și nu o sursă de adevăr.
 
 ```mermaid
 flowchart LR
     S[Cod + contracte] --> I[refresh / index-code]
     I --> DB[(codegraph.sqlite)]
-    DB --> E[obsidian-export]
-    E --> M[index.md + note Markdown]
-    E --> C[code-map.canvas]
+    DB --> E[obsidian-export atomic]
+    E --> M[index.md + trace-index.md + note Markdown]
+    E --> C[code-map.canvas + trace-map.canvas]
     M --> O[Obsidian Graph View]
     C --> O
 ```
@@ -41,7 +41,11 @@ docs/code-map/generated/
 ├── files/*.md
 ├── symbols/*.md          # doar cu --include-symbols
 ├── canvases/code-map.canvas
-└── .export-manifest.json  # proveniență și hash-uri
+├── trace/<type>/*.md
+├── trace-index.md
+├── canvases/trace-map.canvas
+├── .trace-projection-manifest.json
+└── .export-manifest.json
 ```
 
 Directorul implicit este ignorat de Git pentru a evita commit-uri generate la fiecare indexare. Un vault extern poate fi folosit explicit:
@@ -54,7 +58,7 @@ dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- obsidian-exp
   --max-symbols 250
 ```
 
-Același flux este disponibil prin tool-ul MCP `obsidian_export`, cu argumentele `path`, `out`, `includeSymbols` și `maxSymbols`.
+Același flux este disponibil prin tool-ul MCP `obsidian_export`, cu argumentele `path`, `out`, `includeSymbols`, `maxSymbols`, `includeAdvisory` și `includeSuperseded`.
 
 ## Opțiuni
 
@@ -64,8 +68,10 @@ Același flux este disponibil prin tool-ul MCP `obsidian_export`, cu argumentele
 | `--out <vault>` | `docs/code-map/generated` | directorul în care sunt scrise notele; poate fi un vault extern ales explicit |
 | `--include-symbols` | dezactivat | generează note individuale pentru simbolurile selectate |
 | `--max-symbols <n>` | `250` | limitează snapshot-ul de simboluri și reduce zgomotul în Graph View |
+| `--include-advisory` | dezactivat | include entitățile și muchiile T2 numai în vizualizare |
+| `--include-superseded` | dezactivat | include entitățile superseded; implicit proiecția este current-only |
 
-Exporterul nu șterge fișiere vechi. Pentru un vault dedicat, folosește un director nou sau o politică separată de curățare după ce verifici `.export-manifest.json`.
+Exporterul scrie într-un director de staging și face swap numai după generarea completă. Astfel elimină automat notele stale; dacă generarea eșuează, vault-ul anterior rămâne disponibil.
 
 ## Ce se generează
 
@@ -75,7 +81,7 @@ Notele de modul grupează fișierele după domeniu (`modules/ai-code-worker`, `s
 
 Notele de fișier păstrează calea, limbajul, hash-ul indexat și simbolurile găsite. Notele de simbol sunt opționale deoarece exportarea tuturor simbolurilor poate produce un graf greu de folosit.
 
-Canvas-ul este o vedere de ansamblu pe module. Relațiile detaliate se explorează mai bine prin Graph View sau prin `impact-analysis`.
+`code-map.canvas` este vederea de ansamblu pe module. `trace-map.canvas` păstrează separat ADR-urile, regulile, contractele, criteriile, taskurile, gate-urile și evidence, cu edge type explicit. Query-urile authoritative rămân `trace`, `why`, `affected`, `current` și `evidence-for`.
 
 ## Workflow recomandat
 
@@ -109,7 +115,7 @@ source_commit: "..."
 generated_at: "..."
 ```
 
-Aceste valori permit detectarea unei hărți vechi. Dacă `source_commit` sau `source_hash` nu mai corespund indexului curent, regenerează exportul.
+Aceste valori permit detectarea unei hărți vechi. `.trace-projection-manifest.json` poate fi verificat determinist prin `graph-drift --projection-manifest <path>`; digestul, commitul și setul source hash trebuie să corespundă grafului curent.
 Proprietatea `working_tree_dirty` avertizează când exportul a fost făcut peste modificări locale necomise; într-un review de release, preferă un index construit pe un commit curat.
 
 ## Securitate și confidențialitate
@@ -133,5 +139,4 @@ Proprietatea `working_tree_dirty` avertizează când exportul a fost făcut pest
 - export incremental doar pentru fișierele schimbate;
 - linkuri directe către commituri și review findings;
 - filtre de limbaj, accesibilitate și risc;
-- plugin Obsidian opțional care pornește `refresh`/`obsidian-export` și indică staleness;
-- vizualizare de task-uri, gate-uri și evenimente worker lângă harta codului.
+- plugin Obsidian opțional care pornește regenerarea și indică staleness, fără a intra în runtime-ul workerului.

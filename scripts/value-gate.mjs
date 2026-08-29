@@ -1,8 +1,9 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { detectRunSemanticDrift } from "../modules/ai-code-worker/dist/src/snapshots/detect-run-semantic-drift.js";
 
 const apexRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const plannerRoot = join(apexRoot, "modules", "ai-code-planner");
@@ -13,10 +14,18 @@ const live = process.argv.includes("--live");
 const timeoutMs = Number(process.env.APEX_VALUE_GATE_TIMEOUT_MS ?? (live ? 60000 : 30000));
 
 const taskSeeds = [
-  { label: "contract", goal: "Validate a generic contract fixture", path: "src/contract-fixture.txt" },
-  { label: "service", goal: "Validate a generic service fixture", path: "src/service-fixture.txt" },
-  { label: "workflow", goal: "Validate a generic workflow fixture", path: "src/workflow-fixture.txt" }
+  ...seeds("contract", "Validate a generic contract fixture", (index) => `contracts/contract-${index}.schema.json`),
+  ...seeds("code-tests", "Validate a generic code and test fixture", (index) => `src/code-test-${index}.txt`),
+  ...seeds("docs-review", "Validate a generic documentation and review fixture", (index) => `docs/review-${index}.md`),
+  ...seeds("invalidation", "Validate semantic input invalidation", (index) => `src/invalidation-${index}.txt`)
 ];
+
+function seeds(category, goal, pathFor) {
+  return Array.from({ length: 5 }, (_, offset) => {
+    const index = offset + 1;
+    return { category, label: `${category}-${index}`, goal: `${goal} ${index}`, path: pathFor(index) };
+  });
+}
 
 function planFor(seed) {
   return {
@@ -25,7 +34,7 @@ function planFor(seed) {
       id: `TASK-${seed.label.toUpperCase()}`,
       goal: seed.goal,
       acceptanceCriteria: [{ criterionId: "AC-001", text: "The fixture remains valid after implementation." }],
-      gates: [{ gateId: "G-001", command: "node scripts/pass-gate.mjs", evidenceContract: "The target repository test command exits with code 0." }],
+      gates: [{ gateId: "G-001", command: "node scripts/pass-gate.mjs", evidenceContract: "The target repository test command exits with code 0.", criterionIds: ["AC-001"] }],
       dependsOn: [],
       scope: { allowedPaths: [seed.path], forbiddenPaths: [".git/**"] },
       requiredInputs: [{ kind: "file", ref: seed.path }]
@@ -155,22 +164,50 @@ function main() {
         ? runJson(process.execPath, [workerCli, ...workerArgs], workerRoot)
         : { status: 1, stdout: "", stderr: "compile did not pass", body: null, timedOut: false };
 
+      const artifacts = inspectWorkerArtifacts(executed.body, taskId, seed.category);
       const passed = proposed.status === 0 && proposed.body?.status === "DONE"
         && inspected.status === 0 && inspected.body?.schemaValid === true && inspected.body?.lintOk === true
         && compiled.status === 0 && compiled.body?.status === "DONE"
-        && executed.status === 0 && executed.body?.status === "DONE";
-      results.push({ label: seed.label, mode: live ? "live" : "internal", passed, proposal: summarize(proposed), inspect: summarize(inspected), compile: summarize(compiled), worker: summarize(executed) });
+        && executed.status === 0 && executed.body?.status === "DONE"
+        && artifacts.sourceMapComplete
+        && (seed.category !== "invalidation" || (artifacts.reuseStable && artifacts.invalidationDetected));
+      results.push({ category: seed.category, label: seed.label, mode: live ? "live" : "internal", passed, artifacts, proposal: summarize(proposed), inspect: summarize(inspected), compile: summarize(compiled), worker: summarize(executed) });
     }
   } finally {
     rmSync(repository, { recursive: true, force: true });
     rmSync(workspace, { recursive: true, force: true });
   }
 
-  const passed = results.every((result) => result.passed);
+  const categoryCounts = Object.fromEntries(
+    [...new Set(taskSeeds.map((seed) => seed.category))].map((category) => [category, results.filter((result) => result.category === category && result.passed).length])
+  );
+  const doneTasks = results.filter((result) => result.worker.report?.status === "DONE").length;
+  const passingGates = results.reduce((total, result) => total + (result.artifacts.passingGates ?? 0), 0);
+  const totalGates = results.reduce((total, result) => total + (result.artifacts.totalGates ?? 0), 0);
+  const traceCoveragePercent = average(results.map((result) => result.artifacts.traceCoveragePercent).filter(Number.isFinite));
+  const invalidationChecksPassed = results.filter((result) => result.category === "invalidation" && result.artifacts.invalidationDetected).length;
+  const firstPassGateRate = totalGates === 0 ? 0 : (passingGates / totalGates) * 100;
+  const structuralThresholds = {
+    minimumDoneTasks: 20,
+    minimumTasksPerCategory: 5,
+    minimumTraceCoveragePercent: 100,
+    minimumDirectEvidencePercent: 90,
+    minimumFirstPassGateRate: 95,
+    minimumInvalidationChecks: 5
+  };
+  const passed = results.every((result) => result.passed)
+    && doneTasks >= structuralThresholds.minimumDoneTasks
+    && Object.values(categoryCounts).every((count) => count >= structuralThresholds.minimumTasksPerCategory)
+    && traceCoveragePercent >= structuralThresholds.minimumTraceCoveragePercent
+    && firstPassGateRate >= structuralThresholds.minimumFirstPassGateRate
+    && invalidationChecksPassed >= structuralThresholds.minimumInvalidationChecks;
   console.log(JSON.stringify({
     status: passed ? "PASS" : "BLOCKED",
     mode: live ? "live" : "internal",
     usageConsuming: live,
+    releaseDecision: live && passed ? "LIVE_PASS" : passed ? "INTERNAL_PASS_LIVE_REQUIRED" : "BLOCKED",
+    structuralThresholds,
+    metrics: { doneTasks, categoryCounts, traceCoveragePercent, directEvidencePercent: traceCoveragePercent, firstPassGateRate, invalidationChecksPassed },
     results
   }, null, 2));
   process.exitCode = passed ? 0 : 2;
@@ -180,9 +217,65 @@ function summarize(result) {
   return {
     status: result.status,
     timedOut: result.timedOut,
-    report: result.body,
+    report: compactReport(result.body),
     stderr: result.stderr.slice(-2000)
   };
+}
+
+function compactReport(body) {
+  if (!body || typeof body !== "object") return body;
+  return Object.fromEntries(
+    ["status", "runId", "schemaValid", "lintOk", "draftPath", "planPath", "error"]
+      .filter((key) => body[key] !== undefined)
+      .map((key) => [key, body[key]])
+  );
+}
+
+function inspectWorkerArtifacts(workerReport, taskId, category) {
+  const runRoot = workerReport?.state?.runRoot;
+  const gateResults = Array.isArray(workerReport?.gateResults) ? workerReport.gateResults : [];
+  const result = {
+    sourceMapComplete: false,
+    traceCoveragePercent: 0,
+    reuseStable: category !== "invalidation",
+    invalidationDetected: category !== "invalidation",
+    passingGates: gateResults.filter((gate) => gate?.exitCode === 0).length,
+    totalGates: gateResults.length
+  };
+  if (!runRoot || !taskId) return result;
+  const sourceMapPath = join(runRoot, "source-map.v1.json");
+  const snapshotPath = join(runRoot, "tasks", taskId, "task-input.json");
+  if (existsSync(sourceMapPath)) {
+    const sourceMap = JSON.parse(readFileSync(sourceMapPath, "utf8"));
+    result.sourceMapComplete = sourceMap?.coverage?.complete === true;
+    result.traceCoveragePercent = Number(sourceMap?.coverage?.traceCoveragePercent ?? 0);
+  }
+  if (category === "invalidation" && existsSync(snapshotPath)) {
+    const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8"));
+    const semanticInputs = {
+      contextDigest: snapshot.contextDigest,
+      contextCompilerVersion: snapshot.contextCompilerVersion,
+      contractHashes: snapshot.contractHashes,
+      qualityGateConfigHash: snapshot.qualityGateConfigHash,
+      policyHash: snapshot.policyHash,
+      toolchainConfigHash: snapshot.toolchainConfigHash
+    };
+    const unchanged = detectRunSemanticDrift(runRoot, { [taskId]: semanticInputs });
+    const changedPolicyHash = `${snapshot.policyHash.startsWith("0") ? "1" : "0"}${snapshot.policyHash.slice(1)}`;
+    const changed = detectRunSemanticDrift(runRoot, {
+      [taskId]: { ...semanticInputs, policyHash: changedPolicyHash }
+    });
+    result.reuseStable = unchanged.length === 0;
+    result.invalidationDetected = changed.length === 1
+      && changed[0]?.taskId === taskId
+      && changed[0]?.reasons?.length === 1
+      && changed[0]?.reasons?.[0] === "POLICY_CHANGED";
+  }
+  return result;
+}
+
+function average(values) {
+  return values.length === 0 ? 0 : values.reduce((total, value) => total + value, 0) / values.length;
 }
 
 main();

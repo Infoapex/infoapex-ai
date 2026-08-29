@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:source-map.schema.json",
+  "title": "ai-code-worker semantic source map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runId", "manifestSha256", "nodes", "edges", "coverage", "findings", "sourceMapDigest", "createdAt"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "runId": { "type": "string", "minLength": 1 },
+    "manifestSha256": { "$ref": "#/$defs/sha256" },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nodeId", "kind", "canonicalRef", "authority"],
+        "properties": {
+          "nodeId": { "type": "string", "pattern": "^node-[a-f0-9]{16}$" },
+          "kind": { "enum": ["source", "decision", "contract", "criterion", "task", "file", "symbol", "gate", "evidence", "commit", "context-package"] },
+          "canonicalRef": { "type": "string", "minLength": 1 },
+          "authority": { "enum": ["canonical", "advisory", "proposed", "generated"] }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["edgeId", "relation", "fromNodeId", "toNodeId", "confidence", "evidenceRefs"],
+        "properties": {
+          "edgeId": { "type": "string", "pattern": "^edge-[a-f0-9]{16}$" },
+          "relation": { "enum": ["selected_for", "requires", "implemented_by", "changed_by", "verified_by", "derived_from"] },
+          "fromNodeId": { "type": "string", "pattern": "^node-[a-f0-9]{16}$" },
+          "toNodeId": { "type": "string", "pattern": "^node-[a-f0-9]{16}$" },
+          "confidence": { "enum": ["declared", "observed", "derived"] },
+          "evidenceRefs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criteriaTotal", "criteriaWithDirectEvidence", "traceCoveragePercent", "complete"],
+      "properties": {
+        "criteriaTotal": { "type": "integer", "minimum": 0 },
+        "criteriaWithDirectEvidence": { "type": "integer", "minimum": 0 },
+        "traceCoveragePercent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "complete": { "type": "boolean" }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "enum": ["TRACEABILITY_MISSING", "EVIDENCE_MISSING", "EVIDENCE_NOT_PASSING", "ID_BOUNDARY_LOSS", "PROPOSED_SOURCE_AS_EVIDENCE"] },
+          "message": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "sourceMapDigest": { "$ref": "#/$defs/sha256" },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

@@ -1,6 +1,7 @@
 export interface ParsedPlan {
   readonly status: string;
   readonly body: {
+    readonly workerContractVersion?: "1.0" | "1.1";
     readonly goal: string;
     readonly tasks: readonly unknown[];
     readonly globalGates: readonly string[];

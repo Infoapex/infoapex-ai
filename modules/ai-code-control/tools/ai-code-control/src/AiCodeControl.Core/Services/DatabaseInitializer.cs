@@ -20,6 +20,7 @@ PRAGMA foreign_keys=ON;
 PRAGMA busy_timeout=10000;
 PRAGMA temp_store=MEMORY;
 PRAGMA cache_size=-64000;
+BEGIN IMMEDIATE;
 
 CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER NOT NULL PRIMARY KEY,
@@ -28,8 +29,6 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 INSERT OR IGNORE INTO schema_version (version, applied_at, description)
 VALUES (1, datetime('now'), 'Initial schema');
-INSERT OR IGNORE INTO schema_version (version, applied_at, description)
-VALUES (2, datetime('now'), 'Incremental multi-language index runs and raw reference tokens');
 
 CREATE TABLE IF NOT EXISTS files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,6 +112,62 @@ CREATE TABLE IF NOT EXISTS code_index_runs (
     files_pruned INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS trace_nodes (
+    version_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL,
+    node_type TEXT NOT NULL CHECK(node_type IN ('adr','rule','contract','criterion','task','run','gate','evidence','commit','file','symbol','context-package')),
+    node_namespace TEXT NOT NULL,
+    canonical_ref TEXT NOT NULL,
+    title TEXT NOT NULL,
+    source_namespace TEXT NOT NULL,
+    source_hash TEXT NOT NULL,
+    source_commit TEXT NOT NULL,
+    origin TEXT NOT NULL CHECK(origin IN ('ast','git','json-contract','runtime-evidence','adr','frontmatter','manifest','model')),
+    trust_tier TEXT NOT NULL CHECK(trust_tier IN ('T0','T1','T2')),
+    authority TEXT NOT NULL CHECK(authority IN ('canonical','advisory','proposed','generated')),
+    valid_from TEXT NOT NULL,
+    valid_to TEXT NULL,
+    properties_json TEXT NOT NULL CHECK(json_valid(properties_json) AND json_type(properties_json)='object'),
+    CHECK((trust_tier='T0' AND origin IN ('ast','git','json-contract','runtime-evidence')) OR (trust_tier='T1' AND origin IN ('adr','frontmatter','manifest')) OR (trust_tier='T2' AND origin='model')),
+    CHECK(valid_to IS NULL OR valid_to >= valid_from),
+    UNIQUE(node_id, valid_from)
+);
+
+CREATE TABLE IF NOT EXISTS trace_edges (
+    version_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    edge_id TEXT NOT NULL,
+    from_node_id TEXT NOT NULL,
+    to_node_id TEXT NOT NULL,
+    edge_type TEXT NOT NULL CHECK(edge_type IN ('supersedes','depends_on','implements','verified_by','derived_from','changes','references','selected_for')),
+    origin TEXT NOT NULL CHECK(origin IN ('ast','git','json-contract','runtime-evidence','adr','frontmatter','manifest','model')),
+    confidence TEXT NOT NULL CHECK(confidence IN ('deterministic','declared','inferred')),
+    trust_tier TEXT NOT NULL CHECK(trust_tier IN ('T0','T1','T2')),
+    evidence_ref TEXT NOT NULL CHECK(length(evidence_ref) > 0),
+    source_namespace TEXT NOT NULL,
+    source_hash TEXT NOT NULL,
+    source_commit TEXT NOT NULL,
+    valid_from TEXT NOT NULL,
+    valid_to TEXT NULL,
+    properties_json TEXT NOT NULL CHECK(json_valid(properties_json) AND json_type(properties_json)='object'),
+    CHECK((trust_tier='T0' AND origin IN ('ast','git','json-contract','runtime-evidence')) OR (trust_tier='T1' AND origin IN ('adr','frontmatter','manifest')) OR (trust_tier='T2' AND origin='model')),
+    CHECK((trust_tier='T0' AND confidence='deterministic') OR (trust_tier='T1' AND confidence='declared') OR (trust_tier='T2' AND confidence='inferred')),
+    CHECK(valid_to IS NULL OR valid_to >= valid_from),
+    UNIQUE(edge_id, valid_from)
+);
+
+CREATE TABLE IF NOT EXISTS trace_ingest_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mode TEXT NOT NULL,
+    source_namespace TEXT NOT NULL,
+    source_commit TEXT NOT NULL,
+    effective_at TEXT NOT NULL,
+    completed_at TEXT NOT NULL,
+    nodes_inserted INTEGER NOT NULL,
+    nodes_expired INTEGER NOT NULL,
+    edges_inserted INTEGER NOT NULL,
+    edges_expired INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_files_path ON files(path);
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
 CREATE INDEX IF NOT EXISTS idx_symbols_full_name ON symbols(full_name);
@@ -121,13 +176,32 @@ CREATE INDEX IF NOT EXISTS idx_edges_from ON edges(from_symbol);
 CREATE INDEX IF NOT EXISTS idx_edges_to ON edges(to_symbol);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rust_crates_manifest ON rust_crates(manifest_path);
 CREATE INDEX IF NOT EXISTS idx_code_index_runs_completed ON code_index_runs(completed_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trace_nodes_current ON trace_nodes(node_id) WHERE valid_to IS NULL;
+CREATE INDEX IF NOT EXISTS idx_trace_nodes_source_current ON trace_nodes(source_namespace, source_commit) WHERE valid_to IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trace_edges_current ON trace_edges(edge_id) WHERE valid_to IS NULL;
+CREATE INDEX IF NOT EXISTS idx_trace_edges_from_current ON trace_edges(from_node_id, edge_type) WHERE valid_to IS NULL;
+CREATE INDEX IF NOT EXISTS idx_trace_edges_to_current ON trace_edges(to_node_id, edge_type) WHERE valid_to IS NULL;
+CREATE INDEX IF NOT EXISTS idx_trace_edges_source_current ON trace_edges(source_namespace, source_commit) WHERE valid_to IS NULL;
+CREATE INDEX IF NOT EXISTS idx_trace_ingest_runs_completed ON trace_ingest_runs(completed_at DESC);
+COMMIT;
 ";
         command.ExecuteNonQuery();
 
         EnsureColumn(connection, "references_map", "reference_token", "TEXT NULL");
+        EnsureColumn(connection, "trace_nodes", "authority", "TEXT NOT NULL DEFAULT 'canonical'");
         using var referenceIndex = connection.CreateCommand();
         referenceIndex.CommandText = "CREATE INDEX IF NOT EXISTS idx_references_token ON references_map(reference_token)";
         referenceIndex.ExecuteNonQuery();
+
+        using var versions = connection.CreateCommand();
+        versions.CommandText = @"
+BEGIN IMMEDIATE;
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (2, datetime('now'), 'Incremental multi-language index runs and raw reference tokens');
+INSERT OR IGNORE INTO schema_version (version, applied_at, description)
+VALUES (3, datetime('now'), 'Temporal trace graph cache');
+COMMIT;";
+        versions.ExecuteNonQuery();
 
         return dbPath;
     }

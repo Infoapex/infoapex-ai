@@ -1,8 +1,24 @@
 {
-  "task": "none",
+  "task": "GRAPH-07 run common ICM plus Graph pilot and produce release decision",
   "language": "csharp",
-  "affectedSymbol": "",
-  "allowedFiles": [],
+  "affectedSymbol": "AiCodeControl.Core.Services.TraceGraphIngestService",
+  "allowedFiles": [
+    "scripts/docs-gate.mjs",
+    "scripts/value-gate.mjs",
+    "docs/OBSIDIAN-CODE-MAP.md",
+    "docs/COMMON-ICM-GRAPH-PILOT.md",
+    "docs/RELEASE-GATES.md",
+    "README.md",
+    "package.json",
+    "scripts/icm-graph-pilot.mjs",
+    "todo.md"
+  ],
+  "allowedPatterns": [
+    "modules/ai-code-control/**",
+    "modules/ai-code-planner/**",
+    "modules/ai-code-worker/**",
+    "docs/plans/**"
+  ],
   "forbiddenPaths": [
     ".ai-code-control/db/",
     "tools/ai-code-control/mcp-server/node_modules/",
@@ -14,5 +30,5 @@
   "requiredValidation": [
     "run-validation"
   ],
-  "riskLevel": "low"
+  "riskLevel": "high"
 }

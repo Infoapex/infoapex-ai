@@ -57,6 +57,86 @@ Until `init` is implemented, copy the template directory manually only for desig
 Copy-Item -Recurse ai-code-worker/templates/project/.ai-code-worker .ai-code-worker
 ```
 
+## Development usage benchmarks
+
+The worker can record bounded start/end checkpoints for work performed in a Codex
+session. Checkpoints contain numeric usage, model/effort metadata, a short session
+fingerprint, and an optional preregistered prediction. Raw rollout text is never
+copied into benchmark state.
+
+```powershell
+node modules/ai-code-worker/dist/src/cli.js benchmark checkpoint --repo . --plan ICM --stage ICM-01 --phase start --engine codex --kind contract --risk high --predicted-low 1400000 --predicted-median 1900000 --predicted-high 2400000 --prediction-source ICM-plan-v1
+node modules/ai-code-worker/dist/src/cli.js benchmark checkpoint --repo . --plan ICM --stage ICM-01 --phase end --engine codex
+node modules/ai-code-worker/dist/src/cli.js benchmark drift --repo . --plan ICM --profile codex:gpt-5.6-sol:high
+```
+
+## Compiled context packages
+
+Context packages are opt-in and use the existing CLI/JSON `ai-code-control` adapter;
+the worker never reads its SQLite databases or .NET types directly.
+
+```json
+{
+  "contextProvider": "ai-code-control",
+  "contextPackage": {
+    "mode": "observe",
+    "maximumTokens": 12000
+  },
+  "adapters": {
+    "aiCodeControl": {
+      "executable": "ai-code-control",
+      "timeoutSeconds": 30,
+      "maximumOutputBytes": 2000000
+    }
+  }
+}
+```
+
+- `off` preserves the existing context-provider behavior and creates no package.
+- `observe` compiles, independently validates and exports packages without changing
+  the engine prompt.
+- `enforce` is fail-closed and available only for Codex/Claude runs. The engine prompt
+  receives the validated package instead of legacy provider output.
+
+Packages are written to `tasks/<taskId>/context-package.v1.json`; the run-level
+`context-package-index.v1.json` records status, digest, artifact path and source
+provenance. The consumer recomputes the producer digest, checks run/task/manifest
+binding, rejects blocking diagnostics and refuses unredacted secret-looking content.
+
+## Semantic snapshots and incremental invalidation
+
+`task-input.json` schema v1.1 binds dependency commits to the compiled context digest,
+context compiler version, selected contract hashes, relevant quality-gate config,
+scope/routing policy, and selected toolchain config. Hashes are canonical and contain
+repository-relative identities only.
+
+The incremental planner reexecutes a task only when one of these declared semantic
+inputs or a dependency commit changes. It reports descendants separately: they become
+stale only when the reexecuted dependency produces a different verified commit.
+Changes to unselected files, source discovery order, timestamps, package IDs, or
+checkout paths do not invalidate a task. Terminal runs stay immutable and use a new
+graph revision rather than being reopened in place; see ADR 0010.
+
+## Semantic source maps
+
+Traceable worker-contract v1.1 runs write `source-map.v1.json` before DONE. Stable nodes
+and edges join context sources, criteria, tasks, changed files, commits, gates and
+evidence using only declared or observed relations. The worker never emits an automatic
+`caused` edge.
+
+Glass-box enforcement requires every criterion and gate ID to survive the
+planner-to-worker-to-evidence boundary and every PASS criterion to have a linked command
+with exit code zero. Missing IDs or evidence block DONE. A source marked `proposed` may
+remain advisory context but cannot verify or authorize a verdict. The artifact is
+schema-validated and digest-protected; Obsidian is a possible viewer, not its source of
+truth.
+
+The drift report separates token-prediction comparability from usage-percentage
+mapping. Model/session changes, non-monotonic counters, and parallel sessions make the
+token delta `NOT_COMPARABLE`. A rate-limit reset invalidates only tokens-per-percentage-
+point; a same-session cumulative token delta remains usable for predicted-versus-actual
+error. Checkpoint schema v1.1 remains read-compatible with legacy v1.0 log entries.
+
 ## Validation
 
 ```powershell

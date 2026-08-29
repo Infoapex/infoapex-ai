@@ -64,6 +64,7 @@ test('round-trips goal, tasks, globalGates, and budgets through write and read',
     const result = readPlanMarkdown(filePath);
 
     assert.strictEqual(result.status, 'accepted');
+    assert.strictEqual(result.workerContractVersion, '1.0');
     assert.strictEqual(result.goal, 'Produce the plan schema and validator.');
     assert.deepStrictEqual(result.tasks, testTasks);
     assert.deepStrictEqual(result.globalGates, testGlobalGates);

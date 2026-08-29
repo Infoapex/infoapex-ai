@@ -90,7 +90,7 @@ describe("updateProjectConfig", () => {
     const result = updateProjectConfig(repo);
 
     assert.equal(result.status, "UPDATED");
-    assert.deepEqual([...result.addedKeys].sort(), ["maximumParallelWriters", "stateRoot", "syncRootPolicy"]);
+    assert.deepEqual([...result.addedKeys].sort(), ["contextPackage", "maximumParallelWriters", "stateRoot", "syncRootPolicy"]);
 
     const config = JSON.parse(readFileSync(join(dir, "config.json"), "utf8"));
     assert.equal(config.contextProvider, "ai-code-control", "existing value must not be overwritten by the default");

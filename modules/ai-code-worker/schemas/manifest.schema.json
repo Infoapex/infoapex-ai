@@ -7,7 +7,7 @@
   "required": ["schemaVersion", "runId", "graphVersion", "plan", "base", "goal", "tasks", "globalGates", "budgets"],
   "properties": {
     "schemaVersion": {
-      "const": "1.0"
+      "enum": ["1.0", "1.1"]
     },
     "runId": {
       "type": "string",
@@ -140,6 +140,45 @@
             "type": "string",
             "minLength": 1
           },
+          "traceability": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["acceptanceCriteria", "gates"],
+            "properties": {
+              "acceptanceCriteria": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["criterionId", "text"],
+                  "properties": {
+                    "criterionId": { "type": "string", "minLength": 1 },
+                    "text": { "type": "string", "minLength": 1 }
+                  }
+                }
+              },
+              "gates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["gateId", "command", "evidenceContract", "criterionIds"],
+                  "properties": {
+                    "gateId": { "type": "string", "minLength": 1 },
+                    "command": { "type": "string", "minLength": 1 },
+                    "evidenceContract": { "type": "string", "minLength": 1 },
+                    "criterionIds": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "routing": {
             "type": "object",
             "additionalProperties": false,
@@ -237,6 +276,26 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.1" } },
+        "required": ["schemaVersion"]
+      },
+      "then": {
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": { "traceability": {} },
+              "required": ["traceability"]
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "pathList": {
       "type": "array",

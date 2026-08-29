@@ -1,4 +1,4 @@
-import type { Plan, WorkerManifestTask, ProjectionWarning } from '../types.js';
+import type { Plan, WorkerManifestTask, WorkerManifestTaskV1_1, ProjectionWarning } from '../types.js';
 
 export function projectToWorkerV1(plan: Plan): {
   manifestTasks: WorkerManifestTask[];
@@ -61,6 +61,31 @@ export function projectToWorkerV1(plan: Plan): {
   }
 
   return { manifestTasks, globalGates, projectionWarnings };
+}
+
+export function projectToWorkerV1_1(plan: Plan): {
+  manifestTasks: WorkerManifestTaskV1_1[];
+  globalGates: string[];
+  projectionWarnings: ProjectionWarning[];
+} {
+  const legacy = projectToWorkerV1(plan);
+  const manifestTasks = legacy.manifestTasks.map((task, index) => ({
+    ...task,
+    traceability: {
+      acceptanceCriteria: plan.tasks[index]!.acceptanceCriteria.map((criterion) => ({ ...criterion })),
+      gates: plan.tasks[index]!.gates.map((gate) => ({
+        ...gate,
+        criterionIds: [...gate.criterionIds]
+      }))
+    }
+  }));
+
+  const projectionWarnings = plan.tasks.flatMap((task) => {
+    const lostFields = task.requiredInputs.map((_, index) => `requiredInputs[${index}].kind`);
+    return lostFields.length > 0 ? [{ taskId: task.id, lostFields }] : [];
+  });
+
+  return { manifestTasks, globalGates: legacy.globalGates, projectionWarnings };
 }
 
 function inferWorkerKind(goal: string): WorkerManifestTask['kind'] {

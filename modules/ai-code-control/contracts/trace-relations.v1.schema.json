@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infoapex.dev/schemas/trace-relations.v1.schema.json",
+  "title": "Trace relations v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "relations"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "relation", "to", "evidenceRef"],
+        "properties": {
+          "from": { "$ref": "#/$defs/endpoint" },
+          "relation": {
+            "enum": ["supersedes", "depends_on", "implements", "verified_by", "derived_from", "changes", "references", "selected_for"]
+          },
+          "to": { "$ref": "#/$defs/endpoint" },
+          "evidenceRef": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "canonicalRef"],
+      "properties": {
+        "type": {
+          "enum": ["adr", "rule", "contract", "criterion", "task", "run", "gate", "evidence", "commit", "file", "symbol", "context-package"]
+        },
+        "canonicalRef": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
