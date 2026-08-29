@@ -21,6 +21,7 @@ export interface CodexCliAdapterConfig {
   readonly sandboxMode?: "workspace-write" | "danger-full-access";
   readonly adapterVersion?: string;
   readonly defaultModel?: string | null;
+  readonly reasoningEffort?: "none" | "low" | "medium" | "high" | "xhigh" | "max";
   readonly timeoutMs?: number;
   readonly maximumOutputBytes?: number;
 }
@@ -161,6 +162,10 @@ export class CodexCliAdapter {
 
     if (this.config.defaultModel) {
       args.splice(this.baseArgs.length + 1, 0, "--model", this.config.defaultModel);
+    }
+
+    if (this.config.reasoningEffort) {
+      args.splice(this.baseArgs.length + 1, 0, "-c", `model_reasoning_effort="${this.config.reasoningEffort}"`);
     }
 
     return {

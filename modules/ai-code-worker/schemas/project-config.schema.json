@@ -116,6 +116,10 @@
             "sandboxMode": {
               "enum": ["workspace-write", "danger-full-access"]
             },
+            "reasoningEffort": {
+              "description": "Reasoning effort passed to Codex as model_reasoning_effort.",
+              "enum": ["none", "low", "medium", "high", "xhigh", "max"]
+            },
             "timeoutSeconds": {
               "type": "integer",
               "minimum": 1

@@ -790,6 +790,7 @@ export function codexAdapterConfigFromProject(config: ProjectConfig | null): Par
   return {
     ...(source?.executable !== undefined ? { executable: source.executable } : {}),
     ...(source?.model !== undefined ? { defaultModel: source.model } : {}),
+    ...(source?.reasoningEffort !== undefined ? { reasoningEffort: source.reasoningEffort } : {}),
     ...(source?.sandboxMode !== undefined ? { sandboxMode: source.sandboxMode } : {}),
     ...(source?.timeoutSeconds !== undefined ? { timeoutMs: source.timeoutSeconds * 1000 } : {}),
     ...(source?.maximumOutputBytes !== undefined ? { maximumOutputBytes: source.maximumOutputBytes } : {}),

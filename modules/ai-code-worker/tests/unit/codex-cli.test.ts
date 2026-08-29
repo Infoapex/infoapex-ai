@@ -88,7 +88,8 @@ describe("codex cli adapter", () => {
       baseArgs: [cli],
       testedVersionRanges: ["0.146.0-alpha.3.1"],
       requiresCapabilitySmokeTest: false,
-      defaultModel: "gpt-test"
+      defaultModel: "gpt-test",
+      reasoningEffort: "high"
     });
     const invocation = adapter.buildExecInvocation({
       runId: "run-codex",
@@ -109,6 +110,7 @@ describe("codex cli adapter", () => {
     assert.ok(invocation.args.includes("--sandbox"));
     assert.ok(invocation.args.includes("workspace-write"));
     assert.ok(invocation.args.includes("--model"));
+    assert.ok(invocation.args.includes('model_reasoning_effort="high"'));
     assert.equal(invocation.stdin, "Implement task.");
 
     // --output-schema/--output-last-message are deliberately not used - a live run

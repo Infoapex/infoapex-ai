@@ -12,6 +12,7 @@ export interface AdapterProjectConfig {
 
 export interface CodexProjectAdapterConfig extends AdapterProjectConfig {
   readonly sandboxMode?: "workspace-write" | "danger-full-access";
+  readonly reasoningEffort?: "none" | "low" | "medium" | "high" | "xhigh" | "max";
 }
 
 export interface ClaudeProjectAdapterConfig extends AdapterProjectConfig {
