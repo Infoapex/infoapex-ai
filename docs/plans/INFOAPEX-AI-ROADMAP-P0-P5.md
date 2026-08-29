@@ -63,8 +63,8 @@ Reguli:
 
 ## 4. P0 — Consolidarea ICM + Graph în produsul generic
 
-**Stare implementare: completată și validată local la 2026-08-30; publicarea
-commit-urilor remote este ultimul pas tranzacțional al etapei.**
+**Stare implementare: completată, validată și publicată pe ramurile `main` la
+2026-08-30.**
 
 Pinurile pregătite pentru publicare sunt:
 
