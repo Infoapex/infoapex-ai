@@ -120,7 +120,7 @@ public sealed class TraceGraphIngestServiceTests : IDisposable
     private List<TraceIngestDocument> Fixtures()
     {
         Write("docs/adr/ADR-0001.md", "# Old decision\n\n**Status:** Accepted\n");
-        Write("docs/adr/ADR-0002.md", "# Current decision\n\n**Status:** Accepted\n\nSupersedes: ADR-0001\n");
+        Write("docs/adr/ADR-0002.md", "# Current decision\n\n- **Status**: acceptat\n\nSupersedes: ADR-0001\n");
         Write("docs/adr/ADR-0003.md", "# Draft decision\n\n**Status:** Proposed\n");
         Write("contracts/sample.schema.json", """
         { "$id": "contracts/sample.schema.json", "title": "Sample contract", "$defs": { "criterion": { "criterionId": "AC-CONTRACT" } } }

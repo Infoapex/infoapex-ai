@@ -127,7 +127,13 @@ public sealed partial class TraceGraphIngestService
         var id = Path.GetFileNameWithoutExtension(document.CanonicalRef);
         var title = HeadingRegex().Match(content) is { Success: true } heading ? heading.Groups[1].Value.Trim() : id;
         var statusMatch = StatusRegex().Match(content);
-        var status = statusMatch.Success ? statusMatch.Groups[1].Value.ToLowerInvariant() : "unknown";
+        var declaredStatus = statusMatch.Success ? statusMatch.Groups[1].Value.ToLowerInvariant() : "unknown";
+        var status = declaredStatus switch
+        {
+            "acceptat" => "accepted",
+            "propus" => "proposed",
+            _ => declaredStatus
+        };
         var authority = status == "accepted" ? "canonical" : status == "proposed" ? "proposed" : "advisory";
         accumulator.AddNode(Node("adr", "adr", id, title, hash, "adr", "T1", authority,
             new { sourceRef = document.CanonicalRef, status }), document.CanonicalRef, diagnostics);
@@ -460,7 +466,7 @@ public sealed partial class TraceGraphIngestService
     { public string Key => string.Join("\n", Relation, From, To, Evidence); }
 
     [GeneratedRegex("^#\\s+(.+)$", RegexOptions.Multiline | RegexOptions.CultureInvariant)] private static partial Regex HeadingRegex();
-    [GeneratedRegex("(?:\\*\\*Status:\\*\\*|^status:)\\s*([A-Za-z-]+)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.CultureInvariant)] private static partial Regex StatusRegex();
+    [GeneratedRegex("(?:\\*\\*Status(?::)?\\*\\*\\s*:?|^\\s*-?\\s*status:)\\s*([A-Za-z-]+)", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.CultureInvariant)] private static partial Regex StatusRegex();
     [GeneratedRegex("^Supersedes:\\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.CultureInvariant)] private static partial Regex SupersedesRegex();
     [GeneratedRegex("ADR-[0-9]{4}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)] private static partial Regex AdrIdRegex();
     [GeneratedRegex("^[a-zA-Z]:[\\\\/]", RegexOptions.CultureInvariant)] private static partial Regex WindowsAbsolutePathRegex();
