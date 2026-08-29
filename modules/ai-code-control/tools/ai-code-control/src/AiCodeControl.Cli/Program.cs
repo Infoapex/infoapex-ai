@@ -63,6 +63,26 @@ async Task<int> RunCommandAsync()
                 });
                 return 0;
             }
+        case "health":
+            {
+                var config = configLoader.LoadCodeControl(repoRoot);
+                var codegraphPath = ResolveCodegraphDbPath(config)
+                    ?? Path.Combine(repoRoot, ".ai-code-control", "db", "codegraph.sqlite");
+                if (!Path.IsPathRooted(codegraphPath))
+                    codegraphPath = Path.Combine(repoRoot, codegraphPath);
+                var memoryPath = Path.Combine(repoRoot, ".ai-code-control", "db", "memory.sqlite");
+                var available = File.Exists(codegraphPath) && File.Exists(memoryPath);
+                WriteJson(new
+                {
+                    schemaVersion = "1.0",
+                    status = available ? "ok" : "error",
+                    error = available ? null : "The codegraph or memory cache is unavailable.",
+                    available,
+                    version = "1.2.0",
+                    detail = available ? "ai-code-control caches are available." : "Run refresh before compiling context."
+                });
+                return available ? 0 : 2;
+            }
         case "health-check":
             {
                 var config = configLoader.LoadCodeControl(repoRoot);
@@ -179,9 +199,29 @@ async Task<int> RunCommandAsync()
                     return 1;
                 }
 
-                WriteJson(new SymbolQueryService().FindSymbol(dbPath, symbol));
+                var service = new SymbolQueryService();
+                if (args.Contains("--json", StringComparer.OrdinalIgnoreCase))
+                {
+                    var matches = service.FindSymbolMatches(dbPath, symbol);
+                    WriteJson(new
+                    {
+                        schemaVersion = "1.0",
+                        status = "ok",
+                        error = (string?)null,
+                        matches = matches.Select(item => new
+                        {
+                            symbol = item.FullName,
+                            file = item.File,
+                            line = (int?)item.StartLine
+                        })
+                    });
+                    return 0;
+                }
+
+                WriteJson(service.FindSymbol(dbPath, symbol));
                 return 0;
             }
+        case "impact":
         case "impact-analysis":
             {
                 var dbPath = EnsureCodegraphDb(configLoader);
@@ -193,7 +233,41 @@ async Task<int> RunCommandAsync()
                 }
 
                 var depth = int.TryParse(GetOptionValue(args, "--depth"), out var parsedDepth) ? parsedDepth : 5;
-                WriteJson(new SymbolQueryService().ImpactAnalysis(dbPath, symbol, depth));
+                var analysis = new SymbolQueryService().ImpactAnalysis(dbPath, symbol, depth);
+                if (command == "impact" || args.Contains("--json", StringComparer.OrdinalIgnoreCase))
+                {
+                    var element = JsonSerializer.SerializeToElement(analysis);
+                    var analysisStatus = element.TryGetProperty("status", out var statusElement)
+                        ? statusElement.GetString()
+                        : null;
+                    var affectedFiles = element.TryGetProperty("impacts", out var impactsElement)
+                        ? impactsElement.EnumerateArray()
+                            .Select(item => item.TryGetProperty("file", out var file) ? file.GetString() : null)
+                            .Where(file => !string.IsNullOrWhiteSpace(file))
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToArray()
+                        : Array.Empty<string?>();
+                    var risk = element.TryGetProperty("riskLevel", out var riskElement)
+                        ? riskElement.GetString()
+                        : null;
+                    var ok = string.Equals(analysisStatus, "ok", StringComparison.OrdinalIgnoreCase);
+                    WriteJson(new
+                    {
+                        schemaVersion = "1.0",
+                        status = ok ? "ok" : "error",
+                        error = ok ? null : $"Impact analysis returned {analysisStatus ?? "an unknown status"}.",
+                        symbol = ok && element.TryGetProperty("target", out var targetElement)
+                            ? targetElement.GetString()
+                            : null,
+                        affectedFiles = ok ? affectedFiles : null,
+                        riskNotes = ok && !string.IsNullOrWhiteSpace(risk)
+                            ? new[] { $"riskLevel:{risk}" }
+                            : Array.Empty<string>()
+                    });
+                    return ok ? 0 : 2;
+                }
+
+                WriteJson(analysis);
                 return 0;
             }
         case "trace":
@@ -395,6 +469,49 @@ async Task<int> RunCommandAsync()
                 WriteJson(new MemorySearchService().Search(memDbPath, query, maxItems));
                 return 0;
             }
+        case "brief":
+            {
+                var task = GetOptionValue(args, "--task") ?? GetPositionalArg(args, 1) ?? "";
+                var memConfig = LoadMemoryConfig();
+                if (memConfig?.Memory == null)
+                {
+                    WriteJson(new
+                    {
+                        schemaVersion = "1.0",
+                        status = "error",
+                        error = "memory-control.json not found.",
+                        summary = (string?)null,
+                        relevantFiles = (string[]?)null
+                    });
+                    return 2;
+                }
+
+                var summary = new MemoryBriefService().GenerateBrief(repoRoot, task, memConfig.Memory);
+                var memoryDb = ResolveMemoryDbPath(memConfig.Memory)
+                    ?? Path.Combine(repoRoot, ".ai-code-control", "db", "memory.sqlite");
+                var relevantFiles = new List<string>
+                {
+                    ".ai-code-control/memory/project-memory.md"
+                };
+                if (!string.IsNullOrWhiteSpace(task) && File.Exists(memoryDb))
+                {
+                    relevantFiles.AddRange(new MemorySearchService()
+                        .Search(memoryDb, task, memConfig.Memory.MaxRecallItems)
+                        .Matches.Select(item => item.SourcePath));
+                }
+                WriteJson(new
+                {
+                    schemaVersion = "1.0",
+                    status = "ok",
+                    error = (string?)null,
+                    summary,
+                    relevantFiles = relevantFiles
+                        .Where(path => !string.IsNullOrWhiteSpace(path))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray()
+                });
+                return 0;
+            }
         case "memory-brief":
             {
                 // Without a task description the brief switches to "recent mode"
@@ -452,6 +569,22 @@ async Task<int> RunCommandAsync()
                     codeDb,
                     config?.Indexing?.Exclude,
                     args.Contains("--full", StringComparer.OrdinalIgnoreCase));
+                if (args.Contains("--json", StringComparer.OrdinalIgnoreCase))
+                {
+                    var refreshed = memory.Errors.Count == 0;
+                    WriteJson(new
+                    {
+                        schemaVersion = "1.0",
+                        status = refreshed ? "ok" : "error",
+                        error = refreshed ? null : string.Join("; ", memory.Errors),
+                        refreshed,
+                        detail = refreshed
+                            ? $"Memory ingested {memory.Ingested}; code indexed {code.FilesIndexed}."
+                            : "Refresh completed with memory errors."
+                    });
+                    return refreshed ? 0 : 2;
+                }
+
                 WriteJson(new
                 {
                     status = memory.Errors.Count == 0 ? "ok" : "partial",

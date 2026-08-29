@@ -183,6 +183,12 @@
           "additionalProperties": false,
           "properties": {
             "executable": { "type": "string", "minLength": 1 },
+            "baseArgs": {
+              "description": "Arguments inserted before every ai-code-control subcommand, for example the path of a published DLL when executable is dotnet.",
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "minItems": 1
+            },
             "timeoutSeconds": { "type": "integer", "minimum": 1 },
             "maximumOutputBytes": { "type": "integer", "minimum": 1024 }
           }

@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 export interface AdapterProjectConfig {
   readonly executable?: string;
+  readonly baseArgs?: readonly string[];
   readonly model?: string | null;
   readonly timeoutSeconds?: number;
   readonly maximumOutputBytes?: number;

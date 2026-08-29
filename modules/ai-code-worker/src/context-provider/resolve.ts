@@ -27,6 +27,7 @@ export function resolveContextProvider(
   return new AiCodeControlCliProvider({
     cwd: options.repositoryRoot,
     executable: adapterConfig?.executable,
+    baseArgs: adapterConfig?.baseArgs,
     timeoutMs: adapterConfig?.timeoutSeconds !== undefined ? adapterConfig.timeoutSeconds * 1000 : undefined,
     maximumOutputBytes: adapterConfig?.maximumOutputBytes
   });

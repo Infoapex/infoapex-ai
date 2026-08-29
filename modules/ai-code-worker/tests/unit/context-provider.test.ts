@@ -48,6 +48,21 @@ describe("resolveContextProvider", () => {
     );
     assert.equal(provider.kind, "ai-code-control");
   });
+
+  it("passes configured baseArgs to the ai-code-control subprocess", async () => {
+    const cli = fakeCli({
+      health: { schemaVersion: "1.0", status: "ok", error: null, available: true, version: "1.2.0", detail: null }
+    });
+    const provider = resolveContextProvider(
+      {
+        contextProvider: "ai-code-control",
+        adapters: { aiCodeControl: { executable: process.execPath, baseArgs: [cli] } }
+      },
+      { repositoryRoot: process.cwd() }
+    );
+
+    assert.equal((await provider.health()).status, "OK");
+  });
 });
 
 describe("AiCodeControlCliProvider", () => {
