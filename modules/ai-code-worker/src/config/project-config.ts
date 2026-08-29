@@ -29,6 +29,10 @@ export interface ProjectConfig {
    * adapter only, never a direct dependency.
    */
   readonly contextProvider?: "none" | "ai-code-control";
+  readonly contextPackage?: {
+    readonly mode: "off" | "observe" | "enforce";
+    readonly maximumTokens: number;
+  };
   /**
    * "Regula configurată" gate for the redacted handoff export (AICW-ADR-001 / plan
    * §13 invariant). Default false - exporting into `.ai-code-control/handoffs/` is

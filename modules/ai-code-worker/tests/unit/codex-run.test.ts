@@ -8,6 +8,7 @@ import { writeFakeCodexCli } from "../../src/engines/codex-cli.js";
 import { runCodex } from "../../src/run/codex-run.js";
 import { SchemaRegistry } from "../../src/schema/json-schema.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
+import type { ContextPackage } from "../../src/context-provider/types.js";
 
 const tempRepos: string[] = [];
 const stateRoots: string[] = [];
@@ -93,6 +94,47 @@ describe("codex run coordinator", () => {
 
     assert.equal(report.status, "DONE");
   });
+
+  it("enforce mode binds the exact context digest to the engine prompt and event log", () => {
+    const repo = createGitRepository();
+    const captureRoot = mkdtempSync(join(tmpdir(), "aicw-context-prompt-"));
+    tempRoots.push(captureRoot);
+    const capturePath = join(captureRoot, "prompt.json");
+    const cli = fakeCli("0.146.0-alpha.3.1", "src/codex-output.txt", capturePath);
+    const contextPackage = packageFor("run-codex-context", "TASK-01");
+
+    const report = runCodex({
+      repositoryPath: repo,
+      planPath: "Plan/RUN.md",
+      runId: "run-codex-context",
+      now: "2026-08-01T10:00:00Z",
+      taskContextPackages: { "TASK-01": contextPackage },
+      contextPackageMode: "enforce",
+      adapterConfig: {
+        executable: process.execPath,
+        baseArgs: [cli],
+        testedVersionRanges: ["0.146.0-alpha.3.1"],
+        requiresCapabilitySmokeTest: true
+      }
+    });
+
+    assert.equal(report.status, "DONE");
+    const prompt = JSON.parse(readFileSync(capturePath, "utf8"));
+    assert.equal(prompt.contextPackage.contextDigest, contextPackage.contextDigest);
+    assert.equal("contextProviderContext" in prompt, false);
+    const events = readFileSync(report.state.eventLogPath!, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    const linked = events.find((event) => event.type === "task.context-compiled");
+    assert.equal(linked?.payload.contextDigest, contextPackage.contextDigest);
+    assert.equal(linked?.payload.consumedByEngine, true);
+    const snapshot = JSON.parse(
+      readFileSync(join(report.state.runRoot!, "tasks", "TASK-01", "task-input.json"), "utf8")
+    );
+    assert.equal(snapshot.contextDigest, contextPackage.contextDigest);
+    assert.equal(snapshot.contextCompilerVersion, contextPackage.compilerVersion);
+  });
 });
 
 function createGitRepository(): string {
@@ -118,13 +160,36 @@ function createGitRepository(): string {
   return repo;
 }
 
-function fakeCli(version: string, touchedFile: string): string {
+function fakeCli(version: string, touchedFile: string, capturePromptPath?: string): string {
   const root = mkdtempSync(join(tmpdir(), "aicw-fake-codex-run-"));
   tempRoots.push(root);
   const cli = join(root, "codex-fake.mjs");
-  writeFakeCodexCli(cli, { version, touchedFile });
+  writeFakeCodexCli(cli, { version, touchedFile, capturePromptPath });
   chmodSync(cli, 0o755);
   return cli;
+}
+
+function packageFor(runId: string, taskId: string): ContextPackage {
+  return {
+    schemaVersion: "1.0",
+    packageId: "ctx-codex-test",
+    runId,
+    taskId,
+    manifestSha256: "a".repeat(64),
+    compilerVersion: "1.0.0",
+    sources: [],
+    budget: {
+      measurement: "characters-fallback",
+      maximumTokens: 1000,
+      estimatedTokens: 0,
+      maximumCharacters: 4000,
+      estimatedCharacters: 0,
+      omittedSources: []
+    },
+    diagnostics: [],
+    contextDigest: "c".repeat(64),
+    createdAt: "2026-08-01T10:00:00Z"
+  };
 }
 
 function acceptedPlan(): string {

@@ -634,6 +634,7 @@ export function writeFakeClaudeCli(
     readonly supportsPrintHelp?: boolean;
     readonly touchedFile?: string;
     readonly delayMs?: number;
+    readonly capturePromptPath?: string;
     /** Wraps the JSON result in prose, simulating a model that does not follow the
      *  "respond with ONLY the JSON object" instruction exactly. */
     readonly wrapResultInProse?: boolean;
@@ -691,6 +692,11 @@ if (args[0] === "-p") {
     request = JSON.parse(fs.readFileSync(0, "utf8"));
   } catch {}
   const touchedFile = ${JSON.stringify(options.touchedFile ?? null)};
+  const capturePromptPath = ${JSON.stringify(options.capturePromptPath ?? null)};
+  if (capturePromptPath) {
+    fs.mkdirSync(path.dirname(capturePromptPath), { recursive: true });
+    fs.writeFileSync(capturePromptPath, JSON.stringify(request, null, 2));
+  }
   const delayMs = ${JSON.stringify(options.delayMs ?? 0)};
   if (delayMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, delayMs));

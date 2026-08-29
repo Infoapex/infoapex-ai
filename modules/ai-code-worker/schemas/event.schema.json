@@ -31,6 +31,7 @@
         "run.recovering",
         "run.superseded",
         "task.input-frozen",
+        "task.context-compiled",
         "task.stale",
         "task.worktree-created",
         "run.wave-dispatched",
@@ -47,6 +48,7 @@
         "repair.attempt-finished",
         "repair.cycle-exhausted",
         "graph.revision-created",
+        "source-map.generated",
         "run.done",
         "run.blocked"
       ]

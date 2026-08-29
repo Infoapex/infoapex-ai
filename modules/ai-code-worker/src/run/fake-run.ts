@@ -30,18 +30,23 @@ import { resolveQualityGate } from "../runner/quality-gate-config.js";
 import { runQualityGateSync, toEvidenceCommand, type QualityGateResult } from "../runner/quality-gate.js";
 import { buildCoverageReview } from "../review/coverage-review.js";
 import { buildTaskInputSnapshot, type SnapshotManifest } from "../snapshots/task-input-snapshot.js";
+import type { SemanticTaskInputs } from "../snapshots/semantic-task-inputs.js";
 import { cherryPickSequence } from "../git/cherry-pick.js";
 import { enforceSyncRootForParallelDispatch } from "../git/sync-root.js";
 import { nextDispatchWave, type DispatchTaskScope } from "./dag-scheduler.js";
 import { integrateTaskCommits } from "./integration.js";
 import { runIndependentReviewAndRepair, type IndependentReviewer } from "./independent-review-repair.js";
 import type { RepairCycleExecutor } from "../repair/repair-cycle.js";
+import { buildTaskEvidenceTraceability } from "../evidence/task-traceability.js";
+import type { ManifestTaskTraceability } from "../manifest/traceability.js";
+import { buildSemanticSourceMap, writeSemanticSourceMap } from "../source-map/semantic-source-map.js";
 
 export interface FakeRunOptions {
   readonly repositoryPath: string;
   readonly planPath: string;
   readonly runId?: string;
   readonly now?: string;
+  readonly semanticTaskInputs?: Readonly<Record<string, SemanticTaskInputs>>;
   /** Optional hook: when the structural coverage review fails, run an
    *  independent review and, if it has blocking findings, attempt bounded
    *  repair before giving up (IMPLEMENTATION-PLAN.md §11.6 steps 7-9).
@@ -169,7 +174,13 @@ export function runFake(options: FakeRunOptions): FakeRunReport {
       continue;
     }
 
-    const snapshot = buildTaskInputSnapshot({ manifest, taskId, states, registry });
+    const snapshot = buildTaskInputSnapshot({
+      manifest,
+      taskId,
+      states,
+      registry,
+      semanticInputs: options.semanticTaskInputs?.[taskId]
+    });
     const touchedFile = fakeTouchedFile(task);
 
     if (!touchedFile) {
@@ -373,7 +384,7 @@ export function runFake(options: FakeRunOptions): FakeRunReport {
       now: timestamp
     });
     gateResults.push(...taskGateReport.results);
-    writeJson(join(taskRoot, "evidence.json"), evidenceFor(compile.runId, execution, taskGateReport.results));
+    writeJson(join(taskRoot, "evidence.json"), evidenceFor(compile.runId, execution, taskGateReport.results, task));
     evidenceByTask[taskId] = `tasks/${taskId}/evidence.json`;
 
     if (taskGateReport.status === "BLOCKED") {
@@ -635,6 +646,39 @@ export function runFake(options: FakeRunOptions): FakeRunReport {
     }
   }
 
+  const sourceMap = buildSemanticSourceMap({
+    runRoot: compile.state.runRoot,
+    manifest,
+    manifestSha256: compile.manifestSha256!,
+    taskCommits,
+    events: eventLog.read().events,
+    createdAt: timestampAt(options.now ?? new Date().toISOString(), tick),
+    registry
+  });
+  if (sourceMap) {
+    writeSemanticSourceMap(compile.state.runRoot, sourceMap);
+    eventLog.append({
+      eventId: `${compile.runId}-${String(eventLog.read().events.length).padStart(4, "0")}-source-map-generated`,
+      runId: compile.runId,
+      type: "source-map.generated",
+      createdAt: timestampAt(options.now ?? new Date().toISOString(), tick),
+      payload: { sourceMapDigest: sourceMap.sourceMapDigest, traceCoveragePercent: sourceMap.coverage.traceCoveragePercent, complete: sourceMap.coverage.complete }
+    });
+    if (!sourceMap.coverage.complete) {
+      return blockRunningRun({
+        compile,
+        eventLog,
+        code: "SOURCE_MAP_ENFORCEMENT_FAILED",
+        message: `Semantic source-map coverage is incomplete: ${sourceMap.coverage.criteriaWithDirectEvidence}/${sourceMap.coverage.criteriaTotal} criteria; ${sourceMap.findings.map((finding) => finding.code).join(", ")}.`,
+        executedTasks,
+        taskCommits,
+        gateResults,
+        usageTotals,
+        now: timestampAt(options.now ?? new Date().toISOString(), tick)
+      });
+    }
+  }
+
   writeRunReports({
     compile,
     status: "DONE",
@@ -671,6 +715,7 @@ export function runFake(options: FakeRunOptions): FakeRunReport {
 }
 
 interface RunManifest extends SnapshotManifest {
+  readonly schemaVersion: "1.0" | "1.1";
   readonly budgets: Record<string, unknown>;
   readonly globalGates: readonly string[];
   readonly tasks: readonly RunManifestTask[];
@@ -679,14 +724,21 @@ interface RunManifest extends SnapshotManifest {
 interface RunManifestTask extends ManifestTask {
   readonly kind: UsageCheckpointTaskKind;
   readonly risk: UsageCheckpointTaskRisk;
+  readonly requiredInputs: readonly string[];
   readonly allowedPaths: readonly string[];
   readonly forbiddenPaths: readonly string[];
   readonly acceptanceCriteria: readonly string[];
   readonly verify: readonly string[];
   readonly concurrencyKeys: readonly string[];
+  readonly traceability?: ManifestTaskTraceability;
 }
 
-function evidenceFor(runId: string, execution: ReturnType<FakeEngineAdapter["start"]>, commands: readonly QualityGateResult[]): unknown {
+function evidenceFor(
+  runId: string,
+  execution: ReturnType<FakeEngineAdapter["start"]>,
+  commands: readonly QualityGateResult[],
+  task: RunManifestTask
+): unknown {
   const inputTotal =
     execution.usage.inputUncachedTokens === null &&
     execution.usage.cacheReadTokens === null &&
@@ -696,8 +748,9 @@ function evidenceFor(runId: string, execution: ReturnType<FakeEngineAdapter["sta
         (execution.usage.cacheReadTokens ?? 0) +
         (execution.usage.cacheWriteTokens ?? 0);
 
+  const taskTraceability = buildTaskEvidenceTraceability(task, commands);
   return {
-    schemaVersion: "1.0",
+    schemaVersion: taskTraceability ? "1.1" : "1.0",
     runId,
     engine: {
       name: "fake",
@@ -721,7 +774,8 @@ function evidenceFor(runId: string, execution: ReturnType<FakeEngineAdapter["sta
       currency: null
     },
     commands: commands.map(toEvidenceCommand),
-    artifacts: []
+    artifacts: [],
+    ...(taskTraceability ? { taskTraceability } : {})
   };
 }
 
@@ -842,7 +896,10 @@ function continueFromCommittedTask(input: {
     now: input.timestamp
   });
   input.gateResults.push(...taskGateReport.results);
-  writeJson(input.taskRoot ? join(input.taskRoot, "evidence.json") : "evidence.json", evidenceFor(input.compile.runId!, input.execution, taskGateReport.results));
+  writeJson(
+    input.taskRoot ? join(input.taskRoot, "evidence.json") : "evidence.json",
+    evidenceFor(input.compile.runId!, input.execution, taskGateReport.results, input.task)
+  );
   input.evidenceByTask[input.taskId] = `tasks/${input.taskId}/evidence.json`;
 
   if (taskGateReport.status === "BLOCKED") {

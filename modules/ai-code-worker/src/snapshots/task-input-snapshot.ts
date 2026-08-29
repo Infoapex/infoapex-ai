@@ -1,6 +1,7 @@
 import { canonicalJson, sha256 } from "../manifest/normalize.js";
 import { SchemaRegistry, type JsonValue } from "../schema/json-schema.js";
 import { buildTaskGraph, dependencyClosure, getTask, type ManifestTask, type TaskRuntimeState } from "../graph/task-graph.js";
+import { emptySemanticTaskInputs, type SemanticTaskInputs } from "./semantic-task-inputs.js";
 
 export interface SnapshotManifest {
   readonly runId: string;
@@ -12,7 +13,7 @@ export interface SnapshotManifest {
 }
 
 export interface TaskInputSnapshot {
-  readonly schemaVersion: "1.0";
+  readonly schemaVersion: "1.1";
   readonly runId: string;
   readonly taskId: string;
   readonly graphVersion: number;
@@ -22,6 +23,12 @@ export interface TaskInputSnapshot {
   readonly inputCommit: string;
   readonly inputTree: string;
   readonly compositionAlgorithm: "topological-task-id-v1";
+  readonly contextDigest: string | null;
+  readonly contextCompilerVersion: string | null;
+  readonly contractHashes: SemanticTaskInputs["contractHashes"];
+  readonly qualityGateConfigHash: string;
+  readonly policyHash: string;
+  readonly toolchainConfigHash: string;
   readonly snapshotMetadataSha256: string;
 }
 
@@ -34,6 +41,7 @@ export interface BuildTaskInputSnapshotInput {
   readonly manifest: SnapshotManifest;
   readonly taskId: string;
   readonly states: ReadonlyMap<string, TaskRuntimeState>;
+  readonly semanticInputs?: SemanticTaskInputs;
   readonly registry?: SchemaRegistry;
 }
 
@@ -55,8 +63,9 @@ export function buildTaskInputSnapshot(input: BuildTaskInputSnapshotInput): Task
     dependencyFor(input.states, dependency)
   );
   const materialized = materializeInput(input.manifest.base.commit, transitiveDependencies);
+  const semanticInputs = input.semanticInputs ?? emptySemanticTaskInputs();
   const snapshotWithoutDigest = {
-    schemaVersion: "1.0" as const,
+    schemaVersion: "1.1" as const,
     runId: input.manifest.runId,
     taskId: input.taskId,
     graphVersion: input.manifest.graphVersion,
@@ -65,7 +74,8 @@ export function buildTaskInputSnapshot(input: BuildTaskInputSnapshotInput): Task
     transitiveDependencies,
     inputCommit: materialized.inputCommit,
     inputTree: materialized.inputTree,
-    compositionAlgorithm: "topological-task-id-v1" as const
+    compositionAlgorithm: "topological-task-id-v1" as const,
+    ...semanticInputs
   };
   const snapshot: TaskInputSnapshot = {
     ...snapshotWithoutDigest,

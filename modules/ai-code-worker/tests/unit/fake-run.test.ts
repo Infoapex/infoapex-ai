@@ -93,6 +93,36 @@ describe("fake run coordinator", () => {
     assert.equal(status.run.taskStates["BACKEND-01"], "FINISHED");
   });
 
+  it("carries v1.1 planner trace identifiers into task evidence", () => {
+    const repo = createTraceableGitRepository();
+    const report = runFake({
+      repositoryPath: repo,
+      planPath: "Plan/RUN.md",
+      runId: "run-traceable-evidence",
+      now: "2026-08-01T10:00:00Z"
+    });
+    const evidence = JSON.parse(readFileSync(join(report.state.runRoot!, "tasks", "BACKEND-01", "evidence.json"), "utf8"));
+    const sourceMap = JSON.parse(readFileSync(join(report.state.runRoot!, "source-map.v1.json"), "utf8"));
+
+    assert.equal(report.status, "DONE");
+    assert.equal(evidence.schemaVersion, "1.1");
+    assert.deepEqual(evidence.taskTraceability, {
+      taskId: "BACKEND-01",
+      criterionIds: ["BACKEND-01-AC-01"],
+      gates: [{
+        gateId: "BACKEND-01-G-01",
+        criterionIds: ["BACKEND-01-AC-01"],
+        evidenceContract: "The command exits with code zero.",
+        commandId: 'node -e "process.exit(0)"'
+      }]
+    });
+    assert.deepEqual(registry.validate("evidence.schema.json", evidence), { valid: true, errors: [] });
+    assert.deepEqual(registry.validate("source-map.schema.json", sourceMap), { valid: true, errors: [] });
+    assert.equal(sourceMap.coverage.complete, true);
+    assert.equal(sourceMap.coverage.traceCoveragePercent, 100);
+    assert.equal(sourceMap.findings.length, 0);
+  });
+
   it("blocks the run when aggregate usage exceeds manifest budgets", () => {
     const repo = createGitRepository({
       maximumRunInputUncachedTokens: 15
@@ -287,6 +317,78 @@ describe("fake run coordinator", () => {
     assert.equal(report.contextProvider?.refresh?.status, "UNAVAILABLE");
   });
 
+  it("observe mode exports compilation outcomes without changing fake-run execution", () => {
+    const repo = createGitRepository();
+    mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
+    writeFileSync(
+      join(repo, ".ai-code-worker", "config.json"),
+      JSON.stringify({
+        contextProvider: "ai-code-control",
+        contextPackage: { mode: "observe", maximumTokens: 2000 },
+        adapters: { aiCodeControl: { executable: "this-binary-does-not-exist-aicw" } }
+      }),
+      "utf8"
+    );
+
+    const output = execFileSync(
+      process.execPath,
+      [resolve("dist/src/cli.js"), "run", "--engine", "fake", "--repo", repo, "--plan", "Plan/RUN.md", "--run-id", "run-context-observe", "--json"],
+      { cwd: tmpdir(), encoding: "utf8" }
+    );
+    const report = JSON.parse(output) as {
+      status: string;
+      state: { runRoot: string };
+      contextPackages: { mode: string; packages: readonly { taskId: string; status: string }[] };
+    };
+
+    assert.equal(report.status, "DONE");
+    assert.equal(report.contextPackages.mode, "observe");
+    assert.deepEqual(report.contextPackages.packages.map((entry) => entry.status), ["UNAVAILABLE", "UNAVAILABLE"]);
+    assert.equal(existsSync(join(report.state.runRoot, "context-package-index.v1.json")), true);
+    const snapshot = JSON.parse(
+      readFileSync(join(report.state.runRoot, "tasks", "CONTRACT-01", "task-input.json"), "utf8")
+    ) as Record<string, unknown>;
+    assert.equal(snapshot.schemaVersion, "1.1");
+    assert.equal(snapshot.contextDigest, null);
+    assert.match(String(snapshot.qualityGateConfigHash), /^[a-f0-9]{64}$/);
+    assert.match(String(snapshot.policyHash), /^[a-f0-9]{64}$/);
+    assert.match(String(snapshot.toolchainConfigHash), /^[a-f0-9]{64}$/);
+  });
+
+  it("enforce mode fails closed before execution when the selected engine cannot consume packages", () => {
+    const repo = createGitRepository();
+    mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
+    writeFileSync(
+      join(repo, ".ai-code-worker", "config.json"),
+      JSON.stringify({
+        contextProvider: "ai-code-control",
+        contextPackage: { mode: "enforce", maximumTokens: 2000 },
+        adapters: { aiCodeControl: { executable: "this-binary-does-not-exist-aicw" } }
+      }),
+      "utf8"
+    );
+
+    let output = "";
+    try {
+      output = execFileSync(
+        process.execPath,
+        [resolve("dist/src/cli.js"), "run", "--engine", "fake", "--repo", repo, "--plan", "Plan/RUN.md", "--run-id", "run-context-enforce", "--json"],
+        { cwd: tmpdir(), encoding: "utf8" }
+      );
+    } catch (error) {
+      output = (error as { readonly stdout?: string }).stdout ?? "";
+    }
+    const report = JSON.parse(output) as {
+      status: string;
+      executedTasks: readonly string[];
+      findings: readonly { code: string }[];
+    };
+
+    assert.equal(report.status, "BLOCKED");
+    assert.deepEqual(report.executedTasks, []);
+    assert.equal(report.findings[0]?.code, "CONTEXT_PACKAGE_ENFORCEMENT_FAILED");
+  });
+
   it("omits contextProvider.symbols when no task declares relevantSymbols", () => {
     const repo = createGitRepository();
     mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
@@ -401,6 +503,49 @@ function createGitRepository(budgetOverrides: Record<string, unknown> = {}, gate
     stdio: "ignore"
   });
 
+  return repo;
+}
+
+function createTraceableGitRepository(): string {
+  const repo = createGitRepository();
+  const body = planBody({}, {}) as {
+    workerContractVersion?: "1.1";
+    tasks: Array<Record<string, unknown>>;
+  };
+  body.workerContractVersion = "1.1";
+  body.tasks = body.tasks.map((task) => {
+    const taskId = String(task.id);
+    const criterionId = `${taskId}-AC-01`;
+    const command = (task.verify as string[])[0]!;
+    return {
+      ...task,
+      traceability: {
+        acceptanceCriteria: [{ criterionId, text: (task.acceptanceCriteria as string[])[0]! }],
+        gates: [{
+          gateId: `${taskId}-G-01`,
+          command,
+          evidenceContract: "The command exits with code zero.",
+          criterionIds: [criterionId]
+        }]
+      }
+    };
+  });
+  writeFileSync(join(repo, "Plan", "RUN.md"), `---
+status: accepted
+---
+
+# Traceable fake run plan
+
+\`\`\`json ai-code-worker-plan
+${JSON.stringify(body, null, 2)}
+\`\`\`
+`, "utf8");
+  execFileSync("git", ["add", "Plan/RUN.md"], { cwd: repo, stdio: "ignore" });
+  execFileSync(
+    "git",
+    ["-c", "user.name=ai-code-worker", "-c", "user.email=worker@example.test", "commit", "--amend", "--no-edit"],
+    { cwd: repo, stdio: "ignore" }
+  );
   return repo;
 }
 

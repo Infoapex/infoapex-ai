@@ -4,7 +4,7 @@ import { SchemaRegistry } from "../schema/json-schema.js";
 import { resolveStateRoot } from "../state/state-root.js";
 
 export type UsageCheckpointEngine = "fake" | "claude" | "codex";
-export type UsageCheckpointScope = "run" | "task";
+export type UsageCheckpointScope = "run" | "task" | "development";
 export type UsageCheckpointPhase = "start" | "end";
 export type UsageCheckpointTaskKind = "contract" | "backend" | "frontend" | "database" | "docs" | "test" | "review" | "repair" | "other";
 export type UsageCheckpointTaskRisk = "low" | "medium" | "high";
@@ -17,8 +17,14 @@ export interface UsageCheckpointTokens {
   readonly costUsd: number | null;
 }
 
-export interface UsageCheckpoint {
-  readonly schemaVersion: "1.0";
+export interface UsagePrediction {
+  readonly lowTokens: number;
+  readonly medianTokens: number;
+  readonly highTokens: number;
+  readonly source: string;
+}
+
+interface UsageCheckpointBase {
   readonly checkpointId: string;
   readonly runId: string;
   readonly taskId: string | null;
@@ -34,6 +40,25 @@ export interface UsageCheckpoint {
   readonly percentUsedEstimated: number | null;
 }
 
+export interface LegacyUsageCheckpoint extends UsageCheckpointBase {
+  readonly schemaVersion: "1.0";
+}
+
+export interface ProfiledUsageCheckpoint extends UsageCheckpointBase {
+  readonly schemaVersion: "1.1";
+  readonly model: string | null;
+  readonly reasoningEffort: string | null;
+  readonly modelContextWindow: number | null;
+  readonly rateLimitWindowMinutes: number | null;
+  readonly rateLimitResetsAt: number | null;
+  readonly calibrationProfileId: string | null;
+  readonly sessionFingerprint: string | null;
+  readonly parallelSessionCount: number | null;
+  readonly prediction: UsagePrediction | null;
+}
+
+export type UsageCheckpoint = LegacyUsageCheckpoint | ProfiledUsageCheckpoint;
+
 export interface AppendUsageCheckpointInput {
   readonly checkpointId: string;
   readonly runId: string;
@@ -48,6 +73,15 @@ export interface AppendUsageCheckpointInput {
   readonly contextEstimateTokens?: number | null;
   readonly percentUsedReported?: number | null;
   readonly percentUsedEstimated?: number | null;
+  readonly model?: string | null;
+  readonly reasoningEffort?: string | null;
+  readonly modelContextWindow?: number | null;
+  readonly rateLimitWindowMinutes?: number | null;
+  readonly rateLimitResetsAt?: number | null;
+  readonly calibrationProfileId?: string | null;
+  readonly sessionFingerprint?: string | null;
+  readonly parallelSessionCount?: number | null;
+  readonly prediction?: UsagePrediction | null;
 }
 
 export interface UsageCheckpointLogReadResult {
@@ -67,9 +101,11 @@ export class UsageCheckpointLog {
     private readonly registry = SchemaRegistry.load()
   ) {}
 
-  append(input: AppendUsageCheckpointInput): UsageCheckpoint {
-    const checkpoint: UsageCheckpoint = {
-      schemaVersion: "1.0",
+  append(input: AppendUsageCheckpointInput): ProfiledUsageCheckpoint {
+    validatePrediction(input.prediction ?? null);
+
+    const checkpoint: ProfiledUsageCheckpoint = {
+      schemaVersion: "1.1",
       checkpointId: input.checkpointId,
       runId: input.runId,
       taskId: input.taskId ?? null,
@@ -88,7 +124,16 @@ export class UsageCheckpointLog {
       },
       contextEstimateTokens: input.contextEstimateTokens ?? null,
       percentUsedReported: input.percentUsedReported ?? null,
-      percentUsedEstimated: input.percentUsedEstimated ?? null
+      percentUsedEstimated: input.percentUsedEstimated ?? null,
+      model: input.model ?? null,
+      reasoningEffort: input.reasoningEffort ?? null,
+      modelContextWindow: input.modelContextWindow ?? null,
+      rateLimitWindowMinutes: input.rateLimitWindowMinutes ?? null,
+      rateLimitResetsAt: input.rateLimitResetsAt ?? null,
+      calibrationProfileId: input.calibrationProfileId ?? null,
+      sessionFingerprint: input.sessionFingerprint ?? null,
+      parallelSessionCount: input.parallelSessionCount ?? null,
+      prediction: input.prediction ?? null
     };
 
     this.registry.assertValid("usage-checkpoint.schema.json", checkpoint);
@@ -147,4 +192,14 @@ function isLastNonEmptyLine(lines: readonly string[], index: number): boolean {
 
 function ensureDirectory(path: string): void {
   mkdirSync(path, { recursive: true });
+}
+
+function validatePrediction(prediction: UsagePrediction | null): void {
+  if (!prediction) {
+    return;
+  }
+
+  if (prediction.lowTokens > prediction.medianTokens || prediction.medianTokens > prediction.highTokens) {
+    throw new Error("Usage prediction must satisfy lowTokens <= medianTokens <= highTokens.");
+  }
 }

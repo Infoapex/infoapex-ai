@@ -9,6 +9,7 @@ import { SchemaRegistry } from "../schema/json-schema.js";
 import { isPathInside, resolveStateRoot } from "../state/state-root.js";
 import { parsePlanMarkdown } from "./plan-parser.js";
 import { resolveRoutingProfile } from "../routing/routing-policy.js";
+import { validateManifestTraceability, type TraceableManifestTask } from "../manifest/traceability.js";
 
 export interface CompileOptions {
   readonly repositoryPath: string;
@@ -89,7 +90,7 @@ export function runCompile(options: CompileOptions): CompileReport {
     return blocked(repository, "ROUTING_PROFILE_UNAVAILABLE", error instanceof Error ? error.message : String(error));
   }
   const manifest = {
-    schemaVersion: "1.0",
+    schemaVersion: parsedPlan.body.workerContractVersion ?? "1.0",
     runId,
     graphVersion: 1,
     plan: {
@@ -106,6 +107,18 @@ export function runCompile(options: CompileOptions): CompileReport {
     globalGates: parsedPlan.body.globalGates,
     budgets: parsedPlan.body.budgets
   };
+  const manifestValidation = registry.validate("manifest.schema.json", manifest);
+  if (!manifestValidation.valid) {
+    return blocked(
+      repository,
+      "MANIFEST_INVALID",
+      manifestValidation.errors.map((issue) => `${issue.instancePath} ${issue.message}`).join("; ")
+    );
+  }
+  const traceabilityErrors = validateManifestTraceability(manifest as typeof manifest & { readonly tasks: readonly TraceableManifestTask[] });
+  if (traceabilityErrors.length > 0) {
+    return blocked(repository, "MANIFEST_TRACEABILITY_INVALID", traceabilityErrors.join("; "));
+  }
   const frozenManifest = freezeManifest(manifest, registry);
   const repositoryFingerprint = sha256(`${repository.worktreeRoot}:${repository.gitCommonDir}:${repository.headCommit}`);
   const executionProfile = loadExecutionProfile(repository.worktreeRoot);

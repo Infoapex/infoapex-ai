@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "relations": [
+    {
+      "from": { "type": "adr", "canonicalRef": "ADR-0011" },
+      "relation": "references",
+      "to": { "type": "contract", "canonicalRef": "contracts/trace-relations.v1.schema.json" },
+      "evidenceRef": "contracts/examples/trace-relations.v1.example.json"
+    }
+  ]
+}

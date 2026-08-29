@@ -3,6 +3,7 @@ import type { WorkerManifestTask } from '../types.js';
 
 export function readPlanMarkdown(filePath: string): {
   status: string;
+  workerContractVersion: '1.0' | '1.1';
   goal: string;
   tasks: WorkerManifestTask[];
   globalGates: string[];
@@ -25,6 +26,7 @@ export function readPlanMarkdown(filePath: string): {
   }
 
   const parsed = JSON.parse(codeBlockMatch[1]) as {
+    workerContractVersion?: '1.0' | '1.1';
     goal: string;
     tasks: WorkerManifestTask[];
     globalGates: string[];
@@ -33,6 +35,7 @@ export function readPlanMarkdown(filePath: string): {
 
   return {
     status,
+    workerContractVersion: parsed.workerContractVersion ?? '1.0',
     goal: parsed.goal,
     tasks: parsed.tasks,
     globalGates: parsed.globalGates,

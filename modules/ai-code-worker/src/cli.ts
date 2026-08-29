@@ -1,9 +1,18 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { estimateClaudePercentFromTokens } from "./benchmark/claude-calibration.js";
+import { appendDevelopmentCheckpoint, DevelopmentCheckpointError } from "./benchmark/development-checkpoint.js";
 import { estimateUsageForPlan, type PlanTaskShape, type PlanUsageEstimate } from "./benchmark/estimate.js";
 import { findLatestCodexRolloutPath, readCodexSessionLog } from "./benchmark/read-codex-session.js";
-import { resolveUsageCheckpointLogPath, UsageCheckpointLog, type UsageCheckpointTokens } from "./benchmark/usage-checkpoint.js";
+import { evaluateUsageDrift, type UsageDriftReport } from "./benchmark/usage-drift.js";
+import {
+  resolveUsageCheckpointLogPath,
+  UsageCheckpointLog,
+  type UsageCheckpointTaskKind,
+  type UsageCheckpointTaskRisk,
+  type UsageCheckpointTokens,
+  type UsagePrediction
+} from "./benchmark/usage-checkpoint.js";
 import { runCompile } from "./compile/compile.js";
 import { AGENTS_MD_BLOCK_VERSION, proposeAgentsMdBlock, writeAgentsMdBlock } from "./config/agents-md-block.js";
 import { initProjectConfig, updateProjectConfig } from "./config/init.js";
@@ -12,6 +21,13 @@ import { loadProjectConfig } from "./config/project-config.js";
 import { resolveContextProvider } from "./context-provider/resolve.js";
 import type { ContextProviderCallResult } from "./context-provider/types.js";
 import { buildTaskContext, type TaskContext } from "./context-provider/task-context.js";
+import {
+  compileTaskContextPackages,
+  failedContextPackageTasks,
+  successfulContextPackages,
+  writeContextPackageArtifacts,
+  type ContextPackageMode
+} from "./context-provider/context-packages.js";
 import { writeRedactedHandoff } from "./report/export-artifacts.js";
 import { createClaudeIndependentReviewer, createCodexIndependentReviewer } from "./review/independent-reviewer-cli.js";
 import { createClaudeRepairExecutor } from "./repair/execute-claude-repair-cycle.js";
@@ -28,11 +44,97 @@ import type { ProjectConfig } from "./config/project-config.js";
 import { runStatus } from "./status/status.js";
 import { findPlannerHandoffRunId, publishWorkerFeedback } from "./integration/apex-handoff.js";
 import { runReadOnlyReview } from "./review/review-command.js";
+import { buildSemanticTaskInputsMap, type SemanticTaskDescriptor } from "./snapshots/semantic-task-inputs.js";
+import { detectRunSemanticDrift } from "./snapshots/detect-run-semantic-drift.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
 
-if (command === "review") {
+if (command === "benchmark") {
+  const subcommand = args[1];
+  const repositoryPath = readOption("--repo") ?? process.cwd();
+  const asJson = args.includes("--json");
+
+  if (subcommand === "checkpoint") {
+    const planId = readOption("--plan");
+    const stageId = readOption("--stage");
+    const phase = readOption("--phase");
+    const engine = readOption("--engine") ?? "codex";
+    const taskKind = readOption("--kind");
+    const taskRisk = readOption("--risk");
+    const rolloutPath = readOption("--session-log");
+    const codexSessionsDir = readOption("--codex-sessions-dir");
+
+    if (!planId || !stageId || (phase !== "start" && phase !== "end") || engine !== "codex") {
+      console.error(
+        "Usage: ai-code-worker benchmark checkpoint --plan <id> --stage <id> --phase <start|end> --engine codex [--repo <path>] [--json]"
+      );
+      process.exitCode = 1;
+    } else if (taskKind !== null && !isTaskKind(taskKind)) {
+      console.error("Unsupported --kind value.");
+      process.exitCode = 1;
+    } else if (taskRisk !== null && !isTaskRisk(taskRisk)) {
+      console.error("Unsupported --risk value. Use low, medium, or high.");
+      process.exitCode = 1;
+    } else {
+      try {
+        const prediction = readPrediction();
+        const checkpoint = appendDevelopmentCheckpoint({
+          repositoryPath,
+          planId,
+          stageId,
+          phase,
+          engine,
+          taskKind,
+          taskRisk,
+          prediction,
+          rolloutPath,
+          codexSessions: codexSessionsDir ? { codexSessionsDir } : undefined
+        });
+
+        if (asJson) {
+          console.log(JSON.stringify(checkpoint, null, 2));
+        } else {
+          console.log(`ai-code-worker benchmark checkpoint: ${checkpoint.checkpointId}`);
+          console.log(`  profile: ${checkpoint.calibrationProfileId ?? "unknown"}`);
+          console.log(`  total tokens: ${sumTokensOrNull(checkpoint.tokens) ?? "unknown"}`);
+          console.log(`  usage: ${checkpoint.percentUsedReported ?? "unknown"}%`);
+          if ((checkpoint.parallelSessionCount ?? 0) > 0) {
+            console.log(`  warning: ${checkpoint.parallelSessionCount} other Codex rollout(s) changed during this stage`);
+          }
+        }
+      } catch (error) {
+        const code = error instanceof DevelopmentCheckpointError ? error.code : "BENCHMARK_CHECKPOINT_INVALID";
+        const message = error instanceof Error ? error.message : String(error);
+        if (asJson) {
+          console.log(JSON.stringify({ status: "BLOCKED", code, message }, null, 2));
+        } else {
+          console.error(`${code}: ${message}`);
+        }
+        process.exitCode = 2;
+      }
+    }
+  } else if (subcommand === "drift") {
+    const planId = readOption("--plan");
+    const profile = readOption("--profile");
+    if (!planId) {
+      console.error("Usage: ai-code-worker benchmark drift --plan <id> [--profile <engine:model:effort>] [--repo <path>] [--json]");
+      process.exitCode = 1;
+    } else {
+      const log = new UsageCheckpointLog(resolveUsageCheckpointLogPath(repositoryPath));
+      const report = evaluateUsageDrift({ checkpoints: log.read().checkpoints, planId, profile });
+      if (asJson) {
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        printUsageDrift(report);
+      }
+      process.exitCode = report.status === "RED" ? 2 : 0;
+    }
+  } else {
+    console.error("Usage: ai-code-worker benchmark <checkpoint|drift> ...");
+    process.exitCode = 1;
+  }
+} else if (command === "review") {
   const repositoryPath = readOption("--repo") ?? process.cwd();
   const inputPath = readOption("--input");
   const engine = readOption("--engine") ?? "fake";
@@ -328,6 +430,36 @@ if (command === "review") {
     // internally and land on the identical run.
     const preview = runCompile({ repositoryPath, planPath, runId });
     const effectiveRunId = preview.runId ?? runId ?? null;
+    const contextPackageMode: ContextPackageMode = projectConfig?.contextPackage?.mode ?? "off";
+    const contextPackageResults =
+      contextPackageMode !== "off" &&
+      preview.status === "PASS" &&
+      preview.state.manifestPath &&
+      preview.manifestSha256
+        ? await compileTaskContextPackages({
+            provider: contextProvider,
+            manifestPath: preview.state.manifestPath,
+            manifestSha256: preview.manifestSha256,
+            maximumTokens: projectConfig?.contextPackage?.maximumTokens ?? 12_000
+          })
+        : null;
+    const contextPackageArtifacts =
+      contextPackageResults && preview.state.runRoot
+        ? writeContextPackageArtifacts(preview.state.runRoot, contextPackageMode, contextPackageResults)
+        : null;
+    const compiledContextPackages = contextPackageResults ? successfulContextPackages(contextPackageResults) : null;
+    const failedContextTasks = contextPackageResults ? failedContextPackageTasks(contextPackageResults) : [];
+    const semanticTaskInputs = preview.state.manifestPath
+      ? buildSemanticTaskInputsMap({
+          repositoryRoot: repositoryPath,
+          tasks: readManifestSemanticTasks(preview.state.manifestPath),
+          contextPackages: compiledContextPackages,
+          projectConfig
+        })
+      : undefined;
+    const semanticDrift = preview.state.runRoot && semanticTaskInputs
+      ? detectRunSemanticDrift(preview.state.runRoot, semanticTaskInputs)
+      : [];
 
     // Flow item 3 (deferred in stage 2 of Part B / Phase 4 - see docs/BENCHMARKS.md):
     // find-symbol/impact-analysis per task, wired now WITHOUT inventing a symbol-
@@ -343,7 +475,7 @@ if (command === "review") {
         ? await lookupContextProviderSymbols(contextProvider, relevantSymbols)
         : null;
     const taskContexts =
-      contextProvider.kind !== "none" && preview.state.manifestPath
+      contextPackageMode !== "enforce" && contextProvider.kind !== "none" && preview.state.manifestPath
         ? await buildTaskContexts(contextProvider, preview.state.manifestPath)
         : null;
 
@@ -465,7 +597,53 @@ if (command === "review") {
           }
         : undefined;
 
-    const report = engine === "codex"
+    const contextEnforcementMessage =
+      contextPackageMode !== "enforce"
+        ? null
+        : engineTyped === "fake"
+          ? "context-package enforce mode requires a real codex or claude engine"
+          : failedContextTasks.length > 0
+            ? `context package compilation failed for tasks: ${failedContextTasks.join(", ")}`
+            : !compiledContextPackages
+              ? "context package compilation did not produce enforceable packages"
+              : null;
+    const preExecutionFailure =
+      semanticDrift.length > 0
+        ? {
+            code: "SEMANTIC_INPUT_DRIFT_REQUIRES_GRAPH_REVISION",
+            message: `stored task inputs drifted: ${semanticDrift
+              .map((item) => `${item.taskId}[${item.reasons.join(",")}]`)
+              .join("; ")}. Create a new authorized graph revision; the frozen run will not be reopened.`
+          }
+        : contextEnforcementMessage
+        ? {
+            code: "CONTEXT_PACKAGE_ENFORCEMENT_FAILED",
+            message: contextEnforcementMessage
+          }
+        : null;
+    const report = preExecutionFailure
+      ? {
+          status: "BLOCKED" as const,
+          runId: effectiveRunId,
+          compile: preview,
+          executedTasks: [] as readonly string[],
+          state: {
+            runRoot: preview.state.runRoot,
+            eventLogPath: null,
+            runEvidencePath: null
+          },
+          taskCommits: {} as Readonly<Record<string, string>>,
+          gateResults: [] as readonly [],
+          usageTotals: null,
+          findings: [
+            {
+              severity: "blocker" as const,
+              code: preExecutionFailure.code,
+              message: preExecutionFailure.message
+            }
+          ]
+        }
+      : engine === "codex"
       ? runCodex({
           repositoryPath,
           planPath,
@@ -476,7 +654,11 @@ if (command === "review") {
             ...(isCodexSandboxMode(codexSandboxMode) ? { sandboxMode: codexSandboxMode } : {})
           },
           ...(independentReviewCodex ? { independentReview: independentReviewCodex } : {}),
-          ...(taskContexts ? { taskContexts } : {})
+          ...(taskContexts ? { taskContexts } : {}),
+          ...(semanticTaskInputs ? { semanticTaskInputs } : {}),
+          ...(contextPackageMode === "enforce" && compiledContextPackages
+            ? { taskContextPackages: compiledContextPackages, contextPackageMode }
+            : {})
         })
       : engine === "claude"
       ? runClaude({
@@ -491,9 +673,13 @@ if (command === "review") {
             ...(claudeDangerouslySkipPermissions !== undefined ? { dangerouslySkipPermissions: claudeDangerouslySkipPermissions } : {})
           },
           ...(independentReviewClaude ? { independentReview: independentReviewClaude } : {}),
-          ...(taskContexts ? { taskContexts } : {})
+          ...(taskContexts ? { taskContexts } : {}),
+          ...(semanticTaskInputs ? { semanticTaskInputs } : {}),
+          ...(contextPackageMode === "enforce" && compiledContextPackages
+            ? { taskContextPackages: compiledContextPackages, contextPackageMode }
+            : {})
         })
-      : runFake({ repositoryPath, planPath, runId });
+      : runFake({ repositoryPath, planPath, runId, ...(semanticTaskInputs ? { semanticTaskInputs } : {}) });
 
     if (effectiveRunId) {
       const tokens = usageTotalsToTokens(report.usageTotals);
@@ -577,6 +763,7 @@ if (command === "review") {
             engineProvenance,
             ...(preRunEstimate ? { preRunEstimate } : {}),
             ...(contextProviderSummary ? { contextProvider: contextProviderSummary } : {}),
+            ...(contextPackageArtifacts ? { contextPackages: contextPackageArtifacts } : {}),
             ...(handoffExport ? { handoffExport } : {}),
             ...(apexHandoff ? { apexHandoff } : {})
           },
@@ -608,6 +795,10 @@ if (command === "review") {
           console.log(`  symbol ${lookup.symbol}: find-symbol=${summarizeProviderCall(lookup.findSymbol)} impact=${summarizeProviderCall(lookup.impact)}`);
         }
       }
+      if (contextPackageArtifacts) {
+        const ok = contextPackageArtifacts.packages.filter((entry) => entry.status === "OK").length;
+        console.log(`context packages: mode=${contextPackageArtifacts.mode} compiled=${ok}/${contextPackageArtifacts.packages.length}`);
+      }
       if (handoffExport) {
         console.log(`handoff exported: ${handoffExport.path}`);
       }
@@ -619,7 +810,7 @@ if (command === "review") {
     process.exitCode = report.status === "BLOCKED" ? 2 : 0;
   }
 } else {
-  console.error("Usage: ai-code-worker <init|update|doctor|status|compile|run|review> [--repo <path>] [--json]");
+  console.error("Usage: ai-code-worker <benchmark|init|update|doctor|status|compile|run|review> [--repo <path>] [--json]");
   process.exitCode = 1;
 }
 
@@ -647,6 +838,43 @@ function readOption(name: string): string | null {
   return args[index + 1] ?? null;
 }
 
+function readPrediction(): UsagePrediction | null {
+  const low = readNumberOption("--predicted-low");
+  const median = readNumberOption("--predicted-median");
+  const high = readNumberOption("--predicted-high");
+  const source = readOption("--prediction-source");
+  const provided = [low, median, high, source].filter((value) => value !== null).length;
+
+  if (provided === 0) {
+    return null;
+  }
+  if (low === null || median === null || high === null || source === null) {
+    throw new Error("Prediction requires --predicted-low, --predicted-median, --predicted-high, and --prediction-source together.");
+  }
+
+  return { lowTokens: low, medianTokens: median, highTokens: high, source };
+}
+
+function readNumberOption(name: string): number | null {
+  const raw = readOption(name);
+  if (raw === null) {
+    return null;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${name} must be a non-negative number.`);
+  }
+  return value;
+}
+
+function isTaskKind(value: string): value is UsageCheckpointTaskKind {
+  return ["contract", "backend", "frontend", "database", "docs", "test", "review", "repair", "other"].includes(value);
+}
+
+function isTaskRisk(value: string): value is UsageCheckpointTaskRisk {
+  return value === "low" || value === "medium" || value === "high";
+}
+
 function isCodexSandboxMode(value: string | undefined): value is "workspace-write" | "danger-full-access" {
   return value === "workspace-write" || value === "danger-full-access";
 }
@@ -662,6 +890,17 @@ function summarizeProviderCall(result: ContextProviderCallResult<unknown>): stri
 function readManifestTaskShapes(manifestPath: string): readonly PlanTaskShape[] {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { readonly tasks: readonly PlanTaskShape[] };
   return manifest.tasks;
+}
+
+function readManifestSemanticTasks(manifestPath: string): readonly (SemanticTaskDescriptor & { readonly id: string })[] {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+    readonly tasks: readonly (SemanticTaskDescriptor & { readonly id: string })[];
+    readonly globalGates?: readonly string[];
+  };
+  return manifest.tasks.map((task) => ({
+    ...task,
+    verify: [...(task.verify ?? []), ...(manifest.globalGates ?? [])]
+  }));
 }
 
 function readManifestRouting(manifestPath: string): unknown {
@@ -685,12 +924,24 @@ function readManifestReviewBase(manifestPath: string | null): ManifestReviewBase
 
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
     readonly base: { readonly commit: string };
-    readonly tasks: readonly { readonly id: string; readonly acceptanceCriteria?: readonly string[] }[];
+    readonly tasks: readonly {
+      readonly id: string;
+      readonly acceptanceCriteria?: readonly string[];
+      readonly traceability?: {
+        readonly acceptanceCriteria: readonly { readonly criterionId: string; readonly text: string }[];
+      };
+    }[];
   };
 
   return {
     baseCommit: manifest.base.commit,
-    tasks: manifest.tasks.map((task) => ({ id: task.id, acceptanceCriteria: task.acceptanceCriteria ?? [] }))
+    tasks: manifest.tasks.map((task) => ({
+      id: task.id,
+      acceptanceCriteria: task.acceptanceCriteria ?? [],
+      ...(task.traceability ? {
+        criterionIds: task.traceability.acceptanceCriteria.map((criterion) => criterion.criterionId)
+      } : {})
+    }))
   };
 }
 
@@ -792,6 +1043,30 @@ function printPreRunEstimate(estimate: PlanUsageEstimate, asJson: boolean): void
   }
 }
 
+function printUsageDrift(report: UsageDriftReport): void {
+  console.log(`ai-code-worker benchmark drift: ${report.status}`);
+  console.log(`  plan: ${report.planId}`);
+  console.log(`  profile: ${report.profile ?? "all"}`);
+  console.log(`  token predictions: ${report.comparableStageCount}/${report.stageCount} comparable`);
+  console.log(`  usage mappings: ${report.usageComparableStageCount}/${report.stageCount} comparable`);
+  if (report.meanAbsolutePercentageError !== null) {
+    console.log(`  MAPE: ${report.meanAbsolutePercentageError.toFixed(1)}%`);
+  }
+  if (report.rangeHitRate !== null) {
+    console.log(`  range hits: ${(report.rangeHitRate * 100).toFixed(1)}%`);
+  }
+  if (report.medianTokensPerPercentagePoint !== null) {
+    console.log(`  median tokens/pp: ${report.medianTokensPerPercentagePoint.toFixed(0)}`);
+  }
+  for (const stage of report.stages) {
+    console.log(
+      `  ${stage.stageId}: prediction=${stage.status}; usageMapping=${stage.usageMappingStatus}; tokens=${stage.actualTokens ?? "unknown"}; usageDelta=${stage.usageDeltaPercentagePoints ?? "n/a"}pp${
+        stage.reasons.length > 0 ? `; ${stage.reasons.join(",")}` : ""
+      }`
+    );
+  }
+}
+
 function usageTotalsToTokens(totals: {
   readonly inputUncachedTokens: number | null;
   readonly cacheReadTokens: number | null;
@@ -830,9 +1105,24 @@ function sumTokensOrNull(tokens: UsageCheckpointTokens): number | null {
 function codexSessionCrossCheck(engine: "fake" | "codex" | "claude"): {
   readonly contextEstimateTokens: number | null;
   readonly percentUsedReported: number | null;
+  readonly model: string | null;
+  readonly reasoningEffort: string | null;
+  readonly modelContextWindow: number | null;
+  readonly rateLimitWindowMinutes: number | null;
+  readonly rateLimitResetsAt: number | null;
+  readonly calibrationProfileId: string | null;
 } {
   if (engine !== "codex") {
-    return { contextEstimateTokens: null, percentUsedReported: null };
+    return {
+      contextEstimateTokens: null,
+      percentUsedReported: null,
+      model: null,
+      reasoningEffort: null,
+      modelContextWindow: null,
+      rateLimitWindowMinutes: null,
+      rateLimitResetsAt: null,
+      calibrationProfileId: null
+    };
   }
 
   const path = findLatestCodexRolloutPath();
@@ -840,6 +1130,12 @@ function codexSessionCrossCheck(engine: "fake" | "codex" | "claude"): {
 
   return {
     contextEstimateTokens: summary?.totalTokenUsage?.totalTokens ?? null,
-    percentUsedReported: summary?.usedPercent ?? null
+    percentUsedReported: summary?.usedPercent ?? null,
+    model: summary?.model ?? null,
+    reasoningEffort: summary?.reasoningEffort ?? null,
+    modelContextWindow: summary?.modelContextWindow ?? null,
+    rateLimitWindowMinutes: summary?.windowMinutes ?? null,
+    rateLimitResetsAt: summary?.resetsAt ?? null,
+    calibrationProfileId: summary ? `codex:${summary.model ?? "unknown-model"}:${summary.reasoningEffort ?? "unknown-effort"}` : null
   };
 }

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run-example",
+  "manifestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "nodes": [
+    {
+      "nodeId": "node-1111111111111111",
+      "kind": "criterion",
+      "canonicalRef": "criterion:TASK-01-AC-01",
+      "authority": "canonical"
+    },
+    {
+      "nodeId": "node-2222222222222222",
+      "kind": "gate",
+      "canonicalRef": "gate:TASK-01-G-01",
+      "authority": "canonical"
+    }
+  ],
+  "edges": [
+    {
+      "edgeId": "edge-3333333333333333",
+      "relation": "verified_by",
+      "fromNodeId": "node-1111111111111111",
+      "toNodeId": "node-2222222222222222",
+      "confidence": "declared",
+      "evidenceRefs": [
+        "manifest.json",
+        "tasks/TASK-01/evidence.json"
+      ]
+    }
+  ],
+  "coverage": {
+    "criteriaTotal": 1,
+    "criteriaWithDirectEvidence": 1,
+    "traceCoveragePercent": 100,
+    "complete": true
+  },
+  "findings": [],
+  "sourceMapDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "createdAt": "2026-08-28T00:00:00Z"
+}

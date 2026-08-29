@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using AiCodeControl.Cli;
 using AiCodeControl.CodeIndexer.Services;
@@ -9,7 +11,10 @@ using AiCodeControl.PythonIndexer.Services;
 using AiCodeControl.RefactorGuard.Services;
 using AiCodeControl.RustIndexer.Services;
 
-var repoRoot = PathResolver.ResolveRepoRoot();
+var requestedRepoRoot = GetOptionValue(args, "--repo");
+var repoRoot = string.IsNullOrWhiteSpace(requestedRepoRoot)
+    ? PathResolver.ResolveRepoRoot()
+    : Path.GetFullPath(requestedRepoRoot);
 
 if (args.Length == 0)
 {
@@ -118,10 +123,51 @@ async Task<int> RunCommandAsync()
                     ScopePath = scopePath,
                     OutputPath = outputPath,
                     IncludeSymbols = args.Contains("--include-symbols", StringComparer.OrdinalIgnoreCase),
-                    MaxSymbols = maxSymbols
+                    MaxSymbols = maxSymbols,
+                    IncludeAdvisory = args.Contains("--include-advisory", StringComparer.OrdinalIgnoreCase),
+                    IncludeSuperseded = args.Contains("--include-superseded", StringComparer.OrdinalIgnoreCase)
                 });
                 WriteJson(result);
                 return 0;
+            }
+        case "trace-ingest":
+            {
+                var manifestPath = GetOptionValue(args, "--manifest");
+                if (string.IsNullOrWhiteSpace(manifestPath))
+                {
+                    WriteJson(new { status = "error", message = "Usage: trace-ingest --manifest <path> [--expected-commit <commit>] [--no-code-index] [--dry-run]" });
+                    return 1;
+                }
+                var sourceCommit = GetOptionValue(args, "--expected-commit") ?? TryReadGitCommit(repoRoot);
+                if (string.IsNullOrWhiteSpace(sourceCommit))
+                {
+                    WriteJson(new { status = "error", message = "A source commit is required; use --expected-commit in repositories without Git." });
+                    return 1;
+                }
+                var databasePath = EnsureCodegraphDb(configLoader);
+                var request = new TraceGraphIngestManifestService().CreateRequest(
+                    repoRoot, databasePath, manifestPath, sourceCommit, DateTimeOffset.UtcNow,
+                    args.Contains("--no-code-index", StringComparer.OrdinalIgnoreCase) ? false : null);
+                var ingest = new TraceGraphIngestService().Build(request);
+                var blocking = ingest.Diagnostics.Any(item => item.Severity == "error");
+                TraceGraphState? state = null;
+                if (!blocking && !args.Contains("--dry-run", StringComparer.OrdinalIgnoreCase))
+                    state = new TraceGraphRepository().Rebuild(databasePath, [ingest.Snapshot]);
+                WriteJson(new
+                {
+                    status = blocking ? "fail" : args.Contains("--dry-run", StringComparer.OrdinalIgnoreCase) ? "dry_run" : "ok",
+                    sourceCommit,
+                    includeCodeIndex = request.IncludeCodeIndex,
+                    ingest.DocumentsRead,
+                    ingest.DocumentsSkipped,
+                    ingest.NodesProduced,
+                    ingest.EdgesProduced,
+                    diagnostics = ingest.Diagnostics,
+                    graphDigest = state?.Digest,
+                    currentNodes = state?.Nodes.Count,
+                    currentEdges = state?.Edges.Count
+                });
+                return blocking ? 2 : 0;
             }
         case "find-symbol":
             {
@@ -148,6 +194,106 @@ async Task<int> RunCommandAsync()
 
                 var depth = int.TryParse(GetOptionValue(args, "--depth"), out var parsedDepth) ? parsedDepth : 5;
                 WriteJson(new SymbolQueryService().ImpactAnalysis(dbPath, symbol, depth));
+                return 0;
+            }
+        case "trace":
+        case "why":
+        case "affected":
+        case "current":
+        case "evidence-for":
+            {
+                var entity = GetPositionalArg(args, 1) ?? GetOptionValue(args, "--entity");
+                if (string.IsNullOrWhiteSpace(entity))
+                {
+                    WriteJson(new
+                    {
+                        status = "error",
+                        message = $"Missing entity. Usage: {command} <entity> [--depth <1-10>] [--max-nodes <1-200>] [--max-edges <1-500>] [--include-advisory]"
+                    });
+                    return 1;
+                }
+
+                var depth = int.TryParse(GetOptionValue(args, "--depth"), out var parsedDepth) ? parsedDepth : 3;
+                var maximumNodes = int.TryParse(GetOptionValue(args, "--max-nodes"), out var parsedNodes) ? parsedNodes : 50;
+                var maximumEdges = int.TryParse(GetOptionValue(args, "--max-edges"), out var parsedEdges) ? parsedEdges : 100;
+                var expectedCommit = args.Contains("--skip-freshness", StringComparer.OrdinalIgnoreCase)
+                    ? null
+                    : GetOptionValue(args, "--expected-commit") ?? TryReadGitCommit(repoRoot);
+                var options = new TraceGraphQueryOptions(
+                    depth, maximumNodes, maximumEdges,
+                    args.Contains("--include-advisory", StringComparer.OrdinalIgnoreCase),
+                    expectedCommit);
+                WriteJson(new TraceGraphQueryService().Query(EnsureCodegraphDb(configLoader), command, entity, options));
+                return 0;
+            }
+        case "graph-drift":
+            {
+                var format = GetOptionValue(args, "--format") ?? "json";
+                if (!string.Equals(format, "json", StringComparison.OrdinalIgnoreCase))
+                {
+                    WriteJson(new { status = "error", message = "graph-drift currently supports only --format json." });
+                    return 1;
+                }
+                var minimumCoverage = decimal.TryParse(
+                    GetOptionValue(args, "--minimum-coverage"),
+                    NumberStyles.Number,
+                    CultureInfo.InvariantCulture,
+                    out var parsedCoverage)
+                    ? parsedCoverage
+                    : 100m;
+                var expectedCommit = args.Contains("--skip-freshness", StringComparer.OrdinalIgnoreCase)
+                    ? null
+                    : GetOptionValue(args, "--expected-commit") ?? TryReadGitCommit(repoRoot);
+                var report = new TraceGraphDriftService().Check(new TraceGraphDriftOptions(
+                    RepositoryRoot: repoRoot,
+                    DatabasePath: EnsureCodegraphDb(configLoader),
+                    ScopePath: GetOptionValue(args, "--scope") ?? ".",
+                    ExpectedSourceCommit: expectedCommit,
+                    SourceManifestPath: GetOptionValue(args, "--sources"),
+                    ExpectedGraphPath: GetOptionValue(args, "--expected-graph"),
+                    ProjectionManifestPath: GetOptionValue(args, "--projection-manifest"),
+                    MinimumCoveragePercent: minimumCoverage));
+                WriteJson(report);
+                var failOnReview = args.Contains("--fail-on-review", StringComparer.OrdinalIgnoreCase);
+                return report.Status == "FAIL" || (failOnReview && report.Status == "REVIEW_REQUIRED") ? 2 : 0;
+            }
+        case "context-compile":
+            {
+                var manifestPathValue = GetOptionValue(args, "--manifest");
+                var manifestSha256 = GetOptionValue(args, "--manifest-sha256");
+                var taskId = GetOptionValue(args, "--task");
+                if (string.IsNullOrWhiteSpace(manifestPathValue) ||
+                    string.IsNullOrWhiteSpace(manifestSha256) ||
+                    string.IsNullOrWhiteSpace(taskId))
+                {
+                    WriteJson(new
+                    {
+                        status = "error",
+                        message = "Usage: context-compile --manifest <path> --manifest-sha256 <sha256> --task <id> [--maximum-tokens <n>] [--repo <path>]"
+                    });
+                    return 1;
+                }
+
+                var manifestPath = Path.IsPathRooted(manifestPathValue)
+                    ? manifestPathValue
+                    : Path.Combine(repoRoot, manifestPathValue);
+                var maximumTokens = int.TryParse(GetOptionValue(args, "--maximum-tokens"), out var parsedMaximumTokens)
+                    ? parsedMaximumTokens
+                    : 12_000;
+                var config = configLoader.LoadCodeControl(repoRoot);
+                var configuredCodegraph = ResolveCodegraphDbPath(config);
+                var fallbackCodegraph = Path.Combine(repoRoot, ".ai-code-control", "db", "codegraph.sqlite");
+                var codegraph = configuredCodegraph is not null && File.Exists(configuredCodegraph)
+                    ? configuredCodegraph
+                    : File.Exists(fallbackCodegraph) ? fallbackCodegraph : null;
+                var package = new ContextPackageCompiler().Compile(new ContextPackageCompilationOptions(
+                    RepositoryRoot: repoRoot,
+                    ManifestPath: manifestPath,
+                    ManifestSha256: manifestSha256,
+                    TaskId: taskId,
+                    MaximumTokens: maximumTokens,
+                    CodegraphDatabasePath: codegraph));
+                Console.WriteLine(ContextPackageJson.Serialize(package));
                 return 0;
             }
         case "verify-changed-files":
@@ -341,8 +487,8 @@ string EnsureCodegraphDb(ConfigLoader configLoader)
     var config = configLoader.LoadCodeControl(repoRoot);
     var dbPath = ResolveCodegraphDbPath(config)
         ?? Path.Combine(repoRoot, ".ai-code-control", "db", "codegraph.sqlite");
-    if (!File.Exists(dbPath))
-        _ = new DatabaseInitializer().InitializeCodegraph(repoRoot, dbPath);
+    // Initialization is idempotent and also applies schema migrations to an existing cache.
+    _ = new DatabaseInitializer().InitializeCodegraph(repoRoot, dbPath);
     return dbPath;
 }
 
@@ -374,7 +520,13 @@ static string? GetPositionalArg(string[] args, int index)
         {
             var isBareFlag = string.Equals(args[i], "--from-current-git-diff", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(args[i], "--full", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(args[i], "--fail-on-stale", StringComparison.OrdinalIgnoreCase);
+                || string.Equals(args[i], "--fail-on-stale", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(args[i], "--include-advisory", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(args[i], "--include-superseded", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(args[i], "--no-code-index", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(args[i], "--dry-run", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(args[i], "--skip-freshness", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(args[i], "--fail-on-review", StringComparison.OrdinalIgnoreCase);
             if (!isBareFlag && i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
                 i++;
             continue;
@@ -408,6 +560,35 @@ static string GetStatus(object result)
     return doc.RootElement.TryGetProperty("status", out var status) ? status.GetString() ?? "fail" : "fail";
 }
 
+static string? TryReadGitCommit(string repositoryRoot)
+{
+    try
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "git",
+            WorkingDirectory = repositoryRoot,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("rev-parse");
+        startInfo.ArgumentList.Add("HEAD");
+        using var process = Process.Start(startInfo);
+        if (process is null)
+            return null;
+        var output = process.StandardOutput.ReadToEnd().Trim();
+        process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        return process.ExitCode == 0 && output.Length > 0 ? output : null;
+    }
+    catch
+    {
+        return null;
+    }
+}
+
 static void WriteJson(object value)
 {
     Console.WriteLine(JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true }));
@@ -423,9 +604,17 @@ static void PrintHelp()
     Console.WriteLine("  index-python --path <path>");
     Console.WriteLine("  index-rust --path <path>");
     Console.WriteLine("  index-code [--path <path>] [--full]  # C#, TypeScript/JS and SQL");
-    Console.WriteLine("  obsidian-export [--path <scope>] [--out <vault>] [--include-symbols] [--max-symbols <n>]");
+    Console.WriteLine("  obsidian-export [--path <scope>] [--out <vault>] [--include-symbols] [--max-symbols <n>] [--include-advisory] [--include-superseded]");
+    Console.WriteLine("  trace-ingest --manifest <path> [--expected-commit <commit>] [--no-code-index] [--dry-run]");
     Console.WriteLine("  find-symbol <query>");
     Console.WriteLine("  impact-analysis <symbol> [--depth <1-20>]");
+    Console.WriteLine("  trace <entity> [--depth <1-10>] [--max-nodes <1-200>] [--max-edges <1-500>] [--include-advisory]");
+    Console.WriteLine("  why <symbol-or-file> [bounded trace options]");
+    Console.WriteLine("  affected <contract-or-adr> [bounded trace options]");
+    Console.WriteLine("  current <adr-or-rule> [bounded trace options]");
+    Console.WriteLine("  evidence-for <criterion-or-task> [bounded trace options]");
+    Console.WriteLine("  graph-drift [--scope <path>] [--sources <manifest>] [--expected-graph <fixture>] [--projection-manifest <manifest>] [--minimum-coverage <0-100>] [--fail-on-review]");
+    Console.WriteLine("  context-compile --manifest <path> --manifest-sha256 <sha256> --task <id> [--maximum-tokens <n>] [--repo <path>]");
     Console.WriteLine("  verify-changed-files --plan <path>");
     Console.WriteLine("  refactor-guard --plan <path>");
     Console.WriteLine("  memory-init");

@@ -6,14 +6,14 @@ import { createClaudeAdapter } from './engine/claude-adapter.js';
 import { decomposePrompt } from './decompose/decompose-prompt.js';
 import { validateAgainstSchema } from './schema-validate.js';
 import { lintPlan } from './linter/lint-plan.js';
-import { projectToWorkerV1 } from './projection/project-to-worker-v1.js';
+import { projectToWorkerV1_1 } from './projection/project-to-worker-v1.js';
 import { writePlanMarkdown } from './plan-file/write-plan-markdown.js';
 import { readPlanMarkdown } from './plan-file/read-plan-markdown.js';
 import type { Plan, Finding } from './types.js';
 import { publishPlannerHandoff, readWorkerFeedback } from './integration/apex-integration.js';
 import { collectPlannerContext } from './context/ai-code-control-cli.js';
 import { applyRoutingProposal } from './routing/propose-routing.js';
-import { validateWorkerTaskExport } from './projection/validate-worker-export.js';
+import { validateWorkerTaskExportV1_1 } from './projection/validate-worker-export.js';
 import { replanFromWorkerFeedback } from './replan/replan-from-worker.js';
 
 const args = process.argv.slice(2);
@@ -188,8 +188,8 @@ if (command === 'propose') {
           process.exitCode = 2;
         } else {
           const planned = applyRoutingProposal(schemaResult.data);
-          const { manifestTasks, globalGates, projectionWarnings } = projectToWorkerV1(planned);
-          const workerExportErrors = validateWorkerTaskExport(manifestTasks);
+          const { manifestTasks, globalGates, projectionWarnings } = projectToWorkerV1_1(planned);
+          const workerExportErrors = validateWorkerTaskExportV1_1(manifestTasks);
 
           if (workerExportErrors.length > 0) {
             if (asJson) {
@@ -220,6 +220,7 @@ if (command === 'propose') {
 
           writePlanMarkdown({
             filePath: planPath,
+            workerContractVersion: '1.1',
             goal: planned.goal,
             tasks: manifestTasks,
             globalGates,

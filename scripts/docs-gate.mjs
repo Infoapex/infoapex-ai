@@ -28,7 +28,7 @@ try {
       id: "DOCS-001",
       goal: "Generate the requested documentation from repository evidence.",
       acceptanceCriteria: [{ criterionId: "AC-01", text: "Documentation is generated from verified repository evidence." }],
-      gates: [{ gateId: "docs-gate", command: "node scripts/pass-gate.mjs", evidenceContract: "The documentation gate exits successfully." }],
+      gates: [{ gateId: "docs-gate", command: "node scripts/pass-gate.mjs", evidenceContract: "The documentation gate exits successfully.", criterionIds: ["AC-01"] }],
       dependsOn: [],
       scope: { allowedPaths: ["docs/generated/**"], forbiddenPaths: ["src/**"] },
       requiredInputs: [{ kind: "file", ref: "README.md" }],

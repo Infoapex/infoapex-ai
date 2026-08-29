@@ -27,9 +27,15 @@ All commands print a single JSON object to stdout, except `memory-brief` which p
 | `run-validation` | `status` pass/fail, `results[]` per toolchain command (`name`, `status`, `exitCode`, `durationMs`, `error`, `output` on failure) |
 | `index-python --path <p>` / `index-rust --path <p>` | counts of files/symbols/references indexed |
 | `index-code [--path <p>] [--full]` | incremental C#/TypeScript/JavaScript/SQL indexing; full rebuild when requested |
-| `obsidian-export [--path <p>] [--out <vault>] [--include-symbols] [--max-symbols <n>]` | generates an Obsidian-compatible Markdown/Canvas projection from the SQLite code graph; does not modify source code |
+| `obsidian-export [--path <p>] [--out <vault>] [--include-symbols] [--max-symbols <n>] [--include-advisory] [--include-superseded]` | atomically generates separate typed code/trace Markdown and Canvas projections plus a graph-drift manifest; never authoritative |
+| `trace-ingest --manifest <p> [--expected-commit <c>] [--no-code-index] [--dry-run]` | rebuilds the trace cache only from a strict repository-local declared manifest; no scan or LLM inference |
 | `find-symbol <query>` | `symbols[]` with `fullName`, `kind`, `file`, `line` |
 | `impact-analysis <full.name> [--depth <n>]` | direct/transitive callers, ambiguity, affected files, `riskLevel` |
+| `trace <entity> [bounded options]` | explicit trace-graph route with current T0/T1 nodes, evidence paths, freshness and traversal metrics |
+| `why <symbol-or-file>` / `affected <contract-or-adr>` | typed trace explanation/affected routes; never fall back to FTS or structural lookup |
+| `current <adr-or-rule>` / `evidence-for <criterion-or-task>` | supersession lineage or verified evidence paths; distinct stale/partial/ambiguous results |
+| `graph-drift [--scope .] [declared manifests] [--fail-on-review]` | PASS/REVIEW_REQUIRED/FAIL enforcement over integrity, freshness, coverage, expected fixtures and optional projection drift |
+| `context-compile --manifest <p> --manifest-sha256 <sha> --task <id> [--maximum-tokens <n>] [--repo <p>]` | strict `context-package.v1` selected from declared task inputs, trace contracts and relevant symbols |
 | `verify-changed-files [--plan <p>]` | scope, branch and parallel-task conflicts |
 | `refactor-guard [--plan <p>]` | verify + validation combined |
 | `memory-init` | creates memory DB + markdown skeleton (idempotent) |
@@ -56,6 +62,9 @@ All commands print a single JSON object to stdout, except `memory-brief` which p
   derived and disposable (ADR-0006). Never edit the DBs directly.
 - Memory is context, not code truth. For "what breaks if I change X" use
   `impact-analysis` (ADR-0004).
+- Route plain text to `memory-search`, symbol lookup/blast radius to
+  `find-symbol`/`impact-analysis`, and declared why/current/evidence questions to the
+  trace commands. Trace queries never silently substitute another route.
 - Write all template files, code comments and docs in English ASCII (no diacritics) -
   encoding safety is a project decision. User-authored memory content may contain
   diacritics; search handles them.

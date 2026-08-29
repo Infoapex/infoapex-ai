@@ -318,6 +318,10 @@ Versioned Markdown, ADRs, contracts and migrations are canonical. SQLite databas
 
 Before editing, run `memory-health`, generate a task-specific `memory-brief`, activate a scoped task manifest, and use `find-symbol` plus `impact-analysis` for existing code.
 
+Use memory search for text discovery, the code graph for symbol lookup and blast radius, and bounded trace queries for declared why, current, affected, and evidence relationships. Never treat a fallback as equivalent evidence.
+
+Use `graph-drift --fail-on-review` as a release gate after the project has declared and ingested its trace sources.
+
 After editing, run validation, verify changed files, refresh memory/code indexes and write a reviewed task summary. Never persist secrets, personal data or raw conversations.
 """;
 
@@ -325,6 +329,6 @@ After editing, run validation, verify changed files, refresh memory/code indexes
 """
 # Claude Code bootstrap
 
-Read and follow `AGENTS.md`. Use the ai-code-control MCP server for memory, indexing, impact analysis, validation and task-scope checks.
+Read and follow `AGENTS.md`. Use the ai-code-control MCP server for memory, indexing, impact analysis, bounded trace queries, validation and task-scope checks.
 """;
 }

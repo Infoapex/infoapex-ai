@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infoapex.dev/contracts/trace-projection-manifest.v1.schema.json",
+  "title": "Trace projection manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "graphDigest", "sourceCommit", "sourceHashes"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "graphDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "sourceCommit": { "type": "string", "minLength": 1 },
+    "sourceHashes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceNamespace", "sourceHash"],
+        "properties": {
+          "sourceNamespace": { "type": "string", "minLength": 1 },
+          "sourceHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      },
+      "uniqueItems": true
+    }
+  }
+}

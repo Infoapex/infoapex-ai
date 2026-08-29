@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
@@ -25,6 +25,7 @@ describe("NoneContextProvider", () => {
     assert.equal((await provider.brief("task")).status, "UNAVAILABLE");
     assert.equal((await provider.findSymbol("Foo")).status, "UNAVAILABLE");
     assert.equal((await provider.impact("Foo")).status, "UNAVAILABLE");
+    assert.equal((await provider.compileContext({ manifestPath: "manifest.json", manifestSha256: "a".repeat(64), taskId: "T1", maximumTokens: 1000 })).status, "UNAVAILABLE");
     assert.equal((await provider.refresh()).status, "UNAVAILABLE");
   });
 });
@@ -145,6 +146,21 @@ describe("AiCodeControlCliProvider", () => {
 
     assert.equal(result.status, "OK");
     assert.deepEqual(result.status === "OK" ? result.value : null, { refreshed: true, detail: "indexed 12 files" });
+  });
+
+  it("parses and validates a context-package.v1 response", async () => {
+    const contextPackage = JSON.parse(readFileSync("templates/reports/context-package.example.json", "utf8"));
+    const cli = fakeCli({ "context-compile": contextPackage });
+    const provider = fakeProvider(cli);
+    const result = await provider.compileContext({
+      manifestPath: "manifest.json",
+      manifestSha256: "a".repeat(64),
+      taskId: "ICM-02",
+      maximumTokens: 4000
+    });
+
+    assert.equal(result.status, "OK");
+    assert.equal(result.status === "OK" ? result.value.contextDigest : null, contextPackage.contextDigest);
   });
 
   it("maps an in-band error envelope to ERROR", async () => {

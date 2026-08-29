@@ -22,7 +22,7 @@ const MINIMAL_PLAN: Plan = {
         { criterionId: 'c1', text: 'Function returns "hello world"' }
       ],
       gates: [
-        { gateId: 'g1', command: 'npm test', evidenceContract: 'All tests pass with exit code 0' }
+        { gateId: 'g1', command: 'npm test', evidenceContract: 'All tests pass with exit code 0', criterionIds: ['c1'] }
       ],
       dependsOn: [],
       scope: {

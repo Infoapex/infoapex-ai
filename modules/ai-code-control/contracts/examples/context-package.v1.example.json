@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "1.0",
+  "packageId": "ctx-ICM-02-001",
+  "runId": "run-001",
+  "taskId": "ICM-02",
+  "manifestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "compilerVersion": "1.0.0",
+  "sources": [
+    {
+      "sourceId": "source-a",
+      "sourceType": "contract",
+      "canonicalRef": "contracts/task.v1.schema.json",
+      "sourceHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sourceCommit": null,
+      "authority": "canonical",
+      "selectionReason": "Task explicitly consumes the worker contract",
+      "renderedContent": "{\"schemaVersion\":\"1.1\"}"
+    },
+    {
+      "sourceId": "source-b",
+      "sourceType": "decision",
+      "canonicalRef": "docs/adr/0001-context.md#decision",
+      "sourceHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "sourceCommit": "abcdef0123456789abcdef0123456789abcdef01",
+      "authority": "advisory",
+      "selectionReason": "Relevant architecture decision",
+      "contentRange": {
+        "startLine": 10,
+        "endLine": 18
+      },
+      "renderedContent": "Use deterministic context selection."
+    }
+  ],
+  "budget": {
+    "measurement": "tokenizer",
+    "maximumTokens": 4000,
+    "estimatedTokens": 120,
+    "omittedSources": [
+      {
+        "sourceId": "source-z",
+        "reason": "budget",
+        "estimatedTokens": 900
+      },
+      {
+        "sourceId": "source-y",
+        "reason": "policy",
+        "estimatedTokens": 20
+      }
+    ]
+  },
+  "diagnostics": [
+    {
+      "code": "CTX_POLICY",
+      "severity": "info",
+      "message": "Policy source was omitted"
+    },
+    {
+      "code": "CTX_RANGE",
+      "severity": "warning",
+      "message": "Only a relevant range was selected",
+      "sourceId": "source-b"
+    }
+  ],
+  "contextDigest": "136f6dd7229f71538b210795014c31035b97eb5f914d6aea92c3d89cb316d063",
+  "createdAt": "2026-08-28T09:00:00Z"
+}

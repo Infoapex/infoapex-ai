@@ -2,6 +2,10 @@
   "schemaVersion": "1.0",
   "defaultEngine": "codex",
   "contextProvider": "none",
+  "contextPackage": {
+    "mode": "off",
+    "maximumTokens": 12000
+  },
   "baseBranch": "main",
   "integrationBranchPrefix": "aiw/integration/",
   "taskBranchPrefix": "aiw/task/",

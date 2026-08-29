@@ -3,13 +3,14 @@ import type { WorkerManifestTask } from '../types.js';
 
 export function writePlanMarkdown(params: {
   filePath: string;
+  workerContractVersion?: '1.0' | '1.1';
   goal: string;
   tasks: WorkerManifestTask[];
   globalGates: string[];
   budgets: object;
 }): void {
-  const { filePath, goal, tasks, globalGates, budgets } = params;
-  const json = JSON.stringify({ goal, tasks, globalGates, budgets }, null, 2);
+  const { filePath, workerContractVersion = '1.0', goal, tasks, globalGates, budgets } = params;
+  const json = JSON.stringify({ workerContractVersion, goal, tasks, globalGates, budgets }, null, 2);
   const content = [
     '---',
     'status: accepted',

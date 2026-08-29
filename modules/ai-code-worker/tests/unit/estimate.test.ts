@@ -70,7 +70,38 @@ describe("estimate", () => {
 
     assert.deepEqual(estimate.estimatedClaudePercent, { low: 1, median: 1, high: 1 });
   });
+
+  it("keeps model and reasoning profiles in separate buckets when a profile is requested", () => {
+    const sol = profiledEndCheckpoint("gpt-5.6-sol", "high", 100);
+    const luna = profiledEndCheckpoint("gpt-5.6-luna", "high", 900);
+
+    const estimate = estimateUsageForPlan({
+      tasks: [{ id: "TASK-A", kind: "backend", risk: "medium", acceptanceCriteria: ["a"] }],
+      history: [sol, luna],
+      profile: { engine: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" }
+    });
+
+    assert.deepEqual(estimate.perTask[0]?.tokens, { low: 100, median: 100, high: 100 });
+    assert.deepEqual(estimate.profile, { engine: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" });
+  });
 });
+
+function profiledEndCheckpoint(model: string, reasoningEffort: string, outputTokens: number): UsageCheckpoint {
+  return {
+    ...checkpoint({ scope: "task", phase: "end", taskKind: "backend", taskRisk: "medium", outputTokens }),
+    schemaVersion: "1.1",
+    engine: "codex",
+    model,
+    reasoningEffort,
+    modelContextWindow: 1_050_000,
+    rateLimitWindowMinutes: 300,
+    rateLimitResetsAt: 123,
+    calibrationProfileId: `codex:${model}:${reasoningEffort}`,
+    sessionFingerprint: "0123456789abcdef",
+    parallelSessionCount: 0,
+    prediction: null
+  };
+}
 
 function endCheckpoint(input: {
   readonly taskKind: string | null;

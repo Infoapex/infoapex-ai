@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infoapex.dev/contracts/expected-trace-graph.v1.schema.json",
+  "title": "Expected authoritative trace graph v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "mode", "nodes", "edges"],
+  "$defs": {
+    "nodeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeType", "canonicalRef"],
+      "properties": {
+        "nodeType": {
+          "enum": ["adr", "rule", "contract", "criterion", "task", "run", "gate", "evidence", "commit", "file", "symbol", "context-package"]
+        },
+        "canonicalRef": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "mode": { "enum": ["exact", "subset"] },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nodeRef" },
+      "uniqueItems": true
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "relation", "to", "evidenceRef", "trustTier"],
+        "properties": {
+          "from": { "$ref": "#/$defs/nodeRef" },
+          "relation": {
+            "enum": ["supersedes", "depends_on", "implements", "verified_by", "derived_from", "changes", "references", "selected_for"]
+          },
+          "to": { "$ref": "#/$defs/nodeRef" },
+          "evidenceRef": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?![A-Za-z]:[\\\\/])(?!/)(?!file:).+"
+          },
+          "trustTier": { "enum": ["T0", "T1"] }
+        }
+      },
+      "uniqueItems": true
+    }
+  }
+}

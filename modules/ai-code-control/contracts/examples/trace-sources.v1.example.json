@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "sources": [
+    {
+      "nodeType": "adr",
+      "canonicalRef": "ADR-0011",
+      "required": true
+    },
+    {
+      "nodeType": "contract",
+      "canonicalRef": "contracts/context-package.v1.schema.json",
+      "required": true,
+      "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ]
+}

@@ -15,6 +15,10 @@ export function defaultProjectConfigTemplate(): Readonly<Record<string, unknown>
   return {
     schemaVersion: CONFIG_TEMPLATE_VERSION,
     contextProvider: "none",
+    contextPackage: {
+      mode: "off",
+      maximumTokens: 12_000
+    },
     maximumParallelWriters: 2,
     stateRoot: null,
     syncRootPolicy: {

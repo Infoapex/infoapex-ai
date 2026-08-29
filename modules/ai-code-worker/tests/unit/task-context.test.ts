@@ -48,6 +48,7 @@ function fakeProvider(calls: string[]): ContextProvider {
       calls.push(`impact:${symbol}`);
       return { status: "OK", value: { symbol, affectedFiles: ["src/invoice.ts"], riskNotes: ["verify rounding"] } };
     },
+    compileContext: async () => ({ status: "UNAVAILABLE", reason: "not used by legacy task context tests" }),
     refresh: async () => ({ status: "OK", value: { refreshed: true, detail: null } })
   };
 }

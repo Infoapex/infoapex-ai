@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "runId": "20260801-example-a1b2",
   "taskId": "BACKEND-01",
   "graphVersion": 1,
@@ -19,5 +19,16 @@
   "inputCommit": "3333333333333333333333333333333333333333",
   "inputTree": "4444444444444444444444444444444444444444",
   "compositionAlgorithm": "topological-task-id-v1",
+  "contextDigest": "6666666666666666666666666666666666666666666666666666666666666666",
+  "contextCompilerVersion": "ai-code-control/1.0",
+  "contractHashes": [
+    {
+      "canonicalRef": "contracts/api.schema.json",
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    }
+  ],
+  "qualityGateConfigHash": "8888888888888888888888888888888888888888888888888888888888888888",
+  "policyHash": "9999999999999999999999999999999999999999999999999999999999999999",
+  "toolchainConfigHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "snapshotMetadataSha256": "5555555555555555555555555555555555555555555555555555555555555555"
 }

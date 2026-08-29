@@ -11,10 +11,11 @@ Required gates:
 - `ai-code-docs`: full deterministic suite plus an internal planner -> control -> worker -> review documentation gate.
 - `infoapex-ai`: installer init in both modes, status, handoff write/read, bundle clean-clone bootstrap and ZIP extraction.
 
-The reproducible local gate is `npm run value-gate:internal`. It creates three
-generic target fixtures, runs planner `propose -> inspect -> compile`, and runs
-each compiled plan through worker `run --engine fake`. It consumes no provider
-usage. `npm run value-gate:live` is an explicit opt-in for the same flow with
+The reproducible ICM gate is `npm run value-gate:internal`. It executes 20 generic
+planner `propose -> inspect -> compile` tasks through worker `run --engine fake`.
+`npm run pilot:icm-graph:internal` composes that matrix with a generic consumer trace
+graph, 25 hybrid queries, expected graph, coverage, drift, and Obsidian projection.
+Both consume no provider usage. `npm run value-gate:live` is an explicit opt-in with
 the installed Claude CLI and is the only gate that consumes provider usage.
 
 Until the live quota signal and the three-plan value gate pass, the correct

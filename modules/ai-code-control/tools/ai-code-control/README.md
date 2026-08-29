@@ -13,7 +13,8 @@ dotnet run --project src/AiCodeControl.Cli -- run-validation
 dotnet run --project src/AiCodeControl.Cli -- index-python --path .
 dotnet run --project src/AiCodeControl.Cli -- index-rust --path .
 dotnet run --project src/AiCodeControl.Cli -- index-code --path . [--full]
-dotnet run --project src/AiCodeControl.Cli -- obsidian-export [--path <scope>] [--out <vault>] [--include-symbols] [--max-symbols <n>]
+dotnet run --project src/AiCodeControl.Cli -- obsidian-export [--path <scope>] [--out <vault>] [--include-symbols] [--max-symbols <n>] [--include-advisory] [--include-superseded]
+dotnet run --project src/AiCodeControl.Cli -- trace-ingest --manifest <path> [--expected-commit <commit>] [--no-code-index] [--dry-run]
 dotnet run --project src/AiCodeControl.Cli -- find-symbol <query>
 dotnet run --project src/AiCodeControl.Cli -- impact-analysis <symbol> [--depth 5]
 dotnet run --project src/AiCodeControl.Cli -- verify-changed-files --plan .ai-code-control/reports/refactor/current-plan.json
@@ -24,6 +25,12 @@ dotnet run --project src/AiCodeControl.Cli -- memory-prune
 dotnet run --project src/AiCodeControl.Cli -- memory-search <query> [--limit <n>]
 dotnet run --project src/AiCodeControl.Cli -- memory-brief [task]
 dotnet run --project src/AiCodeControl.Cli -- memory-health [--fail-on-stale]
+dotnet run --project src/AiCodeControl.Cli -- trace <entity> [--depth <1-10>] [--max-nodes <1-200>] [--max-edges <1-500>] [--include-advisory]
+dotnet run --project src/AiCodeControl.Cli -- why <symbol-or-file>
+dotnet run --project src/AiCodeControl.Cli -- affected <contract-or-adr>
+dotnet run --project src/AiCodeControl.Cli -- current <adr-or-rule>
+dotnet run --project src/AiCodeControl.Cli -- evidence-for <criterion-or-task>
+dotnet run --project src/AiCodeControl.Cli -- graph-drift --scope . --format json [--sources <manifest>] [--expected-graph <fixture>] [--projection-manifest <manifest>] [--minimum-coverage <0-100>] [--fail-on-review]
 dotnet run --project src/AiCodeControl.Cli -- memory-add-task-summary --title "<title>" --from-current-git-diff
 dotnet run --project src/AiCodeControl.Cli -- refresh [--path .] [--full]
 ```

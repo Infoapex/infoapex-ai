@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "mode": "subset",
+  "nodes": [
+    { "nodeType": "task", "canonicalRef": "TASK-1" },
+    { "nodeType": "criterion", "canonicalRef": "AC-1" }
+  ],
+  "edges": [
+    {
+      "from": { "nodeType": "task", "canonicalRef": "TASK-1" },
+      "relation": "implements",
+      "to": { "nodeType": "criterion", "canonicalRef": "AC-1" },
+      "evidenceRef": "plans/task-1.json",
+      "trustTier": "T1"
+    }
+  ]
+}

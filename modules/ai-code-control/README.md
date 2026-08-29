@@ -10,6 +10,9 @@ Toolkit de memorie persistentă și disciplină de cod pentru agenți AI de prog
   `find-symbol` / `impact-analysis` tranzitiv. C# folosește arbori sintactici Roslyn;
   TypeScript/JavaScript și SQL folosesc parsere syntax-aware; toate trei sunt incrementale.
   Indexerele de compatibilitate pentru Python și Rust rămân disponibile.
+- **Trace graph temporal** — ADR-uri, contracte, task-uri, gates și evidence declarate,
+  interogabile bounded prin `trace`, `why`, `affected`, `current` și
+  `evidence-for`. T2 este exclus implicit, iar fiecare muchie păstrează provenance.
 - **Refactor guard** — un plan per task declară branch-ul, owner-ul și scope-ul de
   fișiere/glob-uri; `verify-changed-files` blochează modificările din afara scope-ului și
   raportează suprapunerile cu task-urile active.
@@ -44,12 +47,27 @@ cd tools/ai-code-control/mcp-server && npm ci && npm run build
 Conectarea la Claude Code / Claude Desktop / alți clienți MCP: [tools/ai-code-control/CONNECT.md](tools/ai-code-control/CONNECT.md)
 Contractul CLI (comenzi, formate JSON, exit code-uri): [CLAUDE.md](CLAUDE.md)
 
+Contractul determinist pentru contextul compilat al agentului este documentat in
+[docs/CONTEXT-PACKAGE-V1.md](docs/CONTEXT-PACKAGE-V1.md). Implementarea curenta
+defineste schema, validarea si digestul semantic; integrarea in prompt ramane separata
+si va fi activata gradual prin modurile `off`, `observe` si `enforce`.
+
+Contractul intern pentru cache-ul temporal de trasabilitate este documentat in
+[docs/TRACE-GRAPH-V1.md](docs/TRACE-GRAPH-V1.md). Graful pastreaza nodurile si muchiile
+de trace separat de graful structural de cod; ingestia si query-urile publice sunt
+activate gradual in etapele Graph Engineering urmatoare. Ingestia determinista accepta
+numai documente declarate si relatii conforme cu
+[contracts/trace-relations.v1.schema.json](contracts/trace-relations.v1.schema.json).
+
 ## Formula memoriei
 
 | Comandă | Ce îi oferă agentului |
 |---------|-----------------------|
 | `memory-brief` | Context: decizii, task-uri anterioare, constrângeri (fără argument de task = brief pe memoria recentă, ideal pentru hook-uri de SessionStart) |
 | `impact-analysis` | Adevărul codului: raza de impact tranzitivă și fișierele afectate |
+| `trace` / `why` / `affected` / `current` / `evidence-for` | Relații declarate multi-hop, cu evidence, freshness și bugete stricte; fără fallback tăcut |
+| `graph-drift` | Enforcement determinist pentru integritate, freshness, coverage, expected fixtures și projection drift |
+| `trace-ingest` | Ingest declarat și determinist pentru sursele trace; suportă dry-run și refuză path traversal |
 | `run-validation` | Adevărul funcționalității: build, lint, teste |
 | `git diff` | Adevărul modificării: ce s-a schimbat efectiv |
 
@@ -59,7 +77,7 @@ este canonic; indexul SQLite este derivat și poate fi oricând reconstruit cu
 
 ## Code map pentru Obsidian
 
-`ai-code-control` poate exporta o proiecție Markdown a grafului SQLite pentru navigare în Obsidian. Exportul este opțional și read-only față de cod: sursa de adevăr rămâne codul, contractele și indexul reconstruibil.
+`ai-code-control` poate exporta proiecții Markdown separate pentru graful de cod și graful tipizat de trasabilitate. Exportul este opțional, atomic și read-only față de sursele canonice; plannerul și workerul nu depind de vault.
 
 ```bash
 dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- refresh --full
@@ -76,9 +94,9 @@ dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- obsidian-exp
   --max-symbols 250
 ```
 
-Exporterul produce `index.md`, note de module și fișier, simboluri doar când sunt cerute și `canvases/code-map.canvas`. Proprietățile YAML păstrează branch-ul, commitul indexat, hash-ul fișierului și momentul generării. Nu se exportă transcripturi brute, secrete sau baza SQLite.
+Exporterul produce `index.md` și `canvases/code-map.canvas` pentru cod, plus `trace-index.md`, note tipizate, `canvases/trace-map.canvas` și `.trace-projection-manifest.json` pentru trasabilitate. Implicit sunt incluse doar entitățile curente T0/T1; `--include-advisory` și `--include-superseded` sunt opt-in. Regenerarea prin staging + swap elimină fișierele stale. Nu se exportă transcripturi brute, secrete sau baza SQLite.
 
-Detaliile și politica de utilizare sunt în [docs/OBSIDIAN-CODE-MAP.md](../../docs/OBSIDIAN-CODE-MAP.md).
+Contractul proiecției de trace și gate-ul de freshness sunt în [docs/OBSIDIAN-TRACE-PROJECTION-V1.md](docs/OBSIDIAN-TRACE-PROJECTION-V1.md).
 
 ## Workflow-ul agentului per task
 

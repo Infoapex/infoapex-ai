@@ -237,11 +237,12 @@ node modules/ai-code-worker/dist/src/cli.js run \
 npm test
 npm run check:generic-boundary
 npm run value-gate:internal
+npm run pilot:icm-graph:internal
 npm run review-gate:internal
 npm run docs-gate:internal
 ```
 
-`value-gate:internal` rulează trei fluxuri generice planner → worker cu motorul `fake`, fără consum de provider. `value-gate:live` folosește Claude instalat local, consumă quota contului și trebuie pornit numai explicit.
+`value-gate:internal` rulează matricea ICM cu 20 de taskuri generice planner → worker și motorul `fake`. `pilot:icm-graph:internal` adaugă ingest declarat, 25 de query-uri hibride, 10 taskuri traceable, drift și proiecția Obsidian. Ambele sunt deterministe și nu consumă provider. `value-gate:live` consumă quota contului și trebuie pornit numai explicit.
 
 Starea corectă a versiunii `0.1.0` este pre-release deoarece:
 

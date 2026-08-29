@@ -13,13 +13,24 @@ export interface CodexSessionUsageSummary {
   readonly totalTokenUsage: CodexSessionTokenUsage | null;
   readonly usedPercent: number | null;
   readonly windowMinutes: number | null;
+  readonly resetsAt: number | null;
   readonly planType: string | null;
+  readonly sessionId: string | null;
+  readonly model: string | null;
+  readonly reasoningEffort: string | null;
+  readonly modelContextWindow: number | null;
 }
 
 interface CodexRolloutEvent {
+  readonly timestamp?: string;
   readonly type?: string;
   readonly payload?: {
     readonly type?: string;
+    readonly session_id?: unknown;
+    readonly context_window?: unknown;
+    readonly model?: unknown;
+    readonly effort?: unknown;
+    readonly model_context_window?: unknown;
     readonly info?: {
       readonly total_token_usage?: {
         readonly input_tokens?: unknown;
@@ -32,6 +43,7 @@ interface CodexRolloutEvent {
       readonly primary?: {
         readonly used_percent?: unknown;
         readonly window_minutes?: unknown;
+        readonly resets_at?: unknown;
       };
       readonly plan_type?: unknown;
     };
@@ -42,7 +54,12 @@ const EMPTY_SUMMARY: CodexSessionUsageSummary = {
   totalTokenUsage: null,
   usedPercent: null,
   windowMinutes: null,
-  planType: null
+  resetsAt: null,
+  planType: null,
+  sessionId: null,
+  model: null,
+  reasoningEffort: null,
+  modelContextWindow: null
 };
 
 /** Pure parser: scans a `~/.codex/sessions/**\/rollout-*.jsonl` file's content for
@@ -52,6 +69,10 @@ const EMPTY_SUMMARY: CodexSessionUsageSummary = {
  *  docs/HANDOFF-BENCHMARK-TOOL-AND-PHASE-4.md). No summing across events. */
 export function parseCodexSessionLog(content: string): CodexSessionUsageSummary {
   let last: CodexSessionUsageSummary = EMPTY_SUMMARY;
+  let sessionId: string | null = null;
+  let model: string | null = null;
+  let reasoningEffort: string | null = null;
+  let modelContextWindow: number | null = null;
 
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
@@ -64,6 +85,18 @@ export function parseCodexSessionLog(content: string): CodexSessionUsageSummary 
     try {
       event = JSON.parse(trimmed) as CodexRolloutEvent;
     } catch {
+      continue;
+    }
+
+    if (event.type === "session_meta") {
+      sessionId = readString(event.payload?.session_id) ?? sessionId;
+      modelContextWindow = readNumber(event.payload?.context_window) ?? modelContextWindow;
+      continue;
+    }
+
+    if (event.type === "turn_context") {
+      model = readString(event.payload?.model) ?? model;
+      reasoningEffort = readString(event.payload?.effort) ?? reasoningEffort;
       continue;
     }
 
@@ -85,11 +118,16 @@ export function parseCodexSessionLog(content: string): CodexSessionUsageSummary 
         : last.totalTokenUsage,
       usedPercent: rateLimits?.primary ? readNumber(rateLimits.primary.used_percent) : last.usedPercent,
       windowMinutes: rateLimits?.primary ? readNumber(rateLimits.primary.window_minutes) : last.windowMinutes,
-      planType: typeof rateLimits?.plan_type === "string" ? rateLimits.plan_type : last.planType
+      resetsAt: rateLimits?.primary ? readNumber(rateLimits.primary.resets_at) : last.resetsAt,
+      planType: typeof rateLimits?.plan_type === "string" ? rateLimits.plan_type : last.planType,
+      sessionId,
+      model,
+      reasoningEffort,
+      modelContextWindow: readNumber(event.payload.model_context_window) ?? modelContextWindow
     };
   }
 
-  return last;
+  return { ...last, sessionId, model, reasoningEffort, modelContextWindow };
 }
 
 /** Local session-log paths are outside the repository and outside $STATE_ROOT -
@@ -142,6 +180,29 @@ export function findLatestCodexRolloutPath(options: FindLatestCodexRolloutOption
   return latestPath;
 }
 
+/** Returns rollout files modified during a bounded development stage. This is used
+ *  only to flag that an account-level rate-limit percentage may include another
+ *  Codex session; file content is never persisted by the benchmark. */
+export function findCodexRolloutsModifiedSince(
+  since: Date,
+  options: FindLatestCodexRolloutOptions = {},
+  until: Date = new Date()
+): readonly string[] {
+  const root = options.codexSessionsDir ?? join(options.homeDirectory ?? homedir(), ".codex", "sessions");
+
+  if (!existsSync(root)) {
+    return [];
+  }
+
+  return walkJsonlFiles(root)
+    .filter((path) => /rollout-/.test(path))
+    .filter((path) => {
+      const modifiedAt = statSync(path).mtimeMs;
+      return modifiedAt >= since.getTime() && modifiedAt <= until.getTime();
+    })
+    .sort();
+}
+
 function walkJsonlFiles(directory: string): string[] {
   const results: string[] = [];
 
@@ -161,4 +222,8 @@ function walkJsonlFiles(directory: string): string[] {
 
 function readNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }

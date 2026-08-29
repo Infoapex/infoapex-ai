@@ -14,7 +14,7 @@ const plan: Plan = {
       id: 'API-01',
       goal: 'Update the backend API contract',
       acceptanceCriteria: [{ criterionId: 'AC-1', text: 'Contract remains valid.' }],
-      gates: [{ gateId: 'G-1', command: 'npm test', evidenceContract: 'Tests pass.' }],
+      gates: [{ gateId: 'G-1', command: 'npm test', evidenceContract: 'Tests pass.', criterionIds: ['AC-1'] }],
       dependsOn: [],
       scope: { allowedPaths: ['src/api.ts'], forbiddenPaths: [] },
       requiredInputs: [{ kind: 'file', ref: 'src/api.ts' }],
@@ -24,7 +24,7 @@ const plan: Plan = {
       id: 'TEST-01',
       goal: 'Add tests for the API contract',
       acceptanceCriteria: [{ criterionId: 'AC-2', text: 'Coverage is present.' }],
-      gates: [{ gateId: 'G-2', command: 'npm test', evidenceContract: 'Tests pass.' }],
+      gates: [{ gateId: 'G-2', command: 'npm test', evidenceContract: 'Tests pass.', criterionIds: ['AC-2'] }],
       dependsOn: ['API-01'],
       scope: { allowedPaths: ['tests/api.test.ts'], forbiddenPaths: [] },
       requiredInputs: []

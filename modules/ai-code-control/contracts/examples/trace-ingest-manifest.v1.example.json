@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "includeCodeIndex": true,
+  "documents": [
+    {
+      "kind": "adr",
+      "path": ".ai-code-control/memory/decisions/ADR-0011-hybrid-code-trace-graph.md",
+      "canonicalRef": ".ai-code-control/memory/decisions/ADR-0011-hybrid-code-trace-graph.md"
+    },
+    {
+      "kind": "contract",
+      "path": "contracts/context-package.v1.schema.json",
+      "canonicalRef": "contracts/context-package.v1.schema.json"
+    }
+  ]
+}

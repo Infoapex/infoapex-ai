@@ -6,6 +6,8 @@ import type {
   ContextProviderCallResult,
   ContextProviderHealth,
   ContextProviderImpact,
+  ContextPackage,
+  ContextPackageCompileRequest,
   ContextProviderRefreshResult,
   ContextProviderSymbolMatch
 } from "./types.js";
@@ -26,6 +28,7 @@ export interface AiCodeControlCliProviderConfig {
 interface RawEnvelope {
   readonly status?: unknown;
   readonly error?: unknown;
+  readonly message?: unknown;
 }
 
 /**
@@ -94,6 +97,27 @@ export class AiCodeControlCliProvider implements ContextProvider {
     );
   }
 
+  async compileContext(request: ContextPackageCompileRequest): Promise<ContextProviderCallResult<ContextPackage>> {
+    return this.run<ContextPackage>(
+      [
+        "context-compile",
+        "--json",
+        "--manifest",
+        request.manifestPath,
+        "--manifest-sha256",
+        request.manifestSha256,
+        "--task",
+        request.taskId,
+        "--maximum-tokens",
+        String(request.maximumTokens),
+        "--repo",
+        this.cwd
+      ],
+      "context-package.schema.json",
+      (body) => body as unknown as ContextPackage
+    );
+  }
+
   async refresh(): Promise<ContextProviderCallResult<ContextProviderRefreshResult>> {
     return this.run<ContextProviderRefreshResult>(["refresh", "--json"], "context-provider-refresh.schema.json", (body) => ({
       refreshed: (body as { refreshed: boolean | null }).refreshed ?? false,
@@ -132,6 +156,17 @@ export class AiCodeControlCliProvider implements ContextProvider {
       return { status: "ERROR", reason: `${this.executable} ${args[0]} did not return valid JSON on stdout` };
     }
 
+    const envelope = parsed as RawEnvelope;
+
+    if (envelope.status === "error") {
+      const reason = typeof envelope.message === "string"
+        ? envelope.message
+        : typeof envelope.error === "string"
+          ? envelope.error
+          : "unknown provider error";
+      return { status: "ERROR", reason };
+    }
+
     const validation = this.schemaRegistry.validate(schemaName, parsed);
 
     if (!validation.valid) {
@@ -141,12 +176,6 @@ export class AiCodeControlCliProvider implements ContextProvider {
           .map((issue) => `${issue.instancePath} ${issue.message}`)
           .join("; ")}`
       };
-    }
-
-    const envelope = parsed as RawEnvelope;
-
-    if (envelope.status === "error") {
-      return { status: "ERROR", reason: typeof envelope.error === "string" ? envelope.error : "unknown provider error" };
     }
 
     return { status: "OK", value: mapBody(parsed as Record<string, unknown>) };

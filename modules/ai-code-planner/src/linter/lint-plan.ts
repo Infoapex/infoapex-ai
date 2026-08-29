@@ -10,12 +10,6 @@ function blocker(type: Finding['type'], claim: string): Finding {
   return { id: makeId(), type, severity: 'blocker', claim, status: 'proposed' };
 }
 
-// Extract the non-numeric prefix of an ID, e.g. "AC-001" → "AC-", "G-1" → "G-"
-function idPrefix(id: string): string {
-  const m = id.match(/^(.*?)(\d+)$/);
-  return m ? m[1] : id;
-}
-
 function detectCycles(tasks: PlanTask[]): string[][] {
   const taskSet = new Set(tasks.map(t => t.id));
   const adj = new Map<string, string[]>();
@@ -153,16 +147,13 @@ export function lintPlan(plan: Plan): { ok: boolean; findings: Finding[] } {
   }
 
   // 7. GATE_CRITERION_REF
-  // Phase 1 checks:
-  //   (a) unique criterionIds within each task
-  //   (b) by gateId = criterionId naming convention: when a gateId shares the same
-  //       numeric-prefix namespace as any criterionId on the task, it must resolve to
-  //       an existing criterionId (e.g. gateId "AC-999" with criterionIds {"AC-001"} fails)
+  const planCriterionIds = new Set<string>();
+  const planGateIds = new Set<string>();
   for (const task of tasks) {
     const criteria = task.acceptanceCriteria;
     const gates = task.gates;
     const criterionIds = new Set(criteria.map(c => c.criterionId));
-    const criterionPrefixes = new Set([...criterionIds].map(idPrefix));
+    const coveredCriterionIds = new Set<string>();
 
     // (a) unique criterionIds
     const seenCriteria = new Set<string>();
@@ -172,13 +163,32 @@ export function lintPlan(plan: Plan): { ok: boolean; findings: Finding[] } {
           `DUPLICATE_CRITERION_ID: task ${task.id} has duplicate criterionId '${c.criterionId}' in acceptanceCriteria`));
       }
       seenCriteria.add(c.criterionId);
+      if (planCriterionIds.has(c.criterionId)) {
+        findings.push(blocker('internal-contradiction',
+          `DUPLICATE_CRITERION_ID: criterionId '${c.criterionId}' is duplicated across the plan`));
+      }
+      planCriterionIds.add(c.criterionId);
     }
 
-    // (b) naming-convention criterion reference check
     for (const gate of gates) {
-      if (criterionPrefixes.has(idPrefix(gate.gateId)) && !criterionIds.has(gate.gateId)) {
+      if (planGateIds.has(gate.gateId)) {
         findings.push(blocker('internal-contradiction',
-          `UNKNOWN_CRITERION: task ${task.id} gate '${gate.gateId}' references criterionId '${gate.gateId}' which does not exist on this task`));
+          `DUPLICATE_GATE_ID: gateId '${gate.gateId}' is duplicated across the plan`));
+      }
+      planGateIds.add(gate.gateId);
+      for (const criterionId of gate.criterionIds) {
+        if (!criterionIds.has(criterionId)) {
+          findings.push(blocker('internal-contradiction',
+            `UNKNOWN_CRITERION: task ${task.id} gate '${gate.gateId}' references criterionId '${criterionId}' which does not exist on this task`));
+        } else {
+          coveredCriterionIds.add(criterionId);
+        }
+      }
+    }
+    for (const criterionId of criterionIds) {
+      if (!coveredCriterionIds.has(criterionId)) {
+        findings.push(blocker('omission',
+          `UNCOVERED_CRITERION: task ${task.id} criterion '${criterionId}' is not covered by any gate`));
       }
     }
   }

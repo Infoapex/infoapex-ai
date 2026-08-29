@@ -7,7 +7,7 @@ export interface RedactionResult {
 }
 
 const secretPatterns: readonly RegExp[] = [
-  /(?:api[_-]?key|token|secret|password)\s*[:=]\s*["']?[\w.-]{8,}["']?/gi,
+  /\\?["']?(?:api[_-]?key|token|secret|password)\\?["']?\s*[:=]\s*\\?["']?[\w.-]{8,}\\?["']?/gi,
   /sk-[A-Za-z0-9_-]{12,}/g
 ];
 
