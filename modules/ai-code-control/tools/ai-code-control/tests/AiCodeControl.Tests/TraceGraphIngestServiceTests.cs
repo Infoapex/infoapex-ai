@@ -93,6 +93,30 @@ public sealed class TraceGraphIngestServiceTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => service.Rebuild(request, new TraceGraphRepository()));
     }
 
+    [Fact]
+    public void Build_ReadsCriteriaAndGatesFromWorkerManifestV11Traceability()
+    {
+        Write("Plan/worker-v11.json", """
+        { "schemaVersion":"1.1", "tasks":[{
+          "id":"TASK-V11", "acceptanceCriteria":["It works"], "gates":[],
+          "traceability":{
+            "acceptanceCriteria":[{"criterionId":"AC-V11","text":"It works"}],
+            "gates":[{"gateId":"G-V11","command":"test","evidenceContract":"pass","criterionIds":["AC-V11"]}]
+          },
+          "dependsOn":[], "requiredInputs":[]
+        }] }
+        """);
+
+        var result = new TraceGraphIngestService().Build(Request([Doc("plan", "Plan/worker-v11.json")]));
+
+        Assert.Equal(1, result.DocumentsRead);
+        Assert.Equal(0, result.DocumentsSkipped);
+        Assert.Contains(result.Snapshot.Nodes, node => node.NodeType == "criterion" && node.CanonicalRef == "AC-V11");
+        Assert.Contains(result.Snapshot.Nodes, node => node.NodeType == "gate" && node.CanonicalRef == "G-V11");
+        Assert.Contains(result.Snapshot.Edges, edge => edge.EdgeType == "implements");
+        Assert.Contains(result.Snapshot.Edges, edge => edge.EdgeType == "verified_by");
+    }
+
     private List<TraceIngestDocument> Fixtures()
     {
         Write("docs/adr/ADR-0001.md", "# Old decision\n\n**Status:** Accepted\n");

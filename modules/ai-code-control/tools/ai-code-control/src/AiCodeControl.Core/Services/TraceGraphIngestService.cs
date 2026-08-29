@@ -176,7 +176,11 @@ public sealed partial class TraceGraphIngestService
         foreach (var task in tasks.EnumerateArray())
         {
             var taskId = RequiredString(task, "id"); var taskNodeId = Id("task", taskId);
-            if (task.TryGetProperty("acceptanceCriteria", out var criteria) && criteria.ValueKind == JsonValueKind.Array)
+            var traceability = task.TryGetProperty("traceability", out var declaredTraceability)
+                && declaredTraceability.ValueKind == JsonValueKind.Object
+                ? declaredTraceability
+                : task;
+            if (traceability.TryGetProperty("acceptanceCriteria", out var criteria) && criteria.ValueKind == JsonValueKind.Array)
                 foreach (var criterion in criteria.EnumerateArray())
                 {
                     var criterionId = RequiredString(criterion, "criterionId");
@@ -185,7 +189,7 @@ public sealed partial class TraceGraphIngestService
                     accumulator.AddPending("implements", taskNodeId, Id("criterion", criterionId), "manifest", "declared", "T1",
                         document.CanonicalRef, hash, document.CanonicalRef);
                 }
-            if (task.TryGetProperty("gates", out var gates) && gates.ValueKind == JsonValueKind.Array)
+            if (traceability.TryGetProperty("gates", out var gates) && gates.ValueKind == JsonValueKind.Array)
                 foreach (var gate in gates.EnumerateArray())
                 {
                     var gateId = RequiredString(gate, "gateId");
