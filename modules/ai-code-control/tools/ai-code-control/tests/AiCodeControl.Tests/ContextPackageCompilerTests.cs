@@ -1,3 +1,4 @@
+using AiCodeControl.CodeIndexer.Services;
 using AiCodeControl.Core.Models;
 using AiCodeControl.Core.Services;
 using Xunit;
@@ -74,7 +75,31 @@ public sealed class ContextPackageCompilerTests : IDisposable
             diagnostic.Code == "CTX_REFERENCE_INVALID" && diagnostic.Severity == "error");
     }
 
-    private ContextPackage Compile(int maximumTokens, DateTimeOffset? createdAt = null)
+    [Fact]
+    public void Compile_RepresentsResolvedSymbolRangesAsFileSources()
+    {
+        Directory.CreateDirectory(Path.Combine(_root, "src"));
+        File.WriteAllText(
+            Path.Combine(_root, "src", "orders.ts"),
+            "export function resolveOrderActions(): string[] { return []; }\n");
+        var database = Path.Combine(_root, "codegraph.sqlite");
+        new DatabaseInitializer().InitializeCodegraph(_root, database);
+        new CodeIndexerService().Index(_root, ".", database, fullRebuild: true);
+        WriteManifest([], ["file:src/orders.ts.resolveOrderActions"]);
+
+        var package = Compile(maximumTokens: 2000, codegraphDatabasePath: database);
+
+        var source = Assert.Single(package.Sources);
+        Assert.Equal("file", source.SourceType);
+        Assert.Equal("src/orders.ts", source.CanonicalRef);
+        Assert.NotNull(source.ContentRange);
+        Assert.Contains("resolveOrderActions", source.SelectionReason, StringComparison.Ordinal);
+    }
+
+    private ContextPackage Compile(
+        int maximumTokens,
+        DateTimeOffset? createdAt = null,
+        string? codegraphDatabasePath = null)
     {
         return new ContextPackageCompiler().Compile(new(
             RepositoryRoot: _root,
@@ -82,6 +107,7 @@ public sealed class ContextPackageCompilerTests : IDisposable
             ManifestSha256: new string('a', 64),
             TaskId: "T1",
             MaximumTokens: maximumTokens,
+            CodegraphDatabasePath: codegraphDatabasePath,
             CreatedAt: createdAt));
     }
 

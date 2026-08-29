@@ -30,6 +30,7 @@ jobs:
 
       - name: Validate Infoapex AI boundary and installer
         run: |
+          npm run check:provenance
           npm run check:generic-boundary
           npm test
 

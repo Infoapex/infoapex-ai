@@ -175,6 +175,18 @@ public sealed class TraceGraphDriftServiceTests : IDisposable
     }
 
     [Fact]
+    public void CaseDistinctSymbolIdentities_DoNotRequireReview()
+    {
+        var type = Node("symbol", "file:app/layout.tsx.Crumbs", nodeNamespace: "symbol-type");
+        var value = Node("symbol", "file:app/layout.tsx.crumbs", nodeNamespace: "symbol-value");
+        var database = CreateCompleteGraph([type, value]);
+
+        var report = _service.Check(Options(database));
+
+        Assert.DoesNotContain(report.Findings, finding => finding.Code == "AMBIGUOUS_CURRENT_IDENTITY");
+    }
+
+    [Fact]
     public void ExpectedGraphSubset_PassesAndReportsDeterministicMissingDiff()
     {
         var database = CreateCompleteGraph();

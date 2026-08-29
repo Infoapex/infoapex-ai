@@ -181,6 +181,10 @@ npm test
 
 `npm run setup` instalează dependențele bundle-ului și ale modulelor vendorizate. Nu descarcă module private la runtime.
 
+Versiunile standalone proiectate în bundle sunt fixate prin commit complet în
+[`modules/provenance.json`](modules/provenance.json), iar regulile de sincronizare
+sunt descrise în [`docs/MODULE-PROVENANCE.md`](docs/MODULE-PROVENANCE.md).
+
 ## Pornire rapidă
 
 Inițializează bootstrap-ul Infoapex AI în proiectul țintă:

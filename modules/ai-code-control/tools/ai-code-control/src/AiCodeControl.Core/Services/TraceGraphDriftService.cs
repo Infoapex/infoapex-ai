@@ -163,7 +163,7 @@ public sealed partial class TraceGraphDriftService
 
     private static void CheckIdentitiesAndTrust(TraceGraphState state, List<TraceGraphDriftFinding> findings)
     {
-        foreach (var group in state.Nodes.GroupBy(item => $"{item.NodeType}:{item.CanonicalRef}", StringComparer.OrdinalIgnoreCase)
+        foreach (var group in state.Nodes.GroupBy(item => $"{item.NodeType}:{item.CanonicalRef}", StringComparer.Ordinal)
                      .Where(item => item.Count() > 1))
             findings.Add(Finding("AMBIGUOUS_CURRENT_IDENTITY", "warning",
                 "Multiple current nodes share the same type and canonical reference.", group.Key));

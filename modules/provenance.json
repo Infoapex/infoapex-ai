@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-30",
+  "modules": [
+    {
+      "name": "ai-code-control",
+      "bundlePath": "modules/ai-code-control",
+      "sourceRepository": "https://github.com/Infoapex/ai-code-control.git",
+      "sourceBranch": "main",
+      "sourceCommit": "b9c120b4bfa604e0e13a457d39dbf308a687a9f1",
+      "syncMode": "source-with-bundle-manifest",
+      "allowedAdaptations": [
+        ".ai-code-control/reports/refactor/current-plan.json"
+      ]
+    },
+    {
+      "name": "ai-code-worker",
+      "bundlePath": "modules/ai-code-worker",
+      "sourceRepository": "https://github.com/Infoapex/ai-code-worker.git",
+      "sourceBranch": "main",
+      "sourceCommit": "add22c9d1fee18ce308472db6783be5c4afa9df0",
+      "syncMode": "generic-bundle-projection",
+      "allowedAdaptations": [
+        "bundle-local schema URNs",
+        "generic consumer documentation",
+        "bundle-relative integration paths"
+      ]
+    },
+    {
+      "name": "ai-code-planner",
+      "bundlePath": "modules/ai-code-planner",
+      "sourceRepository": "https://github.com/Infoapex/ai-code-planner.git",
+      "sourceBranch": "main",
+      "sourceCommit": "1e5534ba53c54896eafbfa140d0f88616bf9f138",
+      "syncMode": "generic-bundle-projection",
+      "allowedAdaptations": [
+        "bundle-local schema URNs",
+        "generic consumer documentation",
+        "bundle-relative integration paths",
+        ".ai-code-control/reports/refactor/current-plan.json"
+      ]
+    }
+  ]
+}

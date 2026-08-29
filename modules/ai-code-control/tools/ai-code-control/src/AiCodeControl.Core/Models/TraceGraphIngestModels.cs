@@ -27,4 +27,3 @@ public sealed record TraceGraphIngestResult(
     int DocumentsSkipped,
     int NodesProduced,
     int EdgesProduced);
-

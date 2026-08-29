@@ -305,7 +305,9 @@ public sealed partial class ContextPackageCompiler
 
         candidates.Add(new SourceCandidate(
             sourceId,
-            contentRange is null ? InferSourceType(canonicalRef) : "symbol",
+            // canonicalRef remains the repository file that owns the selected range.
+            // The manifest/source map carries the resolved symbol identity separately.
+            InferSourceType(canonicalRef),
             canonicalRef,
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))).ToLowerInvariant(),
             sourceCommit,
