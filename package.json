@@ -16,6 +16,8 @@
     "check:generic-boundary": "node scripts/check-generic-boundary.mjs",
     "value-gate:internal": "node scripts/value-gate.mjs",
     "value-gate:live": "node scripts/value-gate.mjs --live",
+    "p2:preflight": "node scripts/p2-live-preflight.mjs --fixture --json",
+    "p2:preflight:live": "node scripts/p2-live-preflight.mjs --live --json",
     "pilot:icm-graph:internal": "node scripts/icm-graph-pilot.mjs",
     "review-gate:internal": "node scripts/review-gate.mjs",
     "docs-gate:internal": "node scripts/docs-gate.mjs"

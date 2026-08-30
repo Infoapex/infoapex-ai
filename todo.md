@@ -1,5 +1,6 @@
 # Infoapex AI TODO
 
+- P2-A live preflight passed for one Codex and one Claude smoke task; retain the Codex rollout fallback and keep the combined economic verdict inconclusive until a provider-reported USD cost exists.
 - Run the bounded usage-consuming common ICM + Graph pilot on 10 real sequential tasks when provider quota is explicitly authorized; record accuracy, retries, uncached context, total tokens and explanation time. The deterministic internal pilot is PASS, but it cannot establish provider economics.
 - Keep GRAPH-06 parallel reviewers disabled until the live sequential baseline above exists; run the preregistered A/B experiment only with separate authorization.
 - Publish the first private bundle release after ZIP extraction and a clean-project installer smoke test pass.

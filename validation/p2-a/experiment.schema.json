@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:p2-a:experiment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "experimentId", "sourceBaselineCommit", "graph06Enabled", "maximumLiveInvocations", "providers", "tasks"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "experimentId": { "const": "INFOAPEX-P2-A" },
+    "sourceBaselineCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "graph06Enabled": { "const": false },
+    "maximumLiveInvocations": { "const": 2 },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["codex", "claude"],
+      "properties": {
+        "codex": { "$ref": "#/$defs/provider" },
+        "claude": { "$ref": "#/$defs/provider" }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["taskId", "engine", "goal", "goalSha256", "expectedPath", "expectedContent"],
+        "properties": {
+          "taskId": { "type": "string", "minLength": 1 },
+          "engine": { "enum": ["codex", "claude"] },
+          "goal": { "type": "string", "minLength": 1 },
+          "goalSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "expectedPath": { "type": "string", "pattern": "^src/" },
+          "expectedContent": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "effort", "cliVersion"],
+      "properties": {
+        "model": { "type": "string", "minLength": 1 },
+        "effort": { "type": ["string", "null"] },
+        "cliVersion": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -37,3 +37,10 @@ when invoked with explicit `--codex-sandbox danger-full-access`. The default
 `workspace-write` invocation was blocked by the local CLI approval policy. The
 remaining external validation is Claude's usage-consuming planner/value gate and
 its real quota signal.
+
+P2-A update 2026-08-30: the bounded two-invocation preflight passed live for Codex
+and Claude. Claude usage is complete and economically comparable. Codex completed
+functionally, while USD cost remains unavailable; token counts require the
+sanitized local-rollout fallback because CLI 0.147.0 omits them from `exec --json`
+stdout. The combined economic verdict is therefore `inconclusive`. P2-B and the
+three-arm comparison remain release gates; `GRAPH-06` is still disabled.

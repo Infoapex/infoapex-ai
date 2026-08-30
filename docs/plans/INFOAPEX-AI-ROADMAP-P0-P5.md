@@ -215,6 +215,16 @@ importantă decât economisirea de tokeni în prima măsurare. Terra devine al d
 - verdictul separă calitatea, costul, latența și efortul uman;
 - `GRAPH-06` rămâne oprit până la un baseline secvențial complet.
 
+### Status P2-A — 2026-08-30
+
+Preflight-ul bounded cu exact două invocări live este `PASS` funcțional. Codex
+`gpt-5.6-sol/high` și Claude `sonnet` au finalizat taskurile secvențial; clasificarea
+quota/sandbox versus failure determinist a trecut. Claude a produs usage complet,
+iar Codex a necesitat fallback read-only la rollout pentru tokeni și nu a raportat
+cost USD. Verdictul economic comun rămâne corect `inconclusive`. P2-B poate începe
+ca experiment funcțional controlat, fără afirmații economice complete și fără
+activarea `GRAPH-06`.
+
 ## 7. P3 — Primul release privat
 
 ### Obiectiv
