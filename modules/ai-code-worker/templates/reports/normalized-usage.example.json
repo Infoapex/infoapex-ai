@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "sampleCount": 3,
+  "deduplicatedSampleCount": 2,
+  "parserVersions": ["codex-token-count.v1"],
+  "totals": {
+    "agentInvocations": 1,
+    "inputUncachedTokens": 12221,
+    "cacheReadTokens": 71200,
+    "cacheWriteTokens": null,
+    "outputTokens": 2114,
+    "costUsd": null
+  },
+  "completeness": "partial",
+  "economicVerdict": "inconclusive",
+  "unknownFields": ["cacheWriteTokens", "costUsd"]
+}

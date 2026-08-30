@@ -76,7 +76,13 @@ describe("fake run coordinator", () => {
     assert.equal(runReport.review.status, "PASS");
     assert.equal(runReport.review.coverageRows, 2);
     assert.equal(runReport.gates.length, 3);
+    assert.deepEqual(runReport.usageAssessment, {
+      completeness: "partial",
+      economicVerdict: "inconclusive",
+      unknownFields: ["costUsd"]
+    });
     assert.match(runReportMarkdown, /Status: DONE/);
+    assert.match(runReportMarkdown, /Economic verdict: inconclusive/);
     assert.match(runReportMarkdown, /CONTRACT-01: [a-f0-9]{40}/);
     assert.equal(evidence.commands.length, 1);
     assert.equal(report.gateResults.length, 3);

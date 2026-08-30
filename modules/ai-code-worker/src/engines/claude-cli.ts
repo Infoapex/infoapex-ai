@@ -598,7 +598,9 @@ interface ClaudeResultEnvelope {
 // (2.1.177). Per Anthropic's Messages API, usage.input_tokens already excludes cached
 // tokens (cache_creation/cache_read are reported separately), so it maps directly to
 // inputUncachedTokens with no arithmetic needed.
-function parseClaudeUsage(stdout: unknown): EngineUsage {
+export const CLAUDE_USAGE_PARSER_VERSION = "claude-result.v1";
+
+export function parseClaudeUsage(stdout: unknown): EngineUsage {
   if (typeof stdout !== "string") {
     return unknownUsage();
   }
@@ -624,7 +626,7 @@ function parseClaudeUsage(stdout: unknown): EngineUsage {
 }
 
 function readNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 export function writeFakeClaudeCli(

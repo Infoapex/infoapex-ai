@@ -81,6 +81,27 @@ describe("fake engine adapter", () => {
     assert.equal(execution.result.status, "FAILED");
   });
 
+  it("does not sum repeated cumulative usage events", () => {
+    const execution = new FakeEngineAdapter(registry).start({
+      runId: "run-engine-cumulative",
+      taskId: "TASK-CUMULATIVE",
+      executionId: "exec-cumulative",
+      sessionId: "session-cumulative",
+      startedAt: "2026-08-01T10:00:00Z"
+    });
+    const base = execution.events.slice(0, 3);
+    const first = { ...execution.events[3]!, sequence: 3, payload: { inputUncachedTokens: 10, cacheReadTokens: 20, cacheWriteTokens: 0, outputTokens: 2, costUsd: 0.01, accountingMode: "cumulative" } };
+    const last = { ...execution.events[3]!, sequence: 4, payload: { inputUncachedTokens: 25, cacheReadTokens: 40, cacheWriteTokens: 0, outputTokens: 6, costUsd: 0.02, accountingMode: "cumulative" } };
+
+    assert.deepEqual(aggregateUsage([...base, first, last]), {
+      inputUncachedTokens: 25,
+      cacheReadTokens: 40,
+      cacheWriteTokens: 0,
+      outputTokens: 6,
+      costUsd: 0.02
+    });
+  });
+
   it("rejects duplicate or gapped event sequences", () => {
     const execution = new FakeEngineAdapter(registry).start({
       runId: "run-engine-4",

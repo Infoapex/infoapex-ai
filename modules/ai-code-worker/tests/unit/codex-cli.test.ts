@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import {
+  CODEX_USAGE_PARSER_VERSION,
   CodexCliAdapter,
+  parseCodexUsage,
   parseCodexVersion,
   versionMatches,
   writeFakeCodexCli
@@ -19,6 +21,19 @@ after(() => {
 });
 
 describe("codex cli adapter", () => {
+  it("parses the sanitized cumulative token fixture with a versioned parser", () => {
+    const usage = parseCodexUsage(readFileSync("tests/fixtures/engine-usage/codex-rollout-token-count.sample.jsonl", "utf8"));
+
+    assert.equal(CODEX_USAGE_PARSER_VERSION, "codex-token-count.v1");
+    assert.deepEqual(usage, {
+      inputUncachedTokens: 12221,
+      cacheReadTokens: 71200,
+      cacheWriteTokens: null,
+      outputTokens: 2114,
+      costUsd: null
+    });
+  });
+
   it("accepts a newly discovered version when no static range override is configured", () => {
     const cli = fakeCli("9.9.9");
     const adapter = new CodexCliAdapter({

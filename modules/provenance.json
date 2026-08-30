@@ -18,7 +18,7 @@
       "bundlePath": "modules/ai-code-worker",
       "sourceRepository": "https://github.com/Infoapex/ai-code-worker.git",
       "sourceBranch": "main",
-      "sourceCommit": "add22c9d1fee18ce308472db6783be5c4afa9df0",
+      "sourceCommit": "c84f029ab4a70c003d5a35d56ae5e508fa5801d6",
       "syncMode": "generic-bundle-projection",
       "allowedAdaptations": [
         "bundle-local schema URNs",

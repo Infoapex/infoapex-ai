@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:normalized-usage.schema.json",
+  "title": "Infoapex normalized usage report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "sampleCount", "deduplicatedSampleCount", "parserVersions", "totals", "completeness", "economicVerdict", "unknownFields"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "sampleCount": { "type": "integer", "minimum": 0 },
+    "deduplicatedSampleCount": { "type": "integer", "minimum": 0 },
+    "parserVersions": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agentInvocations", "inputUncachedTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "costUsd"],
+      "properties": {
+        "agentInvocations": { "type": "integer", "minimum": 0 },
+        "inputUncachedTokens": { "$ref": "#/$defs/nullableNumber" },
+        "cacheReadTokens": { "$ref": "#/$defs/nullableNumber" },
+        "cacheWriteTokens": { "$ref": "#/$defs/nullableNumber" },
+        "outputTokens": { "$ref": "#/$defs/nullableNumber" },
+        "costUsd": { "$ref": "#/$defs/nullableNumber" }
+      }
+    },
+    "completeness": { "enum": ["complete", "partial", "unavailable"] },
+    "economicVerdict": { "enum": ["comparable", "inconclusive"] },
+    "unknownFields": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["inputUncachedTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "costUsd"] }
+    }
+  },
+  "$defs": {
+    "nullableNumber": { "type": ["number", "null"], "minimum": 0 }
+  }
+}

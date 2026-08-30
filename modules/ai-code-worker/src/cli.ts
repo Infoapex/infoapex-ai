@@ -98,7 +98,8 @@ if (command === "benchmark") {
           console.log(`ai-code-worker benchmark checkpoint: ${checkpoint.checkpointId}`);
           console.log(`  profile: ${checkpoint.calibrationProfileId ?? "unknown"}`);
           console.log(`  total tokens: ${sumTokensOrNull(checkpoint.tokens) ?? "unknown"}`);
-          console.log(`  usage: ${checkpoint.percentUsedReported ?? "unknown"}%`);
+          const used = checkpoint.percentUsedReported;
+          console.log(`  usage: ${used === null ? "unknown" : `${used}% used, ${Math.max(0, 100 - used)}% remaining`}`);
           if ((checkpoint.parallelSessionCount ?? 0) > 0) {
             console.log(`  warning: ${checkpoint.parallelSessionCount} other Codex rollout(s) changed during this stage`);
           }

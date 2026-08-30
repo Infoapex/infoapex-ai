@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
-import { ClaudeCliAdapter, parseClaudeVersion, writeFakeClaudeCli } from "../../src/engines/claude-cli.js";
+import {
+  CLAUDE_USAGE_PARSER_VERSION,
+  ClaudeCliAdapter,
+  parseClaudeUsage,
+  parseClaudeVersion,
+  writeFakeClaudeCli
+} from "../../src/engines/claude-cli.js";
 import { versionMatches } from "../../src/engines/version-match.js";
 
 const tempRoots: string[] = [];
@@ -15,6 +21,19 @@ after(() => {
 });
 
 describe("claude cli adapter", () => {
+  it("parses the sanitized result envelope with a versioned parser", () => {
+    const usage = parseClaudeUsage(readFileSync("tests/fixtures/engine-usage/claude-output-format-json.sample.json", "utf8"));
+
+    assert.equal(CLAUDE_USAGE_PARSER_VERSION, "claude-result.v1");
+    assert.deepEqual(usage, {
+      inputUncachedTokens: 4,
+      cacheReadTokens: 15420,
+      cacheWriteTokens: 1823,
+      outputTokens: 612,
+      costUsd: 0.0842
+    });
+  });
+
   it("accepts a newly discovered version when no static range override is configured", () => {
     const cli = fakeCli("9.9.9");
     const adapter = new ClaudeCliAdapter({

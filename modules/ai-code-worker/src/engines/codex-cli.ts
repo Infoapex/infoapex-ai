@@ -515,7 +515,9 @@ interface CodexTokenCountEvent {
 // subtracted out to get the uncached count. Codex CLI does not surface a cache-write
 // token count or a dollar cost (only a rate-limit percentage, a different unit than
 // EngineUsage) - those stay null rather than guessed.
-function parseCodexUsage(stdout: unknown): EngineUsage {
+export const CODEX_USAGE_PARSER_VERSION = "codex-token-count.v1";
+
+export function parseCodexUsage(stdout: unknown): EngineUsage {
   if (typeof stdout !== "string") {
     return unknownUsage();
   }
@@ -549,7 +551,7 @@ function parseCodexUsage(stdout: unknown): EngineUsage {
   const cachedTokens = readNumber(lastTotal.cached_input_tokens);
 
   return {
-    inputUncachedTokens: inputTokens === null ? null : inputTokens - (cachedTokens ?? 0),
+    inputUncachedTokens: inputTokens === null ? null : Math.max(0, inputTokens - (cachedTokens ?? 0)),
     cacheReadTokens: cachedTokens,
     cacheWriteTokens: null,
     outputTokens: readNumber(lastTotal.output_tokens),
@@ -558,7 +560,7 @@ function parseCodexUsage(stdout: unknown): EngineUsage {
 }
 
 function readNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 export function writeFakeCodexCli(

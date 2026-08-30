@@ -64,6 +64,13 @@ session. Checkpoints contain numeric usage, model/effort metadata, a short sessi
 fingerprint, and an optional preregistered prediction. Raw rollout text is never
 copied into benchmark state.
 
+`percentUsedReported` always means consumed capacity: it starts at `0` and grows.
+Remaining capacity is `100 - percentUsedReported`. The CLI prints both values to
+avoid confusing “98% remaining” with “98% used”. Token deltas and percentage-point
+deltas are compared only inside the same model/effort, session fingerprint and
+unchanged rate-limit window. See `docs/USAGE-TELEMETRY-V1.md` for completeness and
+cumulative-event accounting semantics.
+
 ```powershell
 node modules/ai-code-worker/dist/src/cli.js benchmark checkpoint --repo . --plan ICM --stage ICM-01 --phase start --engine codex --kind contract --risk high --predicted-low 1400000 --predicted-median 1900000 --predicted-high 2400000 --prediction-source ICM-plan-v1
 node modules/ai-code-worker/dist/src/cli.js benchmark checkpoint --repo . --plan ICM --stage ICM-01 --phase end --engine codex
