@@ -41,6 +41,16 @@ export const emptyUsageTotals: UsageTotals = {
 };
 
 export function addUsage(totals: UsageTotals, usage: EngineUsage): UsageTotals {
+  if (totals.agentInvocations === 0) {
+    return {
+      agentInvocations: 1,
+      inputUncachedTokens: usage.inputUncachedTokens,
+      cacheReadTokens: usage.cacheReadTokens,
+      cacheWriteTokens: usage.cacheWriteTokens,
+      outputTokens: usage.outputTokens,
+      costUsd: usage.costUsd
+    };
+  }
   return {
     agentInvocations: totals.agentInvocations + 1,
     inputUncachedTokens: addNullable(totals.inputUncachedTokens, usage.inputUncachedTokens),

@@ -73,4 +73,25 @@ describe("usage budget policy", () => {
     assert.equal(result.status, "BLOCK");
     assert.equal(result.findings[0]?.code, "USAGE_UNKNOWN");
   });
+
+  it("seeds the first invocation so known provider cost remains known", () => {
+    const first = addUsage(emptyUsageTotals, {
+      inputUncachedTokens: 10,
+      cacheReadTokens: 20,
+      cacheWriteTokens: 3,
+      outputTokens: 4,
+      costUsd: 0.0123
+    });
+    assert.equal(first.costUsd, 0.0123);
+
+    const withUnknownRetry = addUsage(first, {
+      inputUncachedTokens: 1,
+      cacheReadTokens: 2,
+      cacheWriteTokens: null,
+      outputTokens: 1,
+      costUsd: null
+    });
+    assert.equal(withUnknownRetry.costUsd, null);
+    assert.equal(withUnknownRetry.cacheWriteTokens, null);
+  });
 });
