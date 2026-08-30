@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "1.0",
+  "experimentId": "INFOAPEX-P2-A",
+  "mode": "live",
+  "usageConsuming": true,
+  "startedAt": "2026-08-30T03:38:06.889Z",
+  "finishedAt": "2026-08-30T03:38:46.930Z",
+  "frozen": {
+    "sourceBaselineCommit": "df1a0462ce85390b33e0674d538b7f8e2ee12134",
+    "graph06Enabled": false,
+    "maximumLiveInvocations": 2,
+    "taskGoalHashes": [
+      "f98faf7286ad5e0c9a9476e7e4b5ae22400175479e6e2866a80ffd3fdd197a6b",
+      "78f4bb4ba5d01d0e3b84521c89f93cbdeef94a262e5646f4ab8831943718b907"
+    ]
+  },
+  "functionalVerdict": "PASS",
+  "economicVerdict": "inconclusive",
+  "p2bReadiness": "FUNCTIONAL_READY_ECONOMIC_PARTIAL",
+  "classification": [
+    { "label": "quota", "expected": true, "actual": true },
+    { "label": "sandbox", "expected": true, "actual": true },
+    { "label": "implementation", "expected": false, "actual": false }
+  ],
+  "smokes": [
+    {
+      "taskId": "P2A-CODEX-SMOKE",
+      "engine": "codex",
+      "requestedModel": "gpt-5.6-sol",
+      "requestedEffort": "high",
+      "expectedCliVersion": "0.147.0",
+      "doctorStatus": "PASS",
+      "observedCliVersion": "0.147.0",
+      "status": "DONE",
+      "blockedReason": null,
+      "findings": [],
+      "elapsedMs": 21940,
+      "runId": "p2-a-codex-live",
+      "engineProvenance": {
+        "requestedEngine": "codex",
+        "engineUsed": "codex",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "usageSource": "sanitized-local-rollout-fallback",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 9059,
+        "cacheReadTokens": 52224,
+        "cacheWriteTokens": null,
+        "outputTokens": 377,
+        "costUsd": null
+      },
+      "usageAssessment": {
+        "completeness": "partial",
+        "economicVerdict": "inconclusive",
+        "unknownFields": ["cacheWriteTokens", "costUsd"]
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "P2A-CLAUDE-SMOKE",
+      "engine": "claude",
+      "requestedModel": "sonnet",
+      "requestedEffort": null,
+      "expectedCliVersion": "2.1.235",
+      "doctorStatus": "PASS",
+      "observedCliVersion": "2.1.235",
+      "status": "DONE",
+      "blockedReason": null,
+      "findings": [],
+      "elapsedMs": 13540,
+      "runId": "p2-a-claude-live",
+      "engineProvenance": {
+        "requestedEngine": "claude",
+        "engineUsed": "claude",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "usageSource": "worker-run-report",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 4,
+        "cacheReadTokens": 21521,
+        "cacheWriteTokens": 7449,
+        "outputTokens": 323,
+        "costUsd": 0.0560073
+      },
+      "usageAssessment": {
+        "completeness": "complete",
+        "economicVerdict": "comparable",
+        "unknownFields": []
+      },
+      "stderrTail": ""
+    }
+  ]
+}

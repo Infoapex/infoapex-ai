@@ -18,6 +18,7 @@ describe("P2-A bounded provider preflight", () => {
     assert.equal(report.frozen.maximumLiveInvocations, 2);
     assert.equal(report.smokes.length, 2);
     assert.deepEqual(report.smokes.map((smoke: { status: string }) => smoke.status), ["DONE", "DONE"]);
+    assert.deepEqual(report.smokes.map((smoke: { usageSource: string }) => smoke.usageSource), ["worker-run-report", "worker-run-report"]);
     assert.deepEqual(report.classification.map((entry: { actual: boolean }) => entry.actual), [true, true, false]);
     assert.equal(report.economicVerdict, "inconclusive");
     assert.equal(report.p2bReadiness, "FUNCTIONAL_READY_ECONOMIC_PARTIAL");

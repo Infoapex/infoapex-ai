@@ -8,6 +8,8 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { writeFakeClaudeCli } from "../modules/ai-code-worker/dist/src/engines/claude-cli.js";
 import { writeFakeCodexCli } from "../modules/ai-code-worker/dist/src/engines/codex-cli.js";
 import { isAvailabilityFailure } from "../modules/ai-code-worker/dist/src/routing/task-execution.js";
+import { assessUsageTotals } from "../modules/ai-code-worker/dist/src/usage/normalized-usage.js";
+import { findCodexRolloutsModifiedSince, readCodexSessionLog } from "../modules/ai-code-worker/dist/src/benchmark/read-codex-session.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workerRoot = join(root, "modules", "ai-code-worker");
@@ -93,11 +95,18 @@ function runSmoke(task) {
     if (executable) doctorArgs.push("--claude-executable", executable), runArgs.push("--claude-executable", executable);
   }
   const doctor = runJson(process.execPath, doctorArgs, workerRoot);
+  const executionStartedAt = new Date();
   const before = Date.now();
   const execution = runJson(process.execPath, runArgs, workerRoot);
+  const executionFinishedAt = new Date();
   const elapsedMs = Date.now() - before;
   const runRoot = execution.body?.state?.runRoot;
   const runReport = runRoot ? readJsonOrNull(join(runRoot, "run-report.json")) : null;
+  const rolloutFallback = task.engine === "codex" && runReport?.usageAssessment?.completeness === "unavailable"
+    ? recoverCodexRolloutUsage(executionStartedAt, executionFinishedAt)
+    : null;
+  const usage = rolloutFallback?.usage ?? runReport?.usage ?? null;
+  const usageAssessment = rolloutFallback ? assessUsageTotals(usage) : runReport?.usageAssessment ?? null;
   return {
     taskId: task.taskId,
     engine: task.engine,
@@ -112,10 +121,31 @@ function runSmoke(task) {
     elapsedMs,
     runId: execution.body?.runId ?? execution.body?.state?.runId ?? null,
     engineProvenance: execution.body?.engineProvenance ?? null,
-    usage: runReport?.usage ?? null,
-    usageAssessment: runReport?.usageAssessment ?? null,
+    usageSource: rolloutFallback ? "sanitized-local-rollout-fallback" : "worker-run-report",
+    usage,
+    usageAssessment,
     stderrTail: execution.stderr.slice(-500)
   };
+}
+
+function recoverCodexRolloutUsage(startedAt, finishedAt) {
+  const candidates = findCodexRolloutsModifiedSince(startedAt, {}, finishedAt);
+  for (const path of [...candidates].reverse()) {
+    const summary = readCodexSessionLog(path);
+    const total = summary?.totalTokenUsage;
+    if (!total || total.inputTokens === null) continue;
+    return {
+      usage: {
+        agentInvocations: 1,
+        inputUncachedTokens: total.cachedInputTokens === null ? total.inputTokens : Math.max(0, total.inputTokens - total.cachedInputTokens),
+        cacheReadTokens: total.cachedInputTokens,
+        cacheWriteTokens: null,
+        outputTokens: total.outputTokens,
+        costUsd: null
+      }
+    };
+  }
+  return null;
 }
 
 function createRepository(task) {
