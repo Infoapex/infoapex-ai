@@ -8,6 +8,7 @@
       "AGENTS.md",
       "CLAUDE.md",
       "REFACTOR_POLICY.md",
+      "docs/**/*.md",
       ".ai-code-control/reports/refactor/**/*.json",
       ".ai-code-control/reports/validation/**/*.md"
     ],

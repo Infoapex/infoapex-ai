@@ -10,7 +10,9 @@ const names = new Set();
 const requiredModules = new Map([
   ["ai-code-control", "modules/ai-code-control"],
   ["ai-code-worker", "modules/ai-code-worker"],
-  ["ai-code-planner", "modules/ai-code-planner"]
+  ["ai-code-planner", "modules/ai-code-planner"],
+  ["ai-code-review", "modules/ai-code-review"],
+  ["ai-code-docs", "modules/ai-code-docs"]
 ]);
 
 if (manifest.schemaVersion !== "1.0" || !Array.isArray(manifest.modules)) {

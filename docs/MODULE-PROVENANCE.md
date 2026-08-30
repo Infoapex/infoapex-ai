@@ -20,6 +20,7 @@ paths are packaging adaptations. They must not change runtime semantics. Active
 scope manifests are repository-specific governance state and are not copied
 between repositories.
 
-For `ai-code-review` and `ai-code-docs`, standalone extraction and provenance
-pins are part of P1. Until then their vendored implementations remain owned by
-this repository and are not represented as standalone pins.
+`ai-code-review` and `ai-code-docs` are pinned the same way as the other three
+modules. All five canonical modules — `ai-code-control`, `ai-code-worker`,
+`ai-code-planner`, `ai-code-review`, `ai-code-docs` — are required by
+`npm run check:provenance`.

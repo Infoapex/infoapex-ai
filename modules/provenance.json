@@ -37,7 +37,34 @@
         "bundle-local schema URNs",
         "generic consumer documentation",
         "bundle-relative integration paths",
-        ".ai-code-control/reports/refactor/current-plan.json"
+        ".ai-code-control/reports/refactor/current-plan.json",
+        ".ai-code-control/config/memory-control.json: docs/**/*.md added to memory include (bundle-local tooling scope, not runtime semantics)"
+      ]
+    },
+    {
+      "name": "ai-code-review",
+      "bundlePath": "modules/ai-code-review",
+      "sourceRepository": "https://github.com/Infoapex/ai-code-review.git",
+      "sourceBranch": "main",
+      "sourceCommit": "032f646fa4eae2f147d7d6b97a865842ca3d26db",
+      "syncMode": "generic-bundle-projection",
+      "allowedAdaptations": [
+        "bundle-local schema URNs",
+        "generic consumer documentation",
+        "bundle-relative integration paths"
+      ]
+    },
+    {
+      "name": "ai-code-docs",
+      "bundlePath": "modules/ai-code-docs",
+      "sourceRepository": "https://github.com/Infoapex/ai-code-docs.git",
+      "sourceBranch": "main",
+      "sourceCommit": "1b3eef8a7f24f6902d5aa003de371c89a6f621df",
+      "syncMode": "generic-bundle-projection",
+      "allowedAdaptations": [
+        "bundle-local schema URNs",
+        "generic consumer documentation",
+        "bundle-relative integration paths"
       ]
     }
   ]
