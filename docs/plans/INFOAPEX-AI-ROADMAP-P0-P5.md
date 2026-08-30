@@ -168,6 +168,14 @@ lipsă, deoarece ar transforma o estimare într-o afirmație financiară falsă.
 - un run complet produce totaluri reproductibile;
 - un run parțial rămâne explicit `inconclusive`.
 
+### Status 2026-08-30
+
+P1 este implementat. Contractul normalizat `1.0`, parserele versionate Codex/Claude,
+semantica explicită folosit versus rămas, agregarea cumulative/incrementală,
+deduplicarea la resume și verdictul economic fail-closed sunt sincronizate din
+`ai-code-worker` la commitul publicat din `modules/provenance.json`. Suita standalone
+a trecut 388/388 teste; validarea bundle-ului este gate-ul final al acestei etape.
+
 ## 6. P2 — Gate-uri live și comparație controlată
 
 ### Obiectiv

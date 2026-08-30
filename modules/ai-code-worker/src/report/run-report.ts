@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { CompileReport } from "../compile/compile.js";
 import type { QualityGateResult } from "../runner/quality-gate.js";
 import type { UsageTotals } from "../policy/usage-budget.js";
+import { assessUsageTotals, type UsageAssessment } from "../usage/normalized-usage.js";
 
 export interface WriteRunReportInput {
   readonly compile: CompileReport;
@@ -24,6 +25,7 @@ export interface RunReport {
   readonly taskCommits: Readonly<Record<string, string>>;
   readonly gates: readonly RunReportGate[];
   readonly usage: UsageTotals | null;
+  readonly usageAssessment: UsageAssessment;
   readonly review: {
     readonly status: string | null;
     readonly coverageRows: number | null;
@@ -71,6 +73,7 @@ export function writeRunReports(input: WriteRunReportInput): { readonly jsonPath
       outputSha256: gate.outputSha256
     })),
     usage: input.usageTotals,
+    usageAssessment: assessUsageTotals(input.usageTotals),
     review: {
       status: readString(review?.status),
       coverageRows: Array.isArray(review?.coverageMatrix) ? review.coverageMatrix.length : null,
@@ -140,6 +143,10 @@ ${gates}
 | Cache write tokens | ${report.usage?.cacheWriteTokens ?? "null"} |
 | Output tokens | ${report.usage?.outputTokens ?? "null"} |
 | Reported cost USD | ${report.usage?.costUsd ?? "null"} |
+
+- Completeness: ${report.usageAssessment.completeness}
+- Economic verdict: ${report.usageAssessment.economicVerdict}
+- Unknown fields: ${report.usageAssessment.unknownFields.join(", ") || "none"}
 `;
 }
 

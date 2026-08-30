@@ -19,6 +19,7 @@ describe("schema registry", () => {
     ["evidence.schema.json", "templates/reports/evidence.example.json"],
     ["context-package.schema.json", "templates/reports/context-package.example.json"],
     ["source-map.schema.json", "templates/reports/source-map.example.json"],
+    ["normalized-usage.schema.json", "templates/reports/normalized-usage.example.json"],
     ["review.schema.json", "templates/reports/review.example.json"],
     ["manifest.schema.json", "tests/fixtures/manifest/valid-minimal.json"],
     ["review-finding.schema.json", "templates/reports/review-finding.example.json"],

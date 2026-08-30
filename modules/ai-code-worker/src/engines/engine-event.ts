@@ -97,6 +97,20 @@ export function validateEngineEventStream(events: readonly EngineEvent[]): void 
 }
 
 export function aggregateUsage(events: readonly EngineEvent[]): EngineUsage {
+  const usageEvents = events.filter((event) => event.type === "usage.reported");
+  const explicitModes = new Set(
+    usageEvents
+      .map((event) => event.payload.accountingMode)
+      .filter((mode): mode is string => mode === "incremental" || mode === "cumulative")
+  );
+  if (explicitModes.size > 1) {
+    return unknownUsage();
+  }
+  if (explicitModes.has("cumulative")) {
+    const last = usageEvents.at(-1);
+    return last ? usageFromPayload(last.payload) : unknownUsage();
+  }
+
   let inputUncachedTokens: number | null = null;
   let cacheReadTokens: number | null = null;
   let cacheWriteTokens: number | null = null;
@@ -121,6 +135,26 @@ export function aggregateUsage(events: readonly EngineEvent[]): EngineUsage {
     cacheWriteTokens,
     outputTokens,
     costUsd
+  };
+}
+
+function usageFromPayload(payload: Record<string, unknown>): EngineUsage {
+  return {
+    inputUncachedTokens: readNullableNumber(payload.inputUncachedTokens),
+    cacheReadTokens: readNullableNumber(payload.cacheReadTokens),
+    cacheWriteTokens: readNullableNumber(payload.cacheWriteTokens),
+    outputTokens: readNullableNumber(payload.outputTokens),
+    costUsd: readNullableNumber(payload.costUsd)
+  };
+}
+
+function unknownUsage(): EngineUsage {
+  return {
+    inputUncachedTokens: null,
+    cacheReadTokens: null,
+    cacheWriteTokens: null,
+    outputTokens: null,
+    costUsd: null
   };
 }
 
