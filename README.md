@@ -1,312 +1,436 @@
 <p align="center">
   <img src="docs/assets/infoapex-ai-splash-architecture.png"
-       alt="InfoApex AI — control plane local pentru agenți de programare: obiectiv, planner, scope, DAG de execuție, poartă de verificare și motoarele Codex CLI / Claude Code"
+       alt="Infoapex AI — control plane local pentru agenți de programare: obiectiv, planner, worker, review, docs și țintă verificată"
        width="100%">
 </p>
 
-# Infoapex AI
+<h1 align="center">Infoapex AI</h1>
 
-**Un strat local de planificare, guvernanță și verificare pentru agenți de programare precum Codex CLI și Claude Code.**
+<p align="center">
+  <b>Un strat local de planificare, guvernanță și verificare<br>peste agenți de programare precum Codex CLI și Claude Code.</b>
+</p>
 
-[![CI](https://github.com/Infoapex/infoapex-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Infoapex/infoapex-ai/actions/workflows/ci.yml)
+<p align="center">
+  <a href="https://github.com/Infoapex/infoapex-ai/actions/workflows/ci.yml"><img src="https://github.com/Infoapex/infoapex-ai/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/status-pre--release-F0B429" alt="pre-release">
+  <img src="https://img.shields.io/badge/node-%E2%89%A522-2F9BFF" alt="Node 22+">
+  <img src="https://img.shields.io/badge/.NET-9-7FD3FF" alt=".NET 9">
+  <img src="https://img.shields.io/badge/local--first-3DD68C" alt="local-first">
+</p>
 
-> Stare: **candidat implementat / pre-release**. Fluxurile deterministe interne sunt funcționale și testate. Validarea live completă cu toți furnizorii și testul final al pachetului ZIP sunt încă porți de release deschise.
+> [!IMPORTANT]
+> **Stare: candidat implementat, pre-release.** Fluxurile deterministe interne sunt
+> funcționale și testate. Rămân deschise gate-ul live cu consum real de provider și
+> smoke test-ul bundle-ului ZIP. Vezi [Unde se află proiectul](#unde-se-află-proiectul).
 
-## Ce este proiectul
+---
 
-Infoapex AI nu este un model lingvistic nou și nici un înlocuitor pentru Codex sau Claude. Este un **control plane local** construit deasupra agenților existenți. El transformă o cerere în planuri și task-uri verificabile, limitează domeniul modificărilor, coordonează execuția, păstrează dovezi și cere review înainte de a declara lucrul terminat.
+## Ideea în trei propoziții
 
-Ideea centrală este separarea responsabilităților:
+Un agent de programare este excelent la o conversație și o modificare punctuală.
+Un flux autonom mai lung are nevoie de altceva: limite verificabile, ordine explicită,
+bugete, dovezi și un verdict independent.
 
-- modelul/agentul propune sau scrie cod;
-- Infoapex AI definește ce are voie să facă, în ce ordine și cu ce buget;
-- Git, worktree-urile, schemele JSON și gate-urile oferă limite și probe reproductibile;
-- memoria proiectului rămâne în Markdown versionat, iar indexurile SQLite sunt cache-uri reconstruibile.
+Infoapex AI nu este un model nou și nu înlocuiește Codex sau Claude. Este **procesul din
+jurul inteligenței** — stratul care decide ce are voie agentul să facă, în ce ordine, cu
+ce buget, și care păstrează probele.
 
-Proiectul este local-first. Codex CLI și Claude Code rămân instalări locale separate; acest repository nu stochează credențialele furnizorilor.
+## Ce rezolvă
 
-## Problema rezolvată
+Un flux autonom trebuie să răspundă determinist la întrebări la care istoricul unei
+conversații nu poate răspunde:
 
-Un agent de programare direct este foarte bun pentru o conversație și o modificare punctuală, dar un flux autonom mai lung are nevoie și de răspunsuri deterministe la întrebări precum:
+| Întrebare | Unde trăiește răspunsul în Infoapex AI |
+|---|---|
+| Care este exact scopul aprobat? | plan validat prin JSON Schema |
+| Ce fișiere pot fi atinse? | manifest autorizat, înghețat înainte de execuție |
+| Ce task depinde de ce alt task? | DAG de execuție |
+| Ce model merită folosit aici? | profil logic per task, rezolvat din politica locală |
+| Cât are voie să consume? | bugete de timp, invocări, tokeni, cost |
+| Ce face rezultatul acceptabil? | gate-uri cu dovezi păstrate |
+| Cum reiau o execuție întreruptă? | stare reluabilă, în afara repository-ului țintă |
+| Cum auditez intenția față de codul produs? | evenimente, manifeste, commit-uri, rapoarte |
 
-- Care este exact scopul aprobat?
-- Ce fișiere și simboluri pot fi atinse?
-- Ce task depinde de ce alt task?
-- Ce motor și ce profil sunt potrivite pentru fiecare task?
-- Ce buget de timp, invocări și tokeni este permis?
-- Ce teste și ce dovezi fac rezultatul acceptabil?
-- Cum poate fi reluată în siguranță o execuție întreruptă?
-- Cum este auditată diferența dintre intenție, codul produs și verdictul final?
-
-Infoapex AI codifică aceste întrebări în contracte, manifeste și stări verificabile, în loc să le lase doar în istoricul conversației.
-
-## Arhitectură
+## Cum funcționează
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#7A90B4','primaryTextColor':'#7C93B5','edgeLabelBackground':'#152238','tertiaryTextColor':'#E8F2FF'}}}%%
 flowchart LR
-    U[Obiectiv<br/>prompt + criterii] --> P[ai-code-planner<br/>descompune și rutează]
-    P -->|plan validat, DAG,<br/>profil logic per task| W[ai-code-worker<br/>execută și dovedește]
-    W -.->|replan: dependență nouă<br/>sau task incomplet| P
-    W --> E{{Motoare LLM<br/>codex · claude · fake}}
-    E --> W
-    W -->|scope guard, gate-uri,<br/>dovezi, commit| R[ai-code-review<br/>read-only, fail-closed]
-    R -->|PASS / FAIL / BLOCKED| D[ai-code-docs<br/>ciclu propriu, gated]
-    D --> T[Țintă<br/>cod verificat + dovezi]
-    C[ai-code-control<br/>advisory, opțional] -.-> P
-    C -.-> W
-    C -.-> R
-    C -.-> D
+    O(["🎯 Obiectiv<br/><small>prompt + criterii</small>"]) --> P
+
+    P["<b>ai-code-planner</b><br/>descompune și rutează<br/><small>DAG · scope · profil per task</small>"]
+    W["<b>ai-code-worker</b><br/>execută și dovedește<br/><small>worktree · gate-uri · commit</small>"]
+    R["<b>ai-code-review</b><br/>verifică independent<br/><small>read-only · fail-closed</small>"]
+    D["<b>ai-code-docs</b><br/>documentează<br/><small>ciclu propriu, gated</small>"]
+    T(["✅ Țintă<br/><small>cod verificat + dovezi</small>"])
+
+    P --> W
+    W -. "replan: dependență nouă<br/>sau task incomplet" .-> P
+    W <==> E{{"🔌 Motoare LLM<br/>codex · claude · fake"}}
+    W --> R
+    R -- "PASS / FAIL / BLOCKED" --> D
+    D --> T
+
+    C["<b>ai-code-control</b> — advisory, opțional<br/><small>memorie · graf de cod · impact · scope guard</small>"]
+    C -.-> P & W & R & D
+
+    classDef start fill:#082032,stroke:#7FD3FF,stroke-width:2px,color:#DFF3FF
+    classDef plan fill:#0B1B33,stroke:#2F9BFF,stroke-width:2px,color:#DCEBFF
+    classDef work fill:#0A1E2E,stroke:#7FD3FF,stroke-width:2px,color:#DFF3FF
+    classDef check fill:#2A2008,stroke:#F0B429,stroke-width:2px,color:#FFEFC8
+    classDef done fill:#082419,stroke:#3DD68C,stroke-width:2px,color:#D6FBEA
+    classDef engine fill:#141C2E,stroke:#94A3B8,stroke-width:2px,color:#E2E8F0
+    classDef advisory fill:#0E1626,stroke:#4A6A99,stroke-width:1.5px,color:#B6C6DC
+
+    class O start
+    class P plan
+    class W work
+    class R check
+    class D,T done
+    class E engine
+    class C advisory
 ```
 
-Modulele nu își importă reciproc codul sursă. Ele comunică prin CLI, JSON, fișiere și scheme versionate, ceea ce permite folosirea și testarea lor independentă.
+Fluxul citește de la stânga la dreapta, dar trei detalii din diagramă sunt
+intenționate și schimbă complet ce înseamnă proiectul.
 
-Trei lucruri din diagramă sunt intenționate și merită citite explicit:
+## Cele trei reguli care fac diferența
 
-- **Un singur punct de invocare.** `ai-code-worker` este singurul component care poate invoca un provider care scrie. `ai-code-review` și `ai-code-docs` deleagă acolo. Centralizarea este chiar mecanismul de guvernanță: un singur loc unde se aplică scope, bugete, gate-uri și dovezi.
-- **Planner-ul rutează logic, nu alege modelul.** Emite profile de tip `mechanical-fast-v1` sau `balanced-default-v1`; worker-ul le rezolvă în motor și model concret din politica locală de rutare și le îngheață în manifest. Planul rămâne portabil și neutru față de furnizor.
-- **Review-ul nu repară.** Providerul de review este read-only și nu primește niciodată capacitate de reparare. Emite un verdict; remedierea este un ciclu nou, autorizat. Repararea automată există, dar înăuntrul worker-ului, în cicluri mărginite, înainte de review.
+### 1. Un singur punct de invocare a modelului
 
-| Modul | Rol real |
-|---|---|
-| `infoapex-ai` | Bootstrap minim pentru modul independent/integrat, stare și handoff-uri. În versiunea curentă nu este încă o interfață unică pentru toate comenzile. |
-| `ai-code-planner` | Transformă un prompt într-un plan structurat, îl validează, îl lint-uiește, propune rutarea logică și îl compilează în formatul worker-ului. Nu scrie cod și nu produce manifestul final înghețat. |
-| `ai-code-worker` | Îngheață manifestul autorizat, construiește DAG-ul, rezolvă profilul logic în motor/model concret, rulează task-urile prin `codex`, `claude` sau `fake`, aplică gate-uri, bugete și cicluri limitate de reparare. Singurul care invocă un provider care scrie. |
-| `ai-code-review` | Orchestrare read-only pentru verificarea criteriilor și a diferențelor dintre commit-uri. `run` este fail-closed: fără validare de la planner, context de la control, rezultat de la worker și review valid de schemă, verdictul nu poate fi `PASS`. |
-| `ai-code-docs` | Orchestrare pentru documentație. `generate` rulează propriul ciclu planner → worker → review și cade dacă oricare pas nu trece. |
-| `ai-code-control` | CLI și server MCP în .NET pentru memorie, căutare full-text, indexarea simbolurilor, analiza impactului și controlul scope-ului. **Advisory și opțional** — absența lui reduce contextul, nu blochează un run de planner sau worker. |
+`ai-code-worker` este **singurul** component care poate invoca un provider care scrie.
+`ai-code-review` și `ai-code-docs` deleagă acolo, chiar dacă au propriile lor cicluri.
 
-De ce contează rutarea per task: o sesiune de agent obișnuită folosește același model scump și pentru un README, și pentru o migrare de bază de date. Planner-ul alocă fiecărui subtask cel mai ieftin model care îl poate rezolva corect și păstrează modelele capabile pentru contracte, migrări și review. Câștigul nu este „cheltuiește mai puțin", ci **să îți permiți modelul capabil exact unde contează**, pentru că nu a fost ars pe fleacuri.
+Nu este un detaliu de implementare, este chiar mecanismul de guvernanță: dacă modelul
+ar fi chemat din patru locuri, ai avea patru locuri de auditat, patru locuri unde
+scope-ul poate scăpa și patru surse de adevăr pentru consum.
 
-## Fluxul unei execuții
+### 2. Planner-ul rutează logic, nu alege modelul
+
+Planner-ul emite **profile logice** — `mechanical-fast-v1`, `balanced-default-v1`.
+Worker-ul le rezolvă în motor și model concret din `.ai-code-worker/routing-policy.json`
+și le îngheață în manifest.
+
+Consecința: planul rămâne portabil. Identificatorii de model sunt politică locală, nu
+conținut de business. Același plan rulează în alt repository, cu altă politică, fără
+rescriere.
+
+### 3. Review-ul nu repară
+
+Providerul de review este read-only și **nu primește niciodată capacitate de reparare**.
+Emite un verdict; remedierea este un ciclu nou, autorizat.
+
+Repararea automată există, dar înăuntrul worker-ului, în cicluri mărginite, înainte de
+review. Un verificator care își poate repara singur constatările nu mai este un
+verificator.
+
+## Economia de tokeni
+
+O sesiune de agent obișnuită folosește același model scump și pentru un README, și
+pentru o migrare de bază de date. Planner-ul alocă fiecărui subtask cel mai ieftin model
+care îl poate rezolva corect și păstrează modelele capabile pentru contracte, migrări și
+review.
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#7A90B4','primaryTextColor':'#7C93B5','edgeLabelBackground':'#152238','tertiaryTextColor':'#E8F2FF'}}}%%
+flowchart TD
+    G["🎯 Un obiectiv"] --> S1 & S2 & S3 & S4
+
+    S1["Actualizează README-ul"]
+    S2["Adaugă fixtures repetitive"]
+    S3["Scrie migrarea de bază de date"]
+    S4["Modifică un contract public"]
+
+    S1 --> L["<b>mechanical-fast</b><br/><small>model ieftin</small>"]
+    S2 --> L
+    S3 --> H["<b>capable-strict</b><br/><small>model capabil</small>"]
+    S4 --> H
+
+    L --> M["Manifest înghețat<br/><small>worker rezolvă profilul → motor + model</small>"]
+    H --> M
+    M --> U["📊 Telemetrie de consum<br/><small>dovadă, nu estimare</small>"]
+
+    classDef goal fill:#0B1B33,stroke:#2F9BFF,stroke-width:2px,color:#DCEBFF
+    classDef task fill:#101A2B,stroke:#64748B,stroke-width:1.5px,color:#DCE6F5
+    classDef cheap fill:#082419,stroke:#3DD68C,stroke-width:2px,color:#D6FBEA
+    classDef strong fill:#2A2008,stroke:#F0B429,stroke-width:2px,color:#FFEFC8
+    classDef out fill:#0A1E2E,stroke:#7FD3FF,stroke-width:2px,color:#DFF3FF
+
+    class G goal
+    class S1,S2,S3,S4 task
+    class L cheap
+    class H strong
+    class M,U out
+```
+
+Câștigul nu este „cheltuiește mai puțin". Este **să îți permiți modelul capabil exact
+unde contează**, pentru că nu a fost ars pe fleacuri.
+
+Ca afirmația să fie verificabilă, consumul este tratat ca dovadă, nu ca estimare:
+câmpurile necunoscute rămân `null` și nu devin zero, iar fiecare raport primește un
+verdict separat — `complete`, `partial` sau `unavailable`. Doar un raport complet poate
+susține o comparație economică.
+
+Distincția nu este teoretică: un PASS funcțional nu implică comparabilitate economică.
+Codex, de exemplu, nu raportează în prezent numărul de cache-write sau costul în USD,
+deci consumul lui normalizat rămâne `partial` — suficient pentru a valida execuția,
+insuficient pentru a susține o afirmație de cost.
+
+## Anatomia unui task
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-sans-serif, system-ui, sans-serif','actorBkg':'#0B1B33','actorBorder':'#2F9BFF','actorTextColor':'#DCEBFF','actorLineColor':'#7A90B4','signalColor':'#7A90B4','signalTextColor':'#7F97B8','labelBoxBkgColor':'#152238','labelBoxBorderColor':'#2F9BFF','labelTextColor':'#DCEBFF','noteBkgColor':'#2A2008','noteBorderColor':'#F0B429','noteTextColor':'#FFEFC8','sequenceNumberColor':'#08131F','activationBkgColor':'#2F9BFF','primaryTextColor':'#7C93B5','altSectionBkgColor':'#7C93B50D'}}}%%
 sequenceDiagram
     autonumber
-    actor User as Utilizator
-    participant Planner as Planner
-    participant Control as Control
-    participant Worker as Worker
-    participant Agent as Codex / Claude
-    participant Git as Git worktree
-    participant Review as Review
+    actor U as Utilizator
+    participant P as Planner
+    participant C as Control
+    participant W as Worker
+    participant A as Codex / Claude
+    participant G as Git worktree
+    participant R as Review
 
-    User->>Planner: obiectiv + criterii de acceptare
-    Planner->>Control: context, simboluri, impact
-    Control-->>Planner: brief și index
-    Planner-->>Worker: plan validat, DAG, scope, gate-uri, bugete
-    Worker->>Git: creează worktree și manifest autorizat
-    Worker->>Agent: task limitat + context
-    Agent->>Git: modificări locale
-    Worker->>Worker: verifică scope, teste, dovezi și buget
+    U->>P: obiectiv + criterii de acceptare
+    P->>C: context, simboluri, impact
+    C-->>P: brief și index (dacă există)
+    P-->>W: plan validat, DAG, scope, gate-uri, bugete
+    W->>G: creează worktree și îngheață manifestul
+    W->>A: task delimitat + context mărginit
+    A->>G: modificări locale
+    W->>W: verifică scope, teste, dovezi, buget
+
     alt gate-urile trec
-        Worker->>Git: commit cu trailere de trasabilitate
-        Worker->>Review: criterii + diff + dovezi
-        Review-->>User: PASS / FAIL / BLOCKED
+        W->>G: commit cu trailere de trasabilitate
+        W->>R: criterii + diff + dovezi
+        R-->>U: PASS / FAIL / BLOCKED
     else dependență lipsă sau task incomplet
-        Worker-->>Planner: raport de execuție (mod integrated)
-        Planner-->>Worker: replan determinist
+        W-->>P: raport de execuție (mod integrated)
+        P-->>W: replan determinist
     else abatere sau eroare
-        Worker-->>User: BLOCKED + constatări + stare reluabilă
+        W-->>U: BLOCKED + constatări + stare reluabilă
     end
 ```
 
-Worker-ul păstrează starea în afara repository-ului țintă, produce evenimente și rapoarte și poate relua fluxuri întrerupte. Izolarea prin worktree, verificarea scope-ului și sandbox-ul motorului sunt straturi diferite; izolarea reală la nivel de sistem de operare depinde de backend-ul și configurația folosite.
+Worker-ul păstrează starea **în afara** repository-ului țintă, produce evenimente și
+rapoarte și poate relua fluxuri întrerupte.
 
-Bucla `replan` este opt-in și bazată pe fișiere: se activează cu `--mode integrated` și folosește canalul comun `.infoapex-ai/runs/<runId>/`. Nu este o dependență de runtime și nu creează apeluri circulare — worker-ul poate rula direct cu un plan, iar planner-ul poate genera planuri fără worker.
+Izolarea prin worktree, verificarea scope-ului și sandbox-ul motorului sunt straturi
+diferite. Izolarea reală la nivel de sistem de operare depinde de backend-ul și
+configurația folosite — vezi [Limite cunoscute](#limite-cunoscute).
 
-## Capabilități principale
+## Modulele
 
-- planuri structurate și validate prin JSON Schema;
-- DAG de task-uri și paralelism controlat;
-- scope explicit, manifest autorizat și detecția fișierelor modificate în afara lui;
-- worktree separat pentru fiecare task de scriere;
-- rutare logică spre Codex sau Claude și fallback pentru erori eligibile;
-- limite de timp, invocări, tokeni, cost estimat și cicluri de reparare;
-- telemetrie de consum normalizată, tratată ca dovadă, nu ca estimare: câmpurile necunoscute rămân `null` și nu devin zero, iar fiecare raport primește un verdict separat (`complete`, `partial`, `unavailable`) — doar un raport complet poate susține o comparație economică;
-- gate-uri globale și pe task, cu dovezi păstrate în raport;
-- review independent și verificarea criteriilor de acceptare;
-- jurnal de evenimente, recuperare după întrerupere și export de handoff redactat;
-- memorie Markdown versionată plus index SQLite reconstruibil;
-- analiză de simboluri și impact tranzitiv pentru C#, TypeScript/JavaScript și SQL;
-- motor `fake` pentru teste deterministe fără consum de provider.
+Modulele nu își importă reciproc codul sursă. Comunică prin CLI, JSON, fișiere și
+scheme versionate, ceea ce le face utilizabile și testabile independent.
 
-## Code map pentru Obsidian
+| Modul | Ce face | Ce nu face |
+|---|---|---|
+| `infoapex-ai` | Bootstrap: `init`, `status`, `handoff`. Configurează modul independent sau integrat. | Nu este încă un CLI unificat pentru toate comenzile. |
+| `ai-code-planner` | Transformă un prompt în plan structurat, îl validează și îl lint-uiește, propune rutarea logică, îl compilează în formatul worker-ului. | Nu scrie cod. Nu produce manifestul final înghețat. Nu îți proiectează arhitectura. |
+| `ai-code-worker` | Îngheață manifestul, construiește DAG-ul, rezolvă profilul logic, invocă motorul, aplică gate-uri, bugete și cicluri limitate de reparare, comite. | Nu importă cod de planner. Nu decide singur criteriile de acceptare. |
+| `ai-code-review` | Orchestrare read-only pentru criterii și diferențe între commit-uri. `run` este fail-closed. | Nu scrie în repository-ul țintă. Nu primește capacitate de reparare. |
+| `ai-code-docs` | Documentație prin ciclu propriu planner → worker → review. `generate` cade dacă oricare pas nu trece. | Nu invocă direct providerul; deleagă worker-ului. |
+| `ai-code-control` | Memorie Markdown + index SQLite FTS, graf de cod, analiză de impact, scope guard, runner de validare, server MCP. | **Advisory și opțional** — absența lui reduce contextul, nu blochează un run. |
 
-`ai-code-control` poate proiecta graful SQLite într-un vault Markdown compatibil cu Obsidian. Exportul este opțional și read-only față de cod: indexul SQLite rămâne reconstruibil, iar sursa de adevăr rămâne codul și documentația versionată.
+## Instalare
 
-```bash
-dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- refresh --full
-dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- obsidian-export
-```
-
-Output-ul implicit este `docs/code-map/generated/` și este ignorat de Git. Pentru un scope sau vault extern:
-
-```bash
-dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- obsidian-export \
-  --path modules/ai-code-worker \
-  --out C:/vaults/infoapex-code-map \
-  --include-symbols \
-  --max-symbols 250
-```
-
-Exporterul produce `index.md`, note de module/fișier, note de simbol selectabile și `canvases/code-map.canvas`. Proprietățile YAML păstrează commitul indexat, branch-ul, hash-ul sursei și momentul generării. Ghidul complet este în [docs/OBSIDIAN-CODE-MAP.md](docs/OBSIDIAN-CODE-MAP.md).
-
-Fluxul exportului este o proiectie unidirectionala din cod si indexul SQLite spre vault-ul Obsidian; modificarile din Obsidian nu sunt aplicate automat in cod:
-
-```mermaid
-flowchart LR
-    CODE[Cod sursa] --> REFRESH[refresh / index-code]
-    REFRESH --> DB[(codegraph.sqlite)]
-    DB --> EXPORT[obsidian-export]
-    EXPORT --> MD[index.md + note Markdown]
-    EXPORT --> CANVAS[code-map.canvas]
-    MD --> GRAPH[Obsidian Graph View]
-    CANVAS --> OBS[Obsidian]
-    GRAPH --> OBS
-```
-
-## Moduri de integrare
-
-```text
-infoapex-ai init --repo <cale> --mode independent
-infoapex-ai init --repo <cale> --mode integrated
-```
-
-`independent` este modul implicit. Planner-ul, worker-ul și celelalte module pot fi folosite separat.
-
-`integrated` activează canalul comun `.infoapex-ai/runs`: planner-ul poate publica planul acceptat și propunerea de rutare, worker-ul poate publica feedback-ul execuției, iar planner-ul poate genera o continuare. Canalul este bazat pe fișiere și nu transformă modulele într-un monolit.
-
-## Cerințe
-
-- Node.js 22 sau mai nou;
-- Git;
-- .NET 9 SDK pentru `ai-code-control` și serverul său MCP;
-- Codex CLI și/sau Claude Code instalat și autentificat pentru execuții reale;
-- un repository Git țintă curat și o politică de permisiuni aleasă conștient.
-
-## Instalare pentru dezvoltare
+**Cerințe:** Node.js 22+, Git, .NET 9 SDK pentru `ai-code-control`, plus Codex CLI
+și/sau Claude Code instalate și autentificate pentru execuții reale.
 
 ```bash
 git clone https://github.com/Infoapex/infoapex-ai.git
 cd infoapex-ai
-npm run setup
+npm run setup     # dependențele bundle-ului și ale modulelor vendorizate
 npm run build
 npm test
 ```
 
-`npm run setup` instalează dependențele bundle-ului și ale modulelor vendorizate. Nu descarcă module private la runtime.
-
-Versiunile standalone proiectate în bundle sunt fixate prin commit complet în
-[`modules/provenance.json`](modules/provenance.json), iar regulile de sincronizare
-sunt descrise în [`docs/MODULE-PROVENANCE.md`](docs/MODULE-PROVENANCE.md).
+`npm run setup` nu descarcă module private la runtime. Versiunile standalone proiectate
+în bundle sunt fixate prin commit complet în [`modules/provenance.json`](modules/provenance.json);
+regulile de sincronizare sunt în [`docs/MODULE-PROVENANCE.md`](docs/MODULE-PROVENANCE.md).
 
 ## Pornire rapidă
 
-Inițializează bootstrap-ul Infoapex AI în proiectul țintă:
+**1. Inițializează bootstrap-ul în proiectul țintă**
 
 ```bash
 npx --package . infoapex-ai init --repo /cale/catre/proiect --mode independent
 npx --package . infoapex-ai status --repo /cale/catre/proiect
 ```
 
-Inițializează worker-ul și verifică mediul:
+**2. Pregătește worker-ul și verifică mediul**
 
 ```bash
-node modules/ai-code-worker/dist/src/cli.js init \
-  --repo /cale/catre/proiect \
-  --engines codex,claude
-
-node modules/ai-code-worker/dist/src/cli.js doctor \
-  --repo /cale/catre/proiect \
-  --engine codex
+node modules/ai-code-worker/dist/src/cli.js init --repo /cale/catre/proiect --engines codex,claude
+node modules/ai-code-worker/dist/src/cli.js doctor --repo /cale/catre/proiect --engine codex
 ```
 
-Propune, inspectează și compilează un plan:
+**3. Propune, inspectează și compilează un plan**
 
 ```bash
 node modules/ai-code-planner/dist/src/cli.js propose \
   "Implementează funcționalitatea X cu teste" \
-  --repo /cale/catre/proiect \
-  --out draft.plan.json
+  --repo /cale/catre/proiect --out draft.plan.json
 
 node modules/ai-code-planner/dist/src/cli.js inspect draft.plan.json
 
 node modules/ai-code-planner/dist/src/cli.js compile draft.plan.json \
-  --task-id FEATURE-X \
-  --repo /cale/catre/proiect \
-  --out Plan/FEATURE-X.md
+  --task-id FEATURE-X --repo /cale/catre/proiect --out Plan/FEATURE-X.md
 ```
 
-Rulează planul cu un motor real:
+**4. Rulează planul**
 
 ```bash
 node modules/ai-code-worker/dist/src/cli.js run \
-  --repo /cale/catre/proiect \
-  --plan Plan/FEATURE-X.md \
-  --engine codex \
-  --fallback-engine claude \
-  --json
+  --repo /cale/catre/proiect --plan Plan/FEATURE-X.md \
+  --engine codex --fallback-engine claude --json
 ```
 
-Înainte de o execuție autonomă, verifică raportul `doctor`, configurația generată, permisiunile motorului și comenzile gate-urilor. Un plan acceptat poate determina executarea de procese locale în repository-ul țintă.
+> [!WARNING]
+> Înainte de o execuție autonomă, verifică raportul `doctor`, configurația generată,
+> permisiunile motorului și comenzile gate-urilor. Un plan acceptat poate determina
+> executarea de procese locale în repository-ul țintă.
+
+Începe cu `--engine fake`: este determinist, nu consumă provider și verifică tot
+wiring-ul de orchestrare.
+
+## Moduri de integrare
+
+```text
+infoapex-ai init --repo <cale> --mode independent   # implicit
+infoapex-ai init --repo <cale> --mode integrated
+```
+
+În modul `independent`, modulele nu folosesc canalul comun și pot fi rulate separat.
+
+Modul `integrated` activează `.infoapex-ai/runs/<runId>/`: planner-ul publică planul
+acceptat și propunerea de rutare, worker-ul publică feedback-ul execuției, iar
+planner-ul poate genera o continuare. Canalul este bazat pe fișiere și versionat. **Nu
+este o dependență de runtime și nu creează apeluri circulare** — worker-ul poate rula
+direct cu un plan, iar planner-ul poate genera planuri fără worker.
+
+## Code map pentru Obsidian
+
+`ai-code-control` poate proiecta graful SQLite într-un vault Markdown compatibil cu
+Obsidian. Exportul este opțional și read-only față de cod.
+
+```bash
+dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- refresh --full
+dotnet run --project tools/ai-code-control/src/AiCodeControl.Cli -- obsidian-export
+```
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#7A90B4','primaryTextColor':'#7C93B5','edgeLabelBackground':'#152238','tertiaryTextColor':'#E8F2FF'}}}%%
+flowchart LR
+    CODE["📁 Cod sursă"] --> REFRESH["refresh / index-code"]
+    REFRESH --> DB[("🗃️ codegraph.sqlite")]
+    DB --> EXPORT["obsidian-export"]
+    EXPORT --> MD["📝 index.md + note"]
+    EXPORT --> CANVAS["🗺️ code-map.canvas"]
+    MD --> OBS["🔮 Obsidian"]
+    CANVAS --> OBS
+
+    classDef src fill:#0B1B33,stroke:#2F9BFF,stroke-width:2px,color:#DCEBFF
+    classDef proc fill:#0A1E2E,stroke:#7FD3FF,stroke-width:2px,color:#DFF3FF
+    classDef store fill:#2A2008,stroke:#F0B429,stroke-width:2px,color:#FFEFC8
+    classDef out fill:#082419,stroke:#3DD68C,stroke-width:2px,color:#D6FBEA
+
+    class CODE src
+    class REFRESH,EXPORT proc
+    class DB store
+    class MD,CANVAS,OBS out
+```
+
+Fluxul este o proiecție **unidirecțională**: modificările din Obsidian nu sunt aplicate
+în cod. Output-ul implicit este `docs/code-map/generated/` și este ignorat de Git.
+Ghidul complet: [docs/OBSIDIAN-CODE-MAP.md](docs/OBSIDIAN-CODE-MAP.md).
 
 ## Verificare și porți de release
 
 ```bash
 npm test
 npm run check:generic-boundary
-npm run value-gate:internal
-npm run pilot:icm-graph:internal
+npm run value-gate:internal        # matrice ICM: 20 taskuri generice, motor fake
+npm run pilot:icm-graph:internal   # + ingest, 25 query-uri hibride, drift, Obsidian
 npm run review-gate:internal
 npm run docs-gate:internal
+npm run p2:preflight               # preflight P2-A pe fixture
 ```
 
-`value-gate:internal` rulează matricea ICM cu 20 de taskuri generice planner → worker și motorul `fake`. `pilot:icm-graph:internal` adaugă ingest declarat, 25 de query-uri hibride, 10 taskuri traceable, drift și proiecția Obsidian. Ambele sunt deterministe și nu consumă provider. `value-gate:live` consumă quota contului și trebuie pornit numai explicit.
+Toate cele de mai sus sunt **deterministe și nu consumă provider**.
+`npm run value-gate:live` și `npm run p2:preflight:live` consumă quota contului și
+trebuie pornite explicit.
 
-Starea corectă a versiunii `0.1.0` este pre-release deoarece:
+## Unde se află proiectul
 
-- gate-ul intern generic trece, dar nu măsoară încă valoarea comparativă față de folosirea directă a agentului;
-- execuția live Codex a fost validată într-un task controlat;
-- gate-ul live complet cu Claude este încă blocat de execuția externă/quota disponibilă;
-- publicarea primului bundle cere încă un smoke test dintr-un ZIP extras într-un proiect curat.
+| Etapă | Conținut | Stare |
+|:--|:--|:--|
+| **P0** | Integrare și publicare ICM + Graph în modulele canonice | ✅ închis |
+| **P1** | Telemetrie de consum completă și comparabilă | ✅ implementat, sincronizat prin provenance |
+| **P2** | Gate-uri live și comparație controlată | 🟡 în lucru — P2-A preflight aterizat, P2-B comparația deschisă |
+| **P3** | Bundle ZIP, clean install, release privat | 🟡 deschis |
+| **P4** | CLI root unificat | ⚪ planificat |
+| **P5** | SDK-uri și operare avansată | ⚪ post-stabilizare |
 
-## Infoapex AI comparat cu un agent folosit direct
+De ce `0.1.0` este pre-release și nu producție:
 
-| Aspect | LLM/chat simplu | Codex/Claude CLI | Extensie IDE Codex/Claude | Infoapex AI + agenți |
+- gate-ul intern generic trece, dar nu măsoară încă valoarea comparativă față de
+  folosirea directă a agentului;
+- execuția live Codex a fost validată într-un task controlat, cu `--codex-sandbox
+  danger-full-access` explicit; invocarea implicită `workspace-write` a fost blocată de
+  politica locală de aprobare;
+- gate-ul live cu Claude rămâne blocat de execuția externă și de quota disponibilă;
+- publicarea primului bundle cere încă un smoke test dintr-un ZIP extras într-un proiect
+  curat.
+
+Detalii și dovezi: [`docs/RELEASE-GATES.md`](docs/RELEASE-GATES.md),
+[`docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md`](docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md),
+[`validation/`](validation/).
+
+## Comparat cu un agent folosit direct
+
+| Aspect | LLM/chat simplu | Codex/Claude CLI | Extensie IDE | Infoapex AI + agenți |
 |---|---|---|---|---|
 | Generare și raționament | Da | Da | Da | Folosește motoarele existente |
-| Experiență interactivă rapidă | Bună | Foarte bună | Cea mai bună în editor | Mai mult setup și structură |
-| Context din repository | Limitat/manual | Nativ | Nativ + context vizual | Index, memorie și brief explicit |
+| Experiență interactivă | Bună | Foarte bună | Cea mai bună în editor | Mai mult setup și structură |
+| Context din repository | Limitat | Nativ | Nativ + vizual | Index, memorie și brief explicit |
 | Plan executabil și versionat | De regulă nu | Depinde de sesiune | Depinde de sesiune | Da, cu scheme și lint |
-| Scope autorizat verificabil | Nu | Permisiuni ale agentului | Permisiuni ale agentului | Manifest, fișiere permise și verificare post-execuție |
+| Scope autorizat verificabil | Nu | Permisiuni ale agentului | Permisiuni ale agentului | Manifest + verificare post-execuție |
 | DAG și execuție multi-task | Nu | Agentic, în sesiune | Agentic, în sesiune | Explicit și reluabil |
 | Rutare între furnizori | Nu | Nu în aceeași execuție | Nu în aceeași execuție | Codex/Claude + fallback controlat |
 | Bugete și cicluri limitate | Foarte puțin | Configurație de sesiune | Configurație de sesiune | Politici explicite în plan |
-| Dovezi și audit | Istoric conversație | Loguri de sesiune | Istoric + diff | Evenimente, manifeste, gate-uri, commit-uri și rapoarte |
-| Cost operațional | Mic | Mic | Mic | Mai mare; justificat pentru fluxuri complexe sau reglementate |
+| Dovezi și audit | Istoric conversație | Loguri de sesiune | Istoric + diff | Evenimente, manifeste, gate-uri, rapoarte |
+| Cost operațional | Mic | Mic | Mic | Mai mare; justificat pentru fluxuri complexe |
 
-[Codex CLI](https://learn.chatgpt.com/docs/codex/cli) inspectează repository-ul, editează fișiere și rulează comenzi din terminal, iar [extensia Codex pentru IDE](https://learn.chatgpt.com/docs/codex/ide) adaugă contextul editorului și review-ul vizual al modificărilor. În mod similar, [Claude Code](https://code.claude.com/docs/en/how-claude-code-works) are propriul loop agentic și acces la proiect și terminal, iar [integrările sale IDE](https://code.claude.com/docs/en/ide-integrations) oferă diff-uri inline și controlul permisiunilor.
+[Codex CLI](https://learn.chatgpt.com/docs/codex/cli) și
+[Claude Code](https://code.claude.com/docs/en/how-claude-code-works) au propriile lor
+bucle agentice și acces la proiect și terminal, iar
+[integrările](https://code.claude.com/docs/en/ide-integrations)
+[IDE](https://learn.chatgpt.com/docs/codex/ide) adaugă diff-uri inline și control de
+permisiuni.
 
-Prin urmare, avantajul Infoapex AI nu este „mai multă inteligență”. Avantajul este **procesul din jurul inteligenței**: aceeași cerere poate fi transformată într-un flux controlat, verificabil, reluabil și mai puțin dependent de un singur provider sau de memoria unei sesiuni.
-
-Folosește direct CLI-ul sau extensia IDE pentru explorare, depanare și schimbări mici. Infoapex AI devine util când ai mai multe task-uri dependente, reguli stricte de scope, bugete, handoff între agenți, cerințe de audit sau nevoia de a reproduce procesul într-o echipă.
+**Folosește direct CLI-ul sau extensia** pentru explorare, depanare și schimbări mici.
+**Infoapex AI devine util** când ai task-uri dependente, reguli stricte de scope, bugete,
+handoff între agenți, cerințe de audit sau nevoia de a reproduce procesul într-o echipă.
 
 ## Limite cunoscute
 
-- Nu înlocuiește Codex, Claude sau un alt motor de raționament.
+- Nu înlocuiește Codex, Claude sau alt motor de raționament.
 - Nu garantează calitatea unei cerințe ambigue; criteriile de acceptare rămân esențiale.
-- Motorul `fake` verifică orchestration wiring, nu calitatea unui provider real.
-- Worktree-urile și verificarea scope-ului nu echivalează singure cu un sandbox de sistem de operare.
+- Motorul `fake` verifică wiring-ul de orchestrare, nu calitatea unui provider real.
+- Worktree-urile și verificarea scope-ului **nu echivalează singure cu un sandbox de
+  sistem de operare**.
 - Configurarea greșită a comenzilor de validare poate executa procese locale nedorite.
-- Interfața root `infoapex-ai` este în prezent un bootstrap subțire, nu încă un CLI unificat.
-- Integrarea live, securizarea distribuției și măsurarea A/B față de agenții direcți necesită validare suplimentară înaintea unui release de producție.
+- Interfața root `infoapex-ai` este un bootstrap subțire, nu un CLI unificat.
+- Integrarea live, securizarea distribuției și măsurarea A/B față de agenții direcți
+  necesită validare suplimentară înaintea unui release de producție.
 
 ## Direcții de dezvoltare
 
 - CLI unificat pentru `plan`, `run`, `review`, `docs`, `status` și `resume`;
-- backend real de izolare la nivel de sistem/VM/container, cu capabilități probate, nu doar declarate;
+- backend real de izolare la nivel de sistem/VM/container, cu capabilități probate;
 - validarea strictă a fiecărui mesaj la toate granițele dintre procese;
-- teste Windows și Linux, smoke test automat al bundle-ului ZIP și artefacte semnate;
+- teste Windows și Linux, smoke test automat al bundle-ului ZIP, artefacte semnate;
 - benchmark A/B pe aceleași task-uri: direct Codex/Claude versus flux orchestrat;
 - adaptoare pentru motoare suplimentare fără a cupla contractele de un provider;
 - UI local pentru DAG, bugete, evenimente, dovezi și aprobări umane;
@@ -316,44 +440,53 @@ Folosește direct CLI-ul sau extensia IDE pentru explorare, depanare și schimb�
 
 ```text
 infoapex-ai/
-├── src/                         # CLI-ul root infoapex-ai
+├── src/                         # CLI-ul root: init, status, handoff
 ├── schemas/                     # contractele root de integrare
 ├── modules/
-│   ├── ai-code-planner/
-│   ├── ai-code-worker/
-│   ├── ai-code-review/
-│   ├── ai-code-docs/
-│   └── ai-code-control/
-├── scripts/                     # setup, build și gate-uri integrate
-│   └── splash/                  # generator design-time pentru assets (opțional)
-├── validation/                  # probe și rezultate de validare live/internă
+│   ├── ai-code-planner/         # plan, lint, rutare logică
+│   ├── ai-code-worker/          # execuție, gate-uri, dovezi, commit
+│   ├── ai-code-review/          # review independent, read-only
+│   ├── ai-code-docs/            # documentație prin ciclu gated
+│   └── ai-code-control/         # memorie, graf de cod, scope guard, MCP
+├── scripts/
+│   ├── *.mjs                    # setup, build și gate-uri integrate
+│   └── splash/                  # generator design-time pentru assets
+├── validation/                  # probe și rezultate de validare
 ├── docs/
 │   ├── assets/                  # infografic, logo și sursele lor
-│   └── ...                      # distribuție, CI și release gates
+│   ├── adr/                     # decizii de arhitectură
+│   ├── plans/                   # roadmap P0–P5
+│   └── ...                      # arhitectură, CI, release gates
 └── tests/                       # testele bundle-ului root
 ```
 
 ## Identitate vizuală
 
 Infograficul de mai sus și assets-urile de logo sunt în [`docs/assets/`](docs/assets/),
-împreună cu [nota lor tehnică](docs/assets/README.md). Se regenerează cu:
+cu [nota lor tehnică](docs/assets/README.md). Se regenerează cu:
 
 ```bash
 npm run generate:splash
 ```
 
 Generatorul este **doar design-time** — nimic din bundle-ul livrat nu depinde de el.
-Cere Python cu `fonttools`, `Pillow` și `numpy`, plus Chrome sau Edge pentru
-rasterizare deterministă. Textul din SVG este convertit în contururi, deci imaginile
-nu depind de fonturi instalate; Chromium și Edge le randează identic, iar PNG-urile
-sunt rasterizate din exact aceleași SVG-uri.
+Textul din SVG este convertit în contururi, deci imaginile nu depind de fonturi
+instalate; Chromium și Edge le randează identic, iar PNG-urile sunt rasterizate din
+exact aceleași SVG-uri.
 
 ## Securitate și contribuții
 
-Nu introduce în planuri, rapoarte, fixture-uri sau memoria indexată secrete, token-uri, credențiale, date personale ori conversații brute. Rulează mai întâi motorul `fake`, inspectează planul și folosește cel mai restrictiv profil compatibil cu task-ul.
+Nu introduce în planuri, rapoarte, fixture-uri sau memoria indexată secrete, token-uri,
+credențiale, date personale ori conversații brute.
 
-Orice contribuție ar trebui să păstreze compatibilitatea contractelor sau să introducă o versiune nouă de schemă, să adauge teste negative și să actualizeze documentația și porțile de release.
+Rulează mai întâi motorul `fake`, inspectează planul și folosește cel mai restrictiv
+profil compatibil cu task-ul.
+
+Orice contribuție ar trebui să păstreze compatibilitatea contractelor sau să introducă o
+versiune nouă de schemă, să adauge teste negative și să actualizeze documentația și
+porțile de release.
 
 ## Licență
 
-Proiect proprietar. Verifică termenii de distribuție ai proprietarului și fișierele `LICENSE` ale modulelor înainte de redistribuire.
+Proiect proprietar. Verifică termenii de distribuție ai proprietarului și fișierele
+`LICENSE` ale modulelor înainte de redistribuire.
