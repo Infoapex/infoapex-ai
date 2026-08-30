@@ -811,7 +811,7 @@ function codexPrompt(input: {
       runId: input.snapshot.runId,
       taskId: input.taskId,
       workerInstructions: [
-        "You are executing inside ai-code-worker, not the interactive consumer project coding agent.",
+        "You are executing inside ai-code-worker, not an interactive coding agent session.",
         "Treat this JSON task envelope and its allowedPaths/forbiddenPaths as the active task scope.",
         "Do not broaden scope, push, deploy, or edit files outside allowedPaths.",
         "First read the required inputs and make the actual file changes needed to satisfy every acceptance criterion.",

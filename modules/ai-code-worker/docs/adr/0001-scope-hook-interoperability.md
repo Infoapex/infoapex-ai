@@ -10,7 +10,7 @@
 
 `ai-code-worker` trebuie să creeze commituri numai după ce verifică manifestul înghețat, diff-ul real, căile permise și task gates. Unele repository-uri consumatoare au deja propriile hook-uri Git și propriul scope guard.
 
-consumer project are un hook `.git/hooks/pre-commit` instalat de `ai-code-control`. Hook-ul rulează `verify-changed-files` folosind `.ai-code-control/reports/refactor/current-plan.json`. Un task worker executat într-un worktree va rula același hook, dar trebuie să îi prezinte scope-ul task-ului respectiv, nu manifestul activ din checkout-ul principal.
+Un repository consumator poate avea un hook `.git/hooks/pre-commit` instalat de `ai-code-control`. Hook-ul rulează `verify-changed-files` folosind `.ai-code-control/reports/refactor/current-plan.json`. Un task worker executat într-un worktree va rula același hook, dar trebuie să îi prezinte scope-ul task-ului respectiv, nu manifestul activ din checkout-ul principal.
 
 [Git worktree](https://git-scm.com/docs/git-worktree.html) păstrează componentele comune, inclusiv configurația și hook-urile implicite, în Git common directory partajat între worktree-uri. [Documentația Git hooks](https://git-scm.com/docs/githooks.html) precizează că hook-urile de commit rulează din root-ul worktree-ului, iar `pre-commit` rulează înainte ca mesajul commitului să fie pregătit și nu primește calea mesajului. Prin urmare, un trailer `run-id/task-id` nu poate autoriza verificarea pre-commit.
 
@@ -188,5 +188,5 @@ Respins: scope verification internă este obligatorie, dar nu înlocuiește cont
 ## Implementare etapizată
 
 - Faza 0: detectarea hook-urilor, modelul de scope authority, fake provider și acceptance tests 1–8;
-- Faza 1: slice-ul minim `ai-code-control` necesar pilotului consumer project;
+- Faza 1: slice-ul minim `ai-code-control` necesar pilotului cu proiectul consumator;
 - Faza 4: providerul complet health/brief/impact/scope/refresh și exportul de handoff.

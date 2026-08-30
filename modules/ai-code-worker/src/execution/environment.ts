@@ -6,6 +6,7 @@ export type EnvironmentCapability =
   | "filesystem-restricted"
   | "worktree-write-mount"
   | "network-deny-repository-processes"
+  | "network-provider-only-adapter-control-plane"
   | "environment-scrubbed"
   | "process-limits"
   | "output-limits"
@@ -64,6 +65,11 @@ export class LocalIsolatedExecutionEnvironment implements ExecutionEnvironment {
     if (view.network.repositoryProcesses === "deny") {
       capabilities.add("network-deny-repository-processes");
       warnings.push("Network deny is policy-visible, but the local backend cannot prove host-level network isolation.");
+    }
+
+    if (view.network.adapterControlPlane === "provider-only") {
+      capabilities.add("network-provider-only-adapter-control-plane");
+      warnings.push("Adapter control-plane restriction is policy-visible, but the local backend cannot prove host-level network isolation.");
     }
 
     const missingCapabilities = requiredCapabilities.filter((capability) => !capabilities.has(capability));
@@ -135,6 +141,10 @@ export class FakeExecutionEnvironment implements ExecutionEnvironment {
       capabilities.add("network-deny-repository-processes");
     }
 
+    if (view.network.adapterControlPlane === "provider-only") {
+      capabilities.add("network-provider-only-adapter-control-plane");
+    }
+
     if (!view.environment.inheritByDefault) {
       capabilities.add("environment-scrubbed");
     }
@@ -169,6 +179,12 @@ export class FakeExecutionEnvironment implements ExecutionEnvironment {
   }
 }
 
+// network-provider-only-adapter-control-plane is intentionally NOT required here.
+// adapterControlPlane has been a required schema field since execution-environment
+// v1 but was never read by either backend, so no existing profile or consumer has
+// ever had to satisfy it. Adding it to requiredCapabilities now would silently flip
+// `supported` from true to false for those profiles. Promote it once policy owners
+// decide that is the intended compatibility break.
 const requiredCapabilities: readonly EnvironmentCapability[] = [
   "filesystem-restricted",
   "worktree-write-mount",
@@ -192,6 +208,7 @@ interface EnvironmentProfileView {
   };
   readonly network: {
     readonly repositoryProcesses: "deny" | "allowlist";
+    readonly adapterControlPlane: "provider-only" | "allowlist" | "deny";
   };
   readonly environment: {
     readonly inheritByDefault: boolean;

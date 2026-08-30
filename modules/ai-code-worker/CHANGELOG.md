@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Report `network.adapterControlPlane` in the execution capability doctor. The field
+  has been required by `execution-environment.schema.json` since it was introduced,
+  but neither backend read it, so a profile setting it to `provider-only` reported no
+  corresponding capability while its sibling `repositoryProcesses` did. The new
+  capability, `network-provider-only-adapter-control-plane`, is intentionally not
+  added to `requiredCapabilities`: doing so would silently flip `supported` from
+  `true` to `false` for every existing profile, since none has ever had to satisfy a
+  check that did not exist. That is a compatibility decision for policy owners, not a
+  bug fix to make silently.
 - Amend the implementation plan to v1.2 with explicit process isolation, instruction trust, immutable run authorization, dependency snapshots, streaming engine events, and minimum recovery before pilot.
 - Accept ADR-0001 and add ADR-0002 through ADR-0006.
 - Add public schemas for execution environments, run authorization, task input snapshots, and normalized engine events.

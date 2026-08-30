@@ -52,7 +52,7 @@ Separarea dintre `ai-code-worker/` și `.ai-code-worker/` este intenționată:
 - `.ai-code-worker/` conține numai configurația versionată a proiectului, quality gates și politicile locale;
 - starea operațională și artefactele brute ale rulărilor sunt păstrate într-un state root local, în afara repository-ului;
 - actualizarea submodulului nu suprascrie configurația proiectului;
-- același worker poate fi instalat în consumer project sau în orice alt repository;
+- același worker poate fi instalat într-un repository consumator sau în orice alt repository;
 - în canalul submodule, repository-ul produsului fixează explicit versiunea worker-ului prin commitul submodulului;
 - într-un canal extern, repository-ul păstrează numai `.ai-code-worker/` și versiunea CLI cerută.
 
@@ -978,7 +978,7 @@ Livrabile:
 - compatibility profile fail-closed pentru adaptor;
 - lease, heartbeat, idempotency și recovery minim după process kill;
 - anulare sigură a process tree-urilor și cleanup conservator;
-- bridge minimal de hook pentru pilotul consumer project, testat separat de core provider;
+- bridge minimal de hook pentru pilotul cu proiectul consumator, testat separat de core provider;
 - raport `DONE/BLOCKED`;
 - installer și skill Codex minimal.
 
@@ -986,7 +986,7 @@ Criteriu tehnic de ieșire: un plan mic este implementat end-to-end într-un rep
 
 ### Pilot tehnic înaintea Fazei 2
 
-După criteriul tehnic, worker-ul execută trei task-uri reale consumer project cu risc mic sau mediu, selectate la momentul pilotului. Acesta este un smoke/value gate preliminar și nu demonstrează singur economia produsului.
+După criteriul tehnic, worker-ul execută trei task-uri reale din proiectul consumator, cu risc mic sau mediu, selectate la momentul pilotului. Acesta este un smoke/value gate preliminar și nu demonstrează singur economia produsului.
 
 Înainte de primul task se aprobă `.ai-code-worker/pilot-baseline.json`, care fixează sursa baseline-ului și pragurile fără modificare post-hoc:
 
@@ -1044,7 +1044,7 @@ Criteriu de ieșire: aceeași suită E2E rulează cu Codex și Claude, iar task-
 
 Se execută minimum opt task-uri și se țintește un eșantion de zece: cel puțin trei backend, trei frontend, două full-stack, unul cu migrare și unul care trebuie să ajungă legitim `BLOCKED`; categoriile se pot suprapune. Baseline-ul și pragurile sunt înghețate înaintea eșantionului. Un `BLOCKED` așteptat validează policy-ul, dar nu este numărat ca `DONE`. Rezultatul folosește aceleași verdicturi `PASS`, `FAIL`, `REVIEW_REQUIRED`; numai `PASS` permite afirmații de valoare și release readiness.
 
-**Status**: pe pauză, condiționat de ridicarea îngheței de review manual de pe consumer project (repo consumator țintă pentru task-urile reale ale eșantionului). Cele 5 itemuri de robustețe/design descoperite prin dogfooding real în Faza 2 (verificare comportamentală a capacităților CLI, paralelism real pentru motoarele reale, gate-uri de task cu build/test real, backend `isolated` real, configurare adaptor din CLI) au fost închise înainte de Faza 3; vezi [todo.md](../todo.md).
+**Status**: pe pauză, condiționat de ridicarea îngheței de review manual de pe repo-ul consumator țintă pentru task-urile reale ale eșantionului. Cele 5 itemuri de robustețe/design descoperite prin dogfooding real în Faza 2 (verificare comportamentală a capacităților CLI, paralelism real pentru motoarele reale, gate-uri de task cu build/test real, backend `isolated` real, configurare adaptor din CLI) au fost închise înainte de Faza 3; vezi [todo.md](../todo.md).
 
 ### Faza 3 — repair, replanning și hardening avansat
 
@@ -1244,7 +1244,7 @@ Prima implementare nu trebuie să înceapă cu toți agenții. Ordinea recomanda
 11. usage budgets, failure classifier și recovery minim;
 12. integrare + global gates;
 13. reviewer read-only și criterion coverage;
-14. pilot tehnic consumer project;
+14. pilot tehnic cu proiectul consumator;
 15. Claude adapter și DAG paralel limitat;
 16. gate de valoare extins;
 17. repair/replanning avansat;

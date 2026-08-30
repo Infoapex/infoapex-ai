@@ -642,7 +642,7 @@ export function writeFakeClaudeCli(
     readonly wrapResultInProse?: boolean;
     /** Wraps the JSON result in prose that itself contains stray, non-JSON braces
      *  (e.g. a markdown code span like "{ promoCode }"), simulating the failure mode
-     *  found on a live consumer project run where a naive first-{-to-last-} scan grabbed the
+     *  found on a live consumer-project run where a naive first-{-to-last-} scan grabbed the
      *  wrong span. */
     readonly wrapResultWithStrayBraces?: boolean;
     /** Overrides the fake CLI's "usage" object (input_tokens/cache_creation_input_tokens/

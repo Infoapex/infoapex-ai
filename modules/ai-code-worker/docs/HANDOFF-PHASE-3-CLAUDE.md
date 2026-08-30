@@ -119,6 +119,6 @@ Add focused tests for every Phase 3 feature implemented. If real Codex/Claude ru
 
 ## Current product status
 
-The extended consumer project value gate remains a product validation gate before stable release claims. It is separate from Phase 3 engineering work and is currently documented as paused/conditional on consumer project review availability.
+The extended consumer-project value gate remains a product validation gate before stable release claims. It is separate from Phase 3 engineering work and is currently documented as paused/conditional on consumer-project review availability.
 
 Phase 3 can begin now on `main`.

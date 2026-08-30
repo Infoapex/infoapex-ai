@@ -103,7 +103,7 @@ Măsurat înainte de a construi: `runClaude`/`runCodex` sunt funcții monolitice
 linii, cu dispatch-ul per-task împletit cu recovery/checkpoint/numerotare de evenimente
 — nu există o funcție „rulează un singur task" reutilizabilă direct pentru un
 `RepairTask`. Extragerea completă e o schimbare mare pe cod cu 317+ teste, folosit deja
-de consumer project și `ai-code-planner`. Urmat exact secvențierea proprie din
+de repository-ul consumator și `ai-code-planner`. Urmat exact secvențierea proprie din
 `HANDOFF-PHASE-3-CLAUDE.md`: „doar după ce acoperirea deterministă (fake) e verde, se
 trece la adaptoarele reale."
 
@@ -286,7 +286,7 @@ static în prompt, fără să dea motorului acces direct la MCP). Cere decizie d
 
 **2026-08-16, propunere de arhitectură scrisă** (nu implementată încă): userul a cerut
 un plan complet de simbioză `ai-code-planner` ↔ `ai-code-worker` ↔ `ai-code-control`,
-pornind exact de la acest item. Document salvat în repo-ul consumer project la
+pornind exact de la acest item. Document salvat în repo-ul consumator la
 `Plan/AICW-ACC-Symbiosis/PLAN.md`, scris pentru audit încrucișat Claude+Codex înainte
 de orice cod. Propune 4 mecanisme independente (brief per task, memory-add-task-summary
 automat per task, run-validation ca gate, calea hook-urilor Claude Code ca alternativă)
@@ -301,7 +301,7 @@ o condiție de produs pentru adopția largă, dar cele 5 itemuri tehnice de robu
 descoperite prin dogfooding au fost închise în cod și teste.
 
 Aceste 5 itemi sunt programați **după** „Gate de valoare extins" (în prezent pe pauză,
-condiționat de ridicarea îngheței de review manual de pe consumer project) și **înainte** de
+condiționat de ridicarea îngheței de review manual de pe repo-ul consumator) și **înainte** de
 Faza 3 (repair, replanning, hardening avansat) din `docs/IMPLEMENTATION-PLAN.md`.
 
 Motivul secvențierii: gate-ul de valoare extins validează dacă worker-ul, așa cum e

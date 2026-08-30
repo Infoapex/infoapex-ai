@@ -16,6 +16,19 @@ describe("fake execution environment", () => {
     assert.equal(report.profileSha256, sha256(canonicalJson(profile as JsonValue)));
     assert.equal(report.missingCapabilities.length, 0);
     assert.ok(report.capabilities.includes("network-deny-repository-processes"));
+    assert.ok(report.capabilities.includes("network-provider-only-adapter-control-plane"));
+  });
+
+  it("does not report the adapter control-plane capability when the profile allows it", () => {
+    // adapterControlPlane has been a required schema field but was never read by
+    // either backend until now. This locks in that the new check actually branches
+    // on the profile value instead of always reporting the capability as present.
+    const profile = readJson("templates/project/.ai-code-worker/execution-environment.example.json") as Record<string, unknown>;
+    const network = profile.network as Record<string, unknown>;
+    const openProfile = { ...profile, network: { ...network, adapterControlPlane: "allowlist" } };
+    const report = new FakeExecutionEnvironment().doctor(openProfile);
+
+    assert.ok(!report.capabilities.includes("network-provider-only-adapter-control-plane"));
   });
 
   it("fails closed when isolated filesystem restrictions are missing", () => {
