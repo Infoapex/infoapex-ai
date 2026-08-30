@@ -8,3 +8,9 @@ dist/
 
 # Generated Obsidian code-map projection; source code and SQLite remain canonical.
 docs/code-map/generated/
+
+# Font cache for the splash generator; refetched by scripts/splash/build.py.
+scripts/splash/fonts/
+
+# Python bytecode from the design-time splash generator.
+__pycache__/

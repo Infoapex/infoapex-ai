@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="docs/assets/infoapex-ai-splash-architecture.png"
+       alt="InfoApex AI — control plane local pentru agenți de programare: obiectiv, planner, scope, DAG de execuție, poartă de verificare și motoarele Codex CLI / Claude Code"
+       width="100%">
+</p>
+
 # Infoapex AI
 
 **Un strat local de planificare, guvernanță și verificare pentru agenți de programare precum Codex CLI și Claude Code.**
@@ -38,35 +44,38 @@ Infoapex AI codifică aceste întrebări în contracte, manifeste și stări ver
 
 ```mermaid
 flowchart LR
-    U[Obiectivul utilizatorului] --> P[ai-code-planner]
-    C[ai-code-control<br/>memorie + index de cod] --> P
-    P -->|plan validat + DAG + rutare logică| W[ai-code-worker]
-    C --> W
-    W -->|task-uri izolate în worktree| E{Motor local}
-    E --> CX[Codex CLI]
-    E --> CL[Claude Code]
-    E --> FK[Fake engine<br/>teste deterministe]
-    CX --> G[Scope guard + gate-uri + dovezi]
-    CL --> G
-    FK --> G
-    G --> R[ai-code-review]
-    C --> R
-    R -->|PASS / FAIL / BLOCKED| O[Raport + commit-uri + evenimente]
-    D[ai-code-docs] --> P
-    D --> W
-    D --> R
+    U[Obiectiv<br/>prompt + criterii] --> P[ai-code-planner<br/>descompune și rutează]
+    P -->|plan validat, DAG,<br/>profil logic per task| W[ai-code-worker<br/>execută și dovedește]
+    W -.->|replan: dependență nouă<br/>sau task incomplet| P
+    W --> E{{Motoare LLM<br/>codex · claude · fake}}
+    E --> W
+    W -->|scope guard, gate-uri,<br/>dovezi, commit| R[ai-code-review<br/>read-only, fail-closed]
+    R -->|PASS / FAIL / BLOCKED| D[ai-code-docs<br/>ciclu propriu, gated]
+    D --> T[Țintă<br/>cod verificat + dovezi]
+    C[ai-code-control<br/>advisory, opțional] -.-> P
+    C -.-> W
+    C -.-> R
+    C -.-> D
 ```
 
 Modulele nu își importă reciproc codul sursă. Ele comunică prin CLI, JSON, fișiere și scheme versionate, ceea ce permite folosirea și testarea lor independentă.
 
+Trei lucruri din diagramă sunt intenționate și merită citite explicit:
+
+- **Un singur punct de invocare.** `ai-code-worker` este singurul component care poate invoca un provider care scrie. `ai-code-review` și `ai-code-docs` deleagă acolo. Centralizarea este chiar mecanismul de guvernanță: un singur loc unde se aplică scope, bugete, gate-uri și dovezi.
+- **Planner-ul rutează logic, nu alege modelul.** Emite profile de tip `mechanical-fast-v1` sau `balanced-default-v1`; worker-ul le rezolvă în motor și model concret din politica locală de rutare și le îngheață în manifest. Planul rămâne portabil și neutru față de furnizor.
+- **Review-ul nu repară.** Providerul de review este read-only și nu primește niciodată capacitate de reparare. Emite un verdict; remedierea este un ciclu nou, autorizat. Repararea automată există, dar înăuntrul worker-ului, în cicluri mărginite, înainte de review.
+
 | Modul | Rol real |
 |---|---|
 | `infoapex-ai` | Bootstrap minim pentru modul independent/integrat, stare și handoff-uri. În versiunea curentă nu este încă o interfață unică pentru toate comenzile. |
-| `ai-code-planner` | Transformă un prompt într-un plan structurat, îl validează, îl lint-uiește, propune rutarea logică și îl compilează în formatul worker-ului. Nu implementează singur codul. |
-| `ai-code-worker` | Îngheață manifestul autorizat, construiește DAG-ul, rulează task-urile prin motoarele `codex`, `claude` sau `fake`, aplică gate-uri, bugete, review și cicluri limitate de reparare. |
-| `ai-code-review` | Orchestrare read-only pentru verificarea criteriilor și a diferențelor dintre commit-uri. |
-| `ai-code-docs` | Orchestrare pentru documentație generată prin planner, worker și review. |
-| `ai-code-control` | CLI și server MCP în .NET pentru memorie, căutare full-text, indexarea simbolurilor, analiza impactului și controlul scope-ului. |
+| `ai-code-planner` | Transformă un prompt într-un plan structurat, îl validează, îl lint-uiește, propune rutarea logică și îl compilează în formatul worker-ului. Nu scrie cod și nu produce manifestul final înghețat. |
+| `ai-code-worker` | Îngheață manifestul autorizat, construiește DAG-ul, rezolvă profilul logic în motor/model concret, rulează task-urile prin `codex`, `claude` sau `fake`, aplică gate-uri, bugete și cicluri limitate de reparare. Singurul care invocă un provider care scrie. |
+| `ai-code-review` | Orchestrare read-only pentru verificarea criteriilor și a diferențelor dintre commit-uri. `run` este fail-closed: fără validare de la planner, context de la control, rezultat de la worker și review valid de schemă, verdictul nu poate fi `PASS`. |
+| `ai-code-docs` | Orchestrare pentru documentație. `generate` rulează propriul ciclu planner → worker → review și cade dacă oricare pas nu trece. |
+| `ai-code-control` | CLI și server MCP în .NET pentru memorie, căutare full-text, indexarea simbolurilor, analiza impactului și controlul scope-ului. **Advisory și opțional** — absența lui reduce contextul, nu blochează un run de planner sau worker. |
+
+De ce contează rutarea per task: o sesiune de agent obișnuită folosește același model scump și pentru un README, și pentru o migrare de bază de date. Planner-ul alocă fiecărui subtask cel mai ieftin model care îl poate rezolva corect și păstrează modelele capabile pentru contracte, migrări și review. Câștigul nu este „cheltuiește mai puțin", ci **să îți permiți modelul capabil exact unde contează**, pentru că nu a fost ars pe fleacuri.
 
 ## Fluxul unei execuții
 
@@ -93,12 +102,17 @@ sequenceDiagram
         Worker->>Git: commit cu trailere de trasabilitate
         Worker->>Review: criterii + diff + dovezi
         Review-->>User: PASS / FAIL / BLOCKED
+    else dependență lipsă sau task incomplet
+        Worker-->>Planner: raport de execuție (mod integrated)
+        Planner-->>Worker: replan determinist
     else abatere sau eroare
         Worker-->>User: BLOCKED + constatări + stare reluabilă
     end
 ```
 
 Worker-ul păstrează starea în afara repository-ului țintă, produce evenimente și rapoarte și poate relua fluxuri întrerupte. Izolarea prin worktree, verificarea scope-ului și sandbox-ul motorului sunt straturi diferite; izolarea reală la nivel de sistem de operare depinde de backend-ul și configurația folosite.
+
+Bucla `replan` este opt-in și bazată pe fișiere: se activează cu `--mode integrated` și folosește canalul comun `.infoapex-ai/runs/<runId>/`. Nu este o dependență de runtime și nu creează apeluri circulare — worker-ul poate rula direct cu un plan, iar planner-ul poate genera planuri fără worker.
 
 ## Capabilități principale
 
@@ -108,6 +122,7 @@ Worker-ul păstrează starea în afara repository-ului țintă, produce evenimen
 - worktree separat pentru fiecare task de scriere;
 - rutare logică spre Codex sau Claude și fallback pentru erori eligibile;
 - limite de timp, invocări, tokeni, cost estimat și cicluri de reparare;
+- telemetrie de consum normalizată, tratată ca dovadă, nu ca estimare: câmpurile necunoscute rămân `null` și nu devin zero, iar fiecare raport primește un verdict separat (`complete`, `partial`, `unavailable`) — doar un raport complet poate susține o comparație economică;
 - gate-uri globale și pe task, cu dovezi păstrate în raport;
 - review independent și verificarea criteriilor de acceptare;
 - jurnal de evenimente, recuperare după întrerupere și export de handoff redactat;
@@ -310,10 +325,28 @@ infoapex-ai/
 │   ├── ai-code-docs/
 │   └── ai-code-control/
 ├── scripts/                     # setup, build și gate-uri integrate
+│   └── splash/                  # generator design-time pentru assets (opțional)
 ├── validation/                  # probe și rezultate de validare live/internă
-├── docs/                        # distribuție, CI și release gates
+├── docs/
+│   ├── assets/                  # infografic, logo și sursele lor
+│   └── ...                      # distribuție, CI și release gates
 └── tests/                       # testele bundle-ului root
 ```
+
+## Identitate vizuală
+
+Infograficul de mai sus și assets-urile de logo sunt în [`docs/assets/`](docs/assets/),
+împreună cu [nota lor tehnică](docs/assets/README.md). Se regenerează cu:
+
+```bash
+npm run generate:splash
+```
+
+Generatorul este **doar design-time** — nimic din bundle-ul livrat nu depinde de el.
+Cere Python cu `fonttools`, `Pillow` și `numpy`, plus Chrome sau Edge pentru
+rasterizare deterministă. Textul din SVG este convertit în contururi, deci imaginile
+nu depind de fonturi instalate; Chromium și Edge le randează identic, iar PNG-urile
+sunt rasterizate din exact aceleași SVG-uri.
 
 ## Securitate și contribuții
 
