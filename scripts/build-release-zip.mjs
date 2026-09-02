@@ -16,7 +16,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ref = option("--ref") ?? "HEAD";
 const outputPath = resolve(root, option("--out") ?? join("dist-release", "pending.zip"));
 
-const commit = git(["rev-parse", ref]).trim();
+// `^{commit}` dereferences an annotated tag to the commit it points at - without it,
+// `git rev-parse <annotated-tag>` returns the tag OBJECT's own sha, not the commit's
+// (found while cutting v0.1.0: the manifest recorded the tag object, not the commit).
+const commit = git(["rev-parse", `${ref}^{commit}`]).trim();
 const isDirty = git(["status", "--porcelain"]).trim().length > 0;
 if (ref === "HEAD" && isDirty && !process.argv.includes("--allow-dirty")) {
   console.error(JSON.stringify({
