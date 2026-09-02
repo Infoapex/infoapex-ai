@@ -1,7 +1,7 @@
 {
   "name": "@infoapex/infoapex-ai",
   "version": "0.1.0",
-  "private": false,
+  "private": true,
   "type": "module",
   "bin": {
     "infoapex-ai": "dist/src/cli.js"
