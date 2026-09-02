@@ -26,7 +26,14 @@ before distributing or relying on it for anything beyond controlled internal use
   leak in) with a sha256 checksum and manifest; `npm run release:smoke-test` extracts
   it into a clean directory and verifies `setup` → `build` → `test` → all four
   internal gates → the root installer in both modes, all from scratch. Passing as of
-  this release.
+  this release, in CI, on both Windows and Linux.
+- Three real, Windows-specific path-resolution bugs found and fixed by that CI matrix
+  the day it first ran: `git rev-parse --show-toplevel` and Node's own path handling
+  can disagree on a directory's canonical form (short 8.3 alias vs long form) on
+  GitHub Actions' `windows-latest` runner. Fixed at the source
+  (`fs.realpathSync.native`) in `ai-code-worker`'s `gitPreflight`/`resolveStateRoot`
+  and in every gate/pilot script's fixture-root creation — see
+  `docs/RELEASE-GATES.md` for the full diagnostic trail.
 
 ### Known limits
 
@@ -53,9 +60,8 @@ before distributing or relying on it for anything beyond controlled internal use
 Tracked in detail in [`docs/RELEASE-GATES.md`](docs/RELEASE-GATES.md) and
 [`todo.md`](todo.md). As of this release:
 
-- **CI**: the Windows+Linux matrix and the in-CI release smoke test were added this
-  release but have not yet been observed green on a real CI run (verification
-  requires pushing to the shared repository, not yet done as of this note).
+- **CI**: the Windows+Linux matrix and the in-CI release smoke test are green as of
+  this release (confirmed on a real run after fixing the three path bugs above).
 - **`GRAPH-06`** (parallel independent reviewers) remains disabled pending its own
   preregistered A/B experiment and explicit authorization; the sequential baseline it
   depends on now exists (P2-B), but that does not itself authorize the experiment.

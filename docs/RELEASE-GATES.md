@@ -122,3 +122,33 @@ CI matrix (today Linux-only, single job), a root `LICENSE` file, a
 `status`-exposed report of pinned module versions, release notes, and the tag/publish
 step itself - none of these were in this session's scope and none require an external
 or hard-to-reverse action to close the ones that are purely local.
+
+P3 update, same day (remaining local steps): added root `LICENSE` (mirrors every
+vendored module's existing proprietary text, no new terms invented), converted
+`.github/workflows/ci.yml`'s single `ubuntu-latest` job into a
+`[ubuntu-latest, windows-latest]` matrix with the release smoke test as a CI step,
+extended `infoapex-ai status` to report every vendored module's pinned upstream
+commit from `modules/provenance.json`, and wrote `RELEASE-NOTES.md` for v0.1.0.
+
+**Windows CI, same day: three real path-resolution bugs found and fixed, not
+pre-existing flakiness papered over.** The matrix's first real run failed 5
+`ai-code-worker` tests plus, after those were fixed, `docs-gate:internal` - all on
+`windows-latest` only, never on Linux, and never reproducible on a local Windows
+dev machine. Root cause, confirmed directly from CI diagnostics (not guessed): on
+GitHub Actions' `windows-latest` runner, `os.tmpdir()` returns the short (8.3 alias)
+form of the runner's home directory (`C:\Users\RUNNER~1\...`), while
+`git rev-parse --show-toplevel` (used by `gitPreflight()`) resolves the identical
+real directory to its long form (`C:/Users/runneradmin/...`). Every later string
+comparison between the two (`state-root.ts`'s `repositoryHash`, `compile.ts`'s
+`isPathInside(worktreeRoot, planAbsolutePath)`) silently diverged. Two wrong turns
+on the way to the real fix, kept here rather than erased: (1) a sync-root/OneDrive
+env-var hypothesis, disproven by direct local reproduction attempts; (2) plain
+`fs.realpathSync`, verified locally (via a deliberately long directory name and its
+COM-derived short alias) to NOT expand 8.3 short names on Windows at all - only
+`fs.realpathSync.native` does. Fixed at the source with `realpathSync.native` in
+`git/preflight.ts` and `state/state-root.ts`, plus in every gate/pilot script that
+creates a fixture repository under `tmpdir()` (`docs-gate.mjs`, `review-gate.mjs`,
+`value-gate.mjs`, `icm-graph-pilot.mjs`, `p2-live-preflight.mjs`,
+`p2-b-live-pilot.mjs`, `release-smoke-test.mjs`) - each of those calls a *different*
+module's CLI, which does its own path resolution independent of `ai-code-worker`'s
+fix. **CI is now green on both platforms**, including the in-CI release smoke test.
