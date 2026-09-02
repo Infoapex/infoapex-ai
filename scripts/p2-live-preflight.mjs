@@ -25,6 +25,7 @@ const experiment = JSON.parse(readFileSync(experimentPath, "utf8"));
 validateExperiment(experiment);
 const startedAt = new Date().toISOString();
 const workspace = mkdtempSync(join(tmpdir(), "infoapex-p2-a-"));
+const emptyCodexSessionsDir = fixture ? mkdtempSync(join(workspace, "empty-codex-sessions-")) : null;
 
 try {
   const classification = classificationMatrix();
@@ -89,6 +90,9 @@ function runSmoke(task) {
     doctorArgs.push("--codex-model", provider.model, "--codex-sandbox", "danger-full-access");
     runArgs.push("--codex-model", provider.model, "--codex-sandbox", "danger-full-access");
     if (executable) doctorArgs.push("--codex-executable", executable), runArgs.push("--codex-executable", executable);
+    // Fixture mode must stay fully hermetic - see the identical comment in
+    // p2-b-live-pilot.mjs.
+    if (fixture) runArgs.push("--codex-sessions-dir", emptyCodexSessionsDir);
   } else {
     doctorArgs.push("--claude-model", provider.model, "--claude-permission-mode", "dontAsk");
     runArgs.push("--claude-model", provider.model, "--claude-permission-mode", "dontAsk");
@@ -106,7 +110,11 @@ function runSmoke(task) {
     ? recoverCodexRolloutUsage(executionStartedAt, executionFinishedAt)
     : null;
   const usage = rolloutFallback?.usage ?? runReport?.usage ?? null;
-  const usageAssessment = rolloutFallback ? assessUsageTotals(usage) : runReport?.usageAssessment ?? null;
+  // runReport.quotaUsage is computed by ai-code-worker itself, independently of
+  // whether usageTotals/tokens were available - see the identical comment in
+  // p2-b-live-pilot.mjs.
+  const quotaUsage = runReport?.quotaUsage ?? null;
+  const usageAssessment = rolloutFallback ? assessUsageTotals(usage, quotaUsage) : runReport?.usageAssessment ?? null;
   return {
     taskId: task.taskId,
     engine: task.engine,
@@ -124,6 +132,7 @@ function runSmoke(task) {
     usageSource: rolloutFallback ? "sanitized-local-rollout-fallback" : "worker-run-report",
     usage,
     usageAssessment,
+    quotaUsage,
     stderrTail: execution.stderr.slice(-500)
   };
 }

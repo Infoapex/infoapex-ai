@@ -15,12 +15,24 @@
     ]
   },
   "functionalVerdict": "PASS",
-  "economicVerdict": "inconclusive",
-  "p2bReadiness": "FUNCTIONAL_READY_ECONOMIC_PARTIAL",
+  "economicVerdict": "comparable",
+  "p2bReadiness": "READY",
   "classification": [
-    { "label": "quota", "expected": true, "actual": true },
-    { "label": "sandbox", "expected": true, "actual": true },
-    { "label": "implementation", "expected": false, "actual": false }
+    {
+      "label": "quota",
+      "expected": true,
+      "actual": true
+    },
+    {
+      "label": "sandbox",
+      "expected": true,
+      "actual": true
+    },
+    {
+      "label": "implementation",
+      "expected": false,
+      "actual": false
+    }
   ],
   "smokes": [
     {
@@ -53,10 +65,24 @@
       },
       "usageAssessment": {
         "completeness": "partial",
-        "economicVerdict": "inconclusive",
-        "unknownFields": ["costUsd"]
+        "economicVerdict": "comparable",
+        "unknownFields": [
+          "costUsd"
+        ]
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 75,
+          "windowMinutes": 300,
+          "source": "measured"
+        },
+        "weekly": {
+          "percent": 27,
+          "windowMinutes": 10080,
+          "source": "measured"
+        }
+      }
     },
     {
       "taskId": "P2A-CLAUDE-SMOKE",
@@ -91,7 +117,19 @@
         "economicVerdict": "comparable",
         "unknownFields": []
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 2.504017094017094,
+          "windowMinutes": 300,
+          "source": "estimated"
+        },
+        "weekly": {
+          "percent": null,
+          "windowMinutes": null,
+          "source": null
+        }
+      }
     }
   ]
 }

@@ -82,6 +82,29 @@ describe("read-codex-session", () => {
     assert.equal(summary.resetsAt, 123456);
   });
 
+  it("parses rate_limits.secondary (the weekly window) alongside primary (5h)", () => {
+    const summary = parseCodexSessionLog(
+      JSON.stringify({
+        type: "event_msg",
+        payload: {
+          type: "token_count",
+          info: { total_token_usage: { input_tokens: 1000, cached_input_tokens: 800, output_tokens: 50, total_tokens: 1050 } },
+          rate_limits: {
+            primary: { used_percent: 4, window_minutes: 300, resets_at: 111 },
+            secondary: { used_percent: 6, window_minutes: 10080, resets_at: 222 },
+            plan_type: "plus"
+          }
+        }
+      })
+    );
+
+    assert.equal(summary.usedPercent, 4);
+    assert.equal(summary.windowMinutes, 300);
+    assert.equal(summary.secondaryUsedPercent, 6);
+    assert.equal(summary.secondaryWindowMinutes, 10080);
+    assert.equal(summary.secondaryResetsAt, 222);
+  });
+
   it("returns null best-effort when the rollout file does not exist", () => {
     const missing = join(tmpdir(), "aicw-no-such-codex-rollout-xyz.jsonl");
 

@@ -1,4 +1,4 @@
-import { estimateClaudePercentFromTokens, type CalibrationPoint } from "./claude-calibration.js";
+import { estimateClaudePercentFromTokens, fitTokensPerPercentPoint, type CalibrationPoint } from "./claude-calibration.js";
 import type {
   UsageCheckpoint,
   UsageCheckpointEngine,
@@ -46,11 +46,21 @@ export interface PlanUsageEstimate {
    *  history selection exact and prevents samples from another model/effort from
    *  entering the estimate. */
   readonly profile: UsageEstimateProfile | null;
-  /** Derived from totalTokens via the Claude tokens-per-%5h-point calibration -
-   *  meaningful only for a Claude-engine run; codex has no equivalent local %
-   *  reading to calibrate against (see claude-calibration.ts). */
+  /** Derived from totalTokens via the Claude tokens-per-%5h-point calibration
+   *  (claude-calibration.ts's manually-seeded points - Claude has no local %5h/%week
+   *  reading anywhere to calibrate against automatically). */
   readonly estimatedClaudePercent: TokenRange | null;
+  /** Derived from totalTokens via a tokens-per-%5h-point ratio fitted from this
+   *  project's OWN real run history (deriveCodexCalibrationPoints below), not a
+   *  manually-seeded table - unlike Claude, Codex's rollout reports a real, measured
+   *  quota percent per run (see read-codex-session.ts), so every completed real
+   *  Codex run is itself a calibration point. `null` when fewer than
+   *  `MINIMUM_CODEX_CALIBRATION_POINTS` real (tokens, percent) pairs exist yet -
+   *  never fabricated from zero real data. */
+  readonly estimatedCodexPercent: TokenRange | null;
 }
+
+const MINIMUM_CODEX_CALIBRATION_POINTS = 2;
 
 export interface EstimateUsageForPlanOptions {
   readonly tasks: readonly PlanTaskShape[];
@@ -143,7 +153,61 @@ export function estimateUsageForPlan(options: EstimateUsageForPlanOptions): Plan
           high: estimateClaudePercentFromTokens(totalTokens.high, options.claudeCalibrationPoints).percent
         };
 
-  return { perTask, totalTokens, tasksWithoutHistory, profile, estimatedClaudePercent };
+  const codexCalibrationPoints = deriveCodexCalibrationPoints(options.history);
+  const estimatedCodexPercent: TokenRange | null =
+    totalTokens === null || codexCalibrationPoints.length < MINIMUM_CODEX_CALIBRATION_POINTS
+      ? null
+      : (() => {
+          const tokensPerPercentPoint = fitTokensPerPercentPoint(codexCalibrationPoints);
+          return {
+            low: totalTokens.low / tokensPerPercentPoint,
+            median: totalTokens.median / tokensPerPercentPoint,
+            high: totalTokens.high / tokensPerPercentPoint
+          };
+        })();
+
+  return { perTask, totalTokens, tasksWithoutHistory, profile, estimatedClaudePercent, estimatedCodexPercent };
+}
+
+/**
+ * Every completed real Codex run is its own calibration point: unlike Claude, Codex's
+ * rollout reports a real, measured 5-hour quota percent (read-codex-session.ts), so
+ * the (tokens, percent) pair between a run's start and end checkpoints (both written
+ * by cli.ts around the run, see codexSessionCrossCheck) needs no manual /usage
+ * transcription the way claude-calibration.ts's seeded points did. A pair only
+ * counts when both readings are real (`percentUsedReported`, never
+ * `percentUsedEstimated`) and the delta is positive - a zero or negative delta means
+ * the 5-hour window reset between start and end, which is not a valid calibration
+ * signal (same caveat docs/BENCHMARKS.md notes for manual readings).
+ */
+export function deriveCodexCalibrationPoints(history: readonly UsageCheckpoint[]): CalibrationPoint[] {
+  const byRun = new Map<string, { start?: UsageCheckpoint; end?: UsageCheckpoint }>();
+
+  for (const checkpoint of history) {
+    if (checkpoint.scope !== "run" || checkpoint.engine !== "codex") {
+      continue;
+    }
+    const entry = byRun.get(checkpoint.runId) ?? {};
+    if (checkpoint.phase === "start") {
+      entry.start = checkpoint;
+    } else {
+      entry.end = checkpoint;
+    }
+    byRun.set(checkpoint.runId, entry);
+  }
+
+  const points: CalibrationPoint[] = [];
+  for (const { start, end } of byRun.values()) {
+    if (!start || !end || start.percentUsedReported === null || end.percentUsedReported === null) {
+      continue;
+    }
+    const percent = end.percentUsedReported - start.percentUsedReported;
+    const tokens = totalTokensForCheckpoint(end);
+    if (percent > 0 && tokens !== null && tokens > 0) {
+      points.push({ tokens, percent });
+    }
+  }
+  return points;
 }
 
 function profileFromCheckpoint(checkpoint: UsageCheckpoint): UsageEstimateProfile {

@@ -23,7 +23,7 @@
     ]
   },
   "functionalVerdict": "PASS",
-  "economicVerdict": "inconclusive",
+  "economicVerdict": "comparable",
   "summary": {
     "overall": {
       "tasks": 10,
@@ -33,7 +33,10 @@
       "uncachedContextTotal": 48893,
       "totalTokens": 548980,
       "totalTokensComplete": true,
-      "elapsedMsTotal": 246596
+      "elapsedMsTotal": 246596,
+      "quota": {
+        "fiveHourPercentKnownCount": 10
+      }
     },
     "codex": {
       "tasks": 5,
@@ -43,7 +46,12 @@
       "uncachedContextTotal": 48863,
       "totalTokens": 313755,
       "totalTokensComplete": true,
-      "elapsedMsTotal": 149597
+      "elapsedMsTotal": 149597,
+      "quota": {
+        "fiveHourPercentKnownCount": 5,
+        "fiveHourPercentFirstMeasured": 4,
+        "fiveHourPercentLastMeasured": 6
+      }
     },
     "claude": {
       "tasks": 5,
@@ -53,7 +61,11 @@
       "uncachedContextTotal": 30,
       "totalTokens": 235225,
       "totalTokensComplete": true,
-      "elapsedMsTotal": 96999
+      "elapsedMsTotal": 96999,
+      "quota": {
+        "fiveHourPercentKnownCount": 5,
+        "fiveHourPercentSumEstimated": 20.104700854700855
+      }
     }
   },
   "tasks": [
@@ -87,12 +99,24 @@
       },
       "usageAssessment": {
         "completeness": "partial",
-        "economicVerdict": "inconclusive",
+        "economicVerdict": "comparable",
         "unknownFields": [
           "costUsd"
         ]
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 4,
+          "windowMinutes": 300,
+          "source": "measured"
+        },
+        "weekly": {
+          "percent": 6,
+          "windowMinutes": 10080,
+          "source": "measured"
+        }
+      }
     },
     {
       "taskId": "PILOT-B-02",
@@ -127,7 +151,19 @@
         "economicVerdict": "comparable",
         "unknownFields": []
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 4.016239316239316,
+          "windowMinutes": 300,
+          "source": "estimated"
+        },
+        "weekly": {
+          "percent": null,
+          "windowMinutes": null,
+          "source": null
+        }
+      }
     },
     {
       "taskId": "PILOT-B-03",
@@ -159,12 +195,24 @@
       },
       "usageAssessment": {
         "completeness": "partial",
-        "economicVerdict": "inconclusive",
+        "economicVerdict": "comparable",
         "unknownFields": [
           "costUsd"
         ]
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 5,
+          "windowMinutes": 300,
+          "source": "measured"
+        },
+        "weekly": {
+          "percent": 6,
+          "windowMinutes": 10080,
+          "source": "measured"
+        }
+      }
     },
     {
       "taskId": "PILOT-B-04",
@@ -199,7 +247,19 @@
         "economicVerdict": "comparable",
         "unknownFields": []
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 4.023675213675213,
+          "windowMinutes": 300,
+          "source": "estimated"
+        },
+        "weekly": {
+          "percent": null,
+          "windowMinutes": null,
+          "source": null
+        }
+      }
     },
     {
       "taskId": "PILOT-B-05",
@@ -231,12 +291,24 @@
       },
       "usageAssessment": {
         "completeness": "partial",
-        "economicVerdict": "inconclusive",
+        "economicVerdict": "comparable",
         "unknownFields": [
           "costUsd"
         ]
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 5,
+          "windowMinutes": 300,
+          "source": "measured"
+        },
+        "weekly": {
+          "percent": 6,
+          "windowMinutes": 10080,
+          "source": "measured"
+        }
+      }
     },
     {
       "taskId": "PILOT-B-06",
@@ -271,7 +343,19 @@
         "economicVerdict": "comparable",
         "unknownFields": []
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 4.026239316239316,
+          "windowMinutes": 300,
+          "source": "estimated"
+        },
+        "weekly": {
+          "percent": null,
+          "windowMinutes": null,
+          "source": null
+        }
+      }
     },
     {
       "taskId": "PILOT-B-07",
@@ -303,12 +387,24 @@
       },
       "usageAssessment": {
         "completeness": "partial",
-        "economicVerdict": "inconclusive",
+        "economicVerdict": "comparable",
         "unknownFields": [
           "costUsd"
         ]
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 6,
+          "windowMinutes": 300,
+          "source": "measured"
+        },
+        "weekly": {
+          "percent": 6,
+          "windowMinutes": 10080,
+          "source": "measured"
+        }
+      }
     },
     {
       "taskId": "PILOT-B-08",
@@ -343,7 +439,19 @@
         "economicVerdict": "comparable",
         "unknownFields": []
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 4.018034188034188,
+          "windowMinutes": 300,
+          "source": "estimated"
+        },
+        "weekly": {
+          "percent": null,
+          "windowMinutes": null,
+          "source": null
+        }
+      }
     },
     {
       "taskId": "PILOT-B-09",
@@ -375,12 +483,24 @@
       },
       "usageAssessment": {
         "completeness": "partial",
-        "economicVerdict": "inconclusive",
+        "economicVerdict": "comparable",
         "unknownFields": [
           "costUsd"
         ]
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 6,
+          "windowMinutes": 300,
+          "source": "measured"
+        },
+        "weekly": {
+          "percent": 6,
+          "windowMinutes": 10080,
+          "source": "measured"
+        }
+      }
     },
     {
       "taskId": "PILOT-B-10",
@@ -415,7 +535,19 @@
         "economicVerdict": "comparable",
         "unknownFields": []
       },
-      "stderrTail": ""
+      "stderrTail": "",
+      "quotaUsage": {
+        "fiveHour": {
+          "percent": 4.02051282051282,
+          "windowMinutes": 300,
+          "source": "estimated"
+        },
+        "weekly": {
+          "percent": null,
+          "windowMinutes": null,
+          "source": null
+        }
+      }
     }
   ],
   "methodologyNote": "'accurate' requires both a worker DONE status (script-verified gate) and an independent re-check of pilot/evidence-NN.json content by this script. 'fallbacksTriggered' counts doctor-level --fallback-engine activations (quota/availability failure of the requested engine before the task started); no repair-cycle retries are measured here because --independent-review is not enabled (it would add a second live invocation per task, breaking the frozen 10-invocation budget). Wall-clock elapsedMs is used as the explanation-time proxy: no installed CLI (verified via --help on claude 2.1.235 and codex 0.147.0) exposes a separate reasoning-only timer. /usage and /context are Claude Code TUI-only session commands and are not applicable to headless per-task invocations; they are intentionally not used here."

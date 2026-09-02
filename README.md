@@ -369,7 +369,7 @@ trebuie pornite explicit.
 |:--|:--|:--|
 | **P0** | Integrare și publicare ICM + Graph în modulele canonice | ✅ închis |
 | **P1** | Telemetrie de consum completă și comparabilă | ✅ implementat, sincronizat prin provenance |
-| **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, tokeni compleți pe ambele motoare, verdict economic combinat rămâne inconclusive (Codex nu raportează cost în USD pentru cont pe abonament) |
+| **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, tokeni compleți pe ambele motoare, verdict economic **comparable** (procent din cota de 5 ore, nu cost USD — vezi mai jos) |
 | **P3** | Bundle ZIP, clean install, release privat | 🟡 deschis |
 | **P4** | CLI root unificat | ⚪ planificat |
 | **P5** | SDK-uri și operare avansată | ⚪ post-stabilizare |
@@ -380,10 +380,13 @@ De ce `0.1.0` este pre-release și nu producție:
   folosirea directă a agentului;
 - gate-urile live P2-A (2 invocări) și P2-B (10 task-uri reale, secvențial, 5 Codex + 5
   Claude) au trecut funcțional 10/10, cu tokeni compleți pe ambele motoare — vezi
-  `validation/p2-b/LIVE-REPORT.md` — dar verdictul economic combinat rămâne
-  `inconclusive`, deoarece Codex nu raportează cost în USD pentru un cont autentificat
-  prin abonament ChatGPT (confirmat: nu există cont în dolari de raportat în acest mod
-  de facturare); aceasta e o limitare externă, documentată, nu un gate deschis;
+  `validation/p2-b/LIVE-REPORT.md`. Decizie 2026-09-02: costul real, pentru abonamente
+  fixe de 20$/lună (nu facturare per-token), e cât din **fereastra de 5 ore** a fost
+  consumată, nu `costUsd` — care pentru Codex nici nu există structural pe acest tip de
+  cont (confirmat: `rate_limits.credits` arată `has_credits: false`). Ambele motoare au
+  acum acest procent cunoscut (Codex — măsurat direct din CLI; Claude — estimat din
+  tokeni reali printr-o rată calibrată), deci verdictul economic combinat e
+  **`comparable`**, nu `inconclusive`;
 - invocarea Codex necesită încă `--codex-sandbox danger-full-access` explicit;
   invocarea implicită `workspace-write` e blocată de politica locală de aprobare;
 - publicarea primului bundle cere încă un smoke test dintr-un ZIP extras într-un proiect

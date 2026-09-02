@@ -42,6 +42,7 @@ const experiment = JSON.parse(readFileSync(experimentPath, "utf8"));
 validateExperiment(experiment);
 const startedAt = new Date().toISOString();
 const workspace = mkdtempSync(join(tmpdir(), "infoapex-p2-b-"));
+const emptyCodexSessionsDir = fixture ? mkdtempSync(join(workspace, "empty-codex-sessions-")) : null;
 
 try {
   const repository = createRepository();
@@ -187,6 +188,11 @@ function runTask(repository, task, executables) {
   if (task.engine === "codex") {
     runArgs.push("--codex-model", provider.model, "--codex-sandbox", "danger-full-access");
     if (executables.codex) runArgs.push("--codex-executable", executables.codex);
+    // Fixture mode must stay fully hermetic: without this, the worker's own
+    // quota-percent lookup (report/run-report.ts) would read whatever real Codex
+    // rollout history exists on the machine running this script, even though the
+    // fake CLI never touches the real ~/.codex/sessions at all.
+    if (fixture) runArgs.push("--codex-sessions-dir", emptyCodexSessionsDir);
   } else {
     runArgs.push("--claude-model", provider.model, "--claude-permission-mode", "dontAsk");
     if (executables.claude) runArgs.push("--claude-executable", executables.claude);
@@ -204,7 +210,13 @@ function runTask(repository, task, executables) {
     ? recoverCodexRolloutUsage(executionStartedAt, executionFinishedAt)
     : null;
   const usage = rolloutFallback?.usage ?? runReport?.usage ?? null;
-  const usageAssessment = rolloutFallback ? assessUsageTotals(usage) : runReport?.usageAssessment ?? null;
+  // runReport.quotaUsage is computed by ai-code-worker itself (report/run-report.ts)
+  // independently of whether usageTotals/tokens were available - even when Codex's
+  // exec --json omits usage entirely (forcing the token rollout-fallback below), the
+  // worker's OWN separate rollout lookup already populated a real, measured quota
+  // reading, so it is reused as-is rather than recomputed here.
+  const quotaUsage = runReport?.quotaUsage ?? null;
+  const usageAssessment = rolloutFallback ? assessUsageTotals(usage, quotaUsage) : runReport?.usageAssessment ?? null;
 
   const status = execution.body?.status ?? "BLOCKED";
   // Task work lands on a dedicated `aiw/task/<runId>/<taskId>/attempt-N` branch in a
@@ -240,8 +252,13 @@ function runTask(repository, task, executables) {
     usageSource: rolloutFallback ? "sanitized-local-rollout-fallback" : "worker-run-report",
     usage,
     usageAssessment,
+    quotaUsage,
     stderrTail: execution.stderr.slice(-500)
   };
+}
+
+function sum(values) {
+  return values.reduce((total, value) => total + value, 0);
 }
 
 function totalUsageTokens(usage) {
@@ -256,12 +273,37 @@ function buildReport(tasks) {
   const byEngine = { codex: [], claude: [] };
   for (const task of tasks) byEngine[task.requestedEngine].push(task);
 
-  const summarizeEngine = (entries) => {
+  const summarizeEngine = (entries, engine) => {
     const accurate = entries.filter((entry) => entry.accurate).length;
     const fallbacks = entries.filter((entry) => entry.fallbackTriggered).length;
     const tokenTotals = entries.map((entry) => totalUsageTokens(entry.usage));
     const uncachedContextTotal = entries.reduce((sum, entry) => sum + (entry.usage?.inputUncachedTokens ?? 0), 0);
     const elapsedMsTotal = entries.reduce((sum, entry) => sum + entry.elapsedMs, 0);
+    const fiveHourPercents = entries.map((entry) => entry.quotaUsage?.fiveHour?.percent ?? null);
+    const knownFiveHourPercents = fiveHourPercents.filter((percent) => percent !== null);
+    // Claude: each task's %5h is independently ESTIMATED from that task's own tokens,
+    // so summing across tasks is valid (same reasoning as summing token counts).
+    // Codex: each task's %5h is a real, MEASURED, cumulative account-wide gauge at
+    // that moment, not a per-task amount - summing would double-count everything
+    // already reflected in the account's running total, so only first/last (the
+    // observed range across this run) is reported, not a sum.
+    // "mixed" (the overall, cross-engine group) deliberately reports only the known-
+    // count: summing or range-ing across a gauge (Codex) and independent estimates
+    // (Claude) in the same figure would misrepresent both. Per-engine summaries below
+    // carry the actual sum/first-last figures.
+    const quotaSummary =
+      engine === "claude"
+        ? {
+            fiveHourPercentKnownCount: knownFiveHourPercents.length,
+            fiveHourPercentSumEstimated: knownFiveHourPercents.length === entries.length ? sum(knownFiveHourPercents) : null
+          }
+        : engine === "codex"
+          ? {
+              fiveHourPercentKnownCount: knownFiveHourPercents.length,
+              fiveHourPercentFirstMeasured: knownFiveHourPercents[0] ?? null,
+              fiveHourPercentLastMeasured: knownFiveHourPercents.at(-1) ?? null
+            }
+          : { fiveHourPercentKnownCount: knownFiveHourPercents.length };
     return {
       tasks: entries.length,
       accurate,
@@ -272,7 +314,8 @@ function buildReport(tasks) {
         ? tokenTotals.reduce((sum, entry) => sum + entry.total, 0)
         : null,
       totalTokensComplete: tokenTotals.every((entry) => entry.complete),
-      elapsedMsTotal
+      elapsedMsTotal,
+      quota: quotaSummary
     };
   };
 
@@ -297,9 +340,9 @@ function buildReport(tasks) {
     functionalVerdict: functionalPass ? "PASS" : "BLOCKED",
     economicVerdict,
     summary: {
-      overall: summarizeEngine(tasks),
-      codex: summarizeEngine(byEngine.codex),
-      claude: summarizeEngine(byEngine.claude)
+      overall: summarizeEngine(tasks, "mixed"),
+      codex: summarizeEngine(byEngine.codex, "codex"),
+      claude: summarizeEngine(byEngine.claude, "claude")
     },
     tasks,
     methodologyNote:
@@ -313,7 +356,14 @@ function buildReport(tasks) {
       "proxy: no installed CLI (verified via --help on claude 2.1.235 and codex " +
       "0.147.0) exposes a separate reasoning-only timer. /usage and /context are " +
       "Claude Code TUI-only session commands and are not applicable to headless " +
-      "per-task invocations; they are intentionally not used here."
+      "per-task invocations; they are intentionally not used here. " +
+      "'economicVerdict' (2026-09-02 decision) is based on knowing each task's " +
+      "5-hour quota-percent, not costUsd - both engines here run on flat-rate " +
+      "($20/mo) subscriptions, where costUsd is frequently unavailable by design " +
+      "(see docs/RELEASE-GATES.md) and would not have reflected real marginal cost " +
+      "anyway. Codex's percent is measured directly from its rollout; Claude's is " +
+      "estimated from real tokens via a calibrated tokens-per-point ratio (see " +
+      "quota-usage.ts, claude-calibration.ts) - both count as comparable."
   };
 }
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { bucketHistoricalUsage, estimateUsageForPlan } from "../../src/benchmark/estimate.js";
+import { bucketHistoricalUsage, deriveCodexCalibrationPoints, estimateUsageForPlan } from "../../src/benchmark/estimate.js";
 import type { UsageCheckpoint } from "../../src/benchmark/usage-checkpoint.js";
 
 describe("estimate", () => {
@@ -84,7 +84,85 @@ describe("estimate", () => {
     assert.deepEqual(estimate.perTask[0]?.tokens, { low: 100, median: 100, high: 100 });
     assert.deepEqual(estimate.profile, { engine: "codex", model: "gpt-5.6-sol", reasoningEffort: "high" });
   });
+
+  it("derives a Codex calibration point from a real run's start/end percentUsedReported delta and total tokens", () => {
+    const history: UsageCheckpoint[] = [
+      runCheckpoint({ runId: "run-A", phase: "start", percentUsedReported: 4, outputTokens: null }),
+      runCheckpoint({ runId: "run-A", phase: "end", percentUsedReported: 8, outputTokens: 40_000 })
+    ];
+
+    const points = deriveCodexCalibrationPoints(history);
+
+    assert.deepEqual(points, [{ tokens: 40_000, percent: 4 }]);
+  });
+
+  it("ignores Codex run pairs with a zero/negative delta (quota window reset) or a missing reading", () => {
+    const history: UsageCheckpoint[] = [
+      runCheckpoint({ runId: "reset", phase: "start", percentUsedReported: 90, outputTokens: null }),
+      runCheckpoint({ runId: "reset", phase: "end", percentUsedReported: 2, outputTokens: 40_000 }),
+      runCheckpoint({ runId: "no-start", phase: "end", percentUsedReported: 5, outputTokens: 10_000 })
+    ];
+
+    assert.deepEqual(deriveCodexCalibrationPoints(history), []);
+  });
+
+  it("estimates a Codex %5h range from its own derived calibration once there is enough real history, and stays null below the minimum", () => {
+    const taskHistory: UsageCheckpoint[] = [endCheckpoint({ taskKind: "backend", taskRisk: "medium", outputTokens: 20_000 })];
+    const onePoint: UsageCheckpoint[] = [
+      runCheckpoint({ runId: "run-A", phase: "start", percentUsedReported: 4, outputTokens: null }),
+      runCheckpoint({ runId: "run-A", phase: "end", percentUsedReported: 8, outputTokens: 40_000 })
+    ];
+    const twoPoints: UsageCheckpoint[] = [
+      ...onePoint,
+      runCheckpoint({ runId: "run-B", phase: "start", percentUsedReported: 10, outputTokens: null }),
+      runCheckpoint({ runId: "run-B", phase: "end", percentUsedReported: 12, outputTokens: 20_000 })
+    ];
+
+    const belowMinimum = estimateUsageForPlan({
+      tasks: [{ id: "TASK-A", kind: "backend", risk: "medium", acceptanceCriteria: ["a"] }],
+      history: [...taskHistory, ...onePoint]
+    });
+    assert.equal(belowMinimum.estimatedCodexPercent, null);
+
+    const atMinimum = estimateUsageForPlan({
+      tasks: [{ id: "TASK-A", kind: "backend", risk: "medium", acceptanceCriteria: ["a"] }],
+      history: [...taskHistory, ...twoPoints]
+    });
+    // 40,000 tokens -> 4pp (run-A) and 20,000 tokens -> 2pp (run-B) both fit exactly
+    // 10,000 tokens/pp; 20,000 real task tokens should therefore estimate to 2pp.
+    assert.deepEqual(atMinimum.estimatedCodexPercent, { low: 2, median: 2, high: 2 });
+  });
 });
+
+function runCheckpoint(input: {
+  readonly runId: string;
+  readonly phase: UsageCheckpoint["phase"];
+  readonly percentUsedReported: number | null;
+  readonly outputTokens: number | null;
+}): UsageCheckpoint {
+  return {
+    schemaVersion: "1.0",
+    checkpointId: `${input.runId}-${input.phase}`,
+    runId: input.runId,
+    taskId: null,
+    scope: "run",
+    engine: "codex",
+    phase: input.phase,
+    createdAt: "2026-09-02T10:00:00Z",
+    taskKind: null,
+    taskRisk: null,
+    tokens: {
+      inputUncachedTokens: null,
+      cacheReadTokens: null,
+      cacheWriteTokens: null,
+      outputTokens: input.outputTokens,
+      costUsd: null
+    },
+    contextEstimateTokens: null,
+    percentUsedReported: input.percentUsedReported,
+    percentUsedEstimated: null
+  };
+}
 
 function profiledEndCheckpoint(model: string, reasoningEffort: string, outputTokens: number): UsageCheckpoint {
   return {

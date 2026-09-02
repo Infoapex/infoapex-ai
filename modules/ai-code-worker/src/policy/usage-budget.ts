@@ -8,6 +8,11 @@ export interface UsageBudget {
   readonly maximumRunOutputTokens: number;
   readonly maximumRunCostUsd: number | null;
   readonly onUnknownUsage: "allow" | "warn" | "block" | "block-if-cost-required";
+  /** Optional post-hoc quota-percent gate - see usage/quota-usage.ts's
+   *  evaluateQuotaBudget(). Unlike the token/cost fields above, this is NOT enforced
+   *  by evaluateUsageBudget()/the mid-run loop: a real quota reading only exists after
+   *  an invocation completes, so it is checked once, after the run, in run-report.ts. */
+  readonly maximumRunFiveHourPercent: number | null;
 }
 
 export interface UsageTotals {
@@ -94,7 +99,8 @@ export function budgetFromManifest(value: unknown): UsageBudget {
     maximumRunCacheWriteTokens: Number(budget.maximumRunCacheWriteTokens),
     maximumRunOutputTokens: Number(budget.maximumRunOutputTokens),
     maximumRunCostUsd: typeof budget.maximumRunCostUsd === "number" ? budget.maximumRunCostUsd : null,
-    onUnknownUsage: budget.onUnknownUsage as UsageBudget["onUnknownUsage"]
+    onUnknownUsage: budget.onUnknownUsage as UsageBudget["onUnknownUsage"],
+    maximumRunFiveHourPercent: typeof budget.maximumRunFiveHourPercent === "number" ? budget.maximumRunFiveHourPercent : null
   };
 }
 

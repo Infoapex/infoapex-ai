@@ -14,6 +14,12 @@ const tempRepos: string[] = [];
 const stateRoots: string[] = [];
 const tempRoots: string[] = [];
 const registry = SchemaRegistry.load({ schemaDirectory: "schemas" });
+// Isolates report/run-report.ts's real-quota lookup (findLatestCodexRolloutPath)
+// from whatever real Codex rollout history happens to exist on the machine running
+// these tests - an empty directory always yields "no rollout found", the correct,
+// deterministic "unknown quota" outcome for a fake-CLI test double.
+const emptyCodexSessionsDir = mkdtempSync(join(tmpdir(), "aicw-empty-codex-sessions-"));
+tempRoots.push(emptyCodexSessionsDir);
 
 after(() => {
   for (const root of stateRoots) {
@@ -36,6 +42,7 @@ describe("codex run coordinator", () => {
     const cli = fakeCli("0.146.0-alpha.3.1", "src/codex-output.txt");
     const report = runCodex({
       repositoryPath: repo,
+      codexSessionsDir: emptyCodexSessionsDir,
       planPath: "Plan/RUN.md",
       runId: "run-codex",
       now: "2026-08-01T10:00:00Z",
@@ -81,6 +88,7 @@ describe("codex run coordinator", () => {
 
     const report = runCodex({
       repositoryPath: repo,
+      codexSessionsDir: emptyCodexSessionsDir,
       planPath: "Plan/RUN.md",
       runId: "run-codex-project-config",
       now: "2026-08-01T10:00:00Z",
@@ -105,6 +113,7 @@ describe("codex run coordinator", () => {
 
     const report = runCodex({
       repositoryPath: repo,
+      codexSessionsDir: emptyCodexSessionsDir,
       planPath: "Plan/RUN.md",
       runId: "run-codex-context",
       now: "2026-08-01T10:00:00Z",

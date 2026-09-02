@@ -18,7 +18,10 @@ describe("normalized usage accounting", () => {
     assert.equal(report.totals.agentInvocations, 1);
     assert.equal(report.totals.inputUncachedTokens, 180);
     assert.equal(report.completeness, "complete");
-    assert.equal(report.economicVerdict, "comparable");
+    // economicVerdict no longer follows token/cost completeness (2026-09-02 quota-
+    // percent decision, see quota-usage.ts) - it is "inconclusive" whenever no quota
+    // reading is supplied, even when every token/cost field is known.
+    assert.equal(report.economicVerdict, "inconclusive");
   });
 
   it("sums distinct retry and fallback invocations while preserving unknown fields", () => {
@@ -52,6 +55,25 @@ describe("normalized usage accounting", () => {
       economicVerdict: "inconclusive",
       unknownFields: ["inputUncachedTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "costUsd"]
     });
+  });
+
+  it("is comparable when quota is known, even if costUsd is unknown (Codex, subscription accounts)", () => {
+    const totals = { agentInvocations: 1, inputUncachedTokens: 10, cacheReadTokens: 5, cacheWriteTokens: 0, outputTokens: 2, costUsd: null };
+    const quota = { fiveHour: { percent: 4, windowMinutes: 300, source: "measured" as const }, weekly: { percent: null, windowMinutes: null, source: null } };
+
+    const assessment = assessUsageTotals(totals, quota);
+
+    assert.equal(assessment.economicVerdict, "comparable");
+    assert.deepEqual(assessment.unknownFields, ["costUsd"]);
+  });
+
+  it("is inconclusive when quota is unknown, even if costUsd is known (never falls back to the old cost-based rule)", () => {
+    const totals = { agentInvocations: 1, inputUncachedTokens: 10, cacheReadTokens: 5, cacheWriteTokens: 0, outputTokens: 2, costUsd: 0.05 };
+
+    const assessment = assessUsageTotals(totals, null);
+
+    assert.equal(assessment.economicVerdict, "inconclusive");
+    assert.equal(assessment.completeness, "complete");
   });
 });
 

@@ -1,5 +1,6 @@
 import type { EngineUsage } from "../engines/engine-event.js";
 import type { UsageTotals } from "../policy/usage-budget.js";
+import { quotaEconomicVerdict, type QuotaUsage } from "./quota-usage.js";
 
 export type UsageField = "inputUncachedTokens" | "cacheReadTokens" | "cacheWriteTokens" | "outputTokens" | "costUsd";
 export type UsageCompleteness = "complete" | "partial" | "unavailable";
@@ -80,15 +81,27 @@ export function aggregateNormalizedUsage(samples: readonly UsageSample[]): Norma
   };
 }
 
-export function assessUsageTotals(totals: UsageTotals | null): UsageAssessment {
+/**
+ * `completeness`/`unknownFields` describe the 5 raw token/cost fields, unchanged.
+ * `economicVerdict`, per the 2026-09-02 quota-percent decision, no longer depends on
+ * `costUsd` at all - both accounts this project runs against are flat-rate ($20/mo)
+ * subscriptions, where `costUsd` is frequently unavailable by design (see
+ * docs/RELEASE-GATES.md, P2-B) and would never have reflected a real marginal cost
+ * anyway. A run/task is "comparable" when its 5-hour quota-percent is known -
+ * measured or estimated, see quota-usage.ts - regardless of whether `costUsd` is.
+ * `quota` defaults to null for callers that don't yet compute it (e.g. the `fake`
+ * engine, or any call site not updated yet), which correctly yields `inconclusive`
+ * rather than silently reverting to the old cost-based comparability claim.
+ */
+export function assessUsageTotals(totals: UsageTotals | null, quota: QuotaUsage | null = null): UsageAssessment {
   if (totals === null) {
-    return { completeness: "unavailable", economicVerdict: "inconclusive", unknownFields: FIELDS };
+    return { completeness: "unavailable", economicVerdict: quotaEconomicVerdict(quota), unknownFields: FIELDS };
   }
   const unknownFields = FIELDS.filter((field) => totals[field] === null);
   const knownCount = FIELDS.length - unknownFields.length;
   return {
     completeness: knownCount === 0 ? "unavailable" : unknownFields.length === 0 ? "complete" : "partial",
-    economicVerdict: unknownFields.length === 0 ? "comparable" : "inconclusive",
+    economicVerdict: quotaEconomicVerdict(quota),
     unknownFields
   };
 }

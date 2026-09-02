@@ -18,7 +18,8 @@ describe("usage budget policy", () => {
       maximumRunCacheWriteTokens: 1,
       maximumRunOutputTokens: 5,
       maximumRunCostUsd: null,
-      onUnknownUsage: "block"
+      onUnknownUsage: "block",
+      maximumRunFiveHourPercent: null
     });
 
     assert.equal(result.status, "PASS");
@@ -41,7 +42,8 @@ describe("usage budget policy", () => {
       maximumRunCacheWriteTokens: 2,
       maximumRunOutputTokens: 10,
       maximumRunCostUsd: null,
-      onUnknownUsage: "block"
+      onUnknownUsage: "block",
+      maximumRunFiveHourPercent: null
     });
 
     assert.equal(result.status, "BLOCK");
@@ -66,7 +68,8 @@ describe("usage budget policy", () => {
       maximumRunCacheWriteTokens: 100,
       maximumRunOutputTokens: 100,
       maximumRunCostUsd: null,
-      onUnknownUsage: "block"
+      onUnknownUsage: "block",
+      maximumRunFiveHourPercent: null
     });
 
     assert.equal(totals.inputUncachedTokens, null);

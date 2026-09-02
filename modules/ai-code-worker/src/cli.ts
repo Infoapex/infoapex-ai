@@ -327,6 +327,13 @@ if (command === "benchmark") {
   const codexSandboxMode = readOption("--codex-sandbox") ?? undefined;
   const claudeBareMode = args.includes("--claude-bare") ? true : undefined;
   const claudeDangerouslySkipPermissions = args.includes("--claude-dangerously-skip-permissions") ? true : undefined;
+  // Test/fixture-only override for report/run-report.ts's real-quota lookup
+  // (findLatestCodexRolloutPath), which otherwise defaults to the real
+  // `~/.codex/sessions` - without this, a deterministic --engine codex run against a
+  // fake CLI would still report a real, unrelated quota-percent reading from whatever
+  // Codex activity happens to exist on the host machine. Production callers never set
+  // this; it exists so --engine codex fixtures (e.g. the P2 pilots) stay hermetic.
+  const codexSessionsDir = readOption("--codex-sessions-dir") ?? undefined;
   const asJson = args.includes("--json");
 
   if (!planPath) {
@@ -649,6 +656,7 @@ if (command === "benchmark") {
           repositoryPath,
           planPath,
           runId,
+          ...(codexSessionsDir !== undefined ? { codexSessionsDir } : {}),
           adapterConfig: {
             ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}),
             ...(codexModel !== undefined ? { defaultModel: codexModel } : {}),
@@ -1035,7 +1043,13 @@ function printPreRunEstimate(estimate: PlanUsageEstimate, asJson: boolean): void
 
   if (estimate.estimatedClaudePercent) {
     console.log(
-      `  estimated %5h (claude, calibrated): ${estimate.estimatedClaudePercent.low.toFixed(1)}-${estimate.estimatedClaudePercent.high.toFixed(1)} (median ${estimate.estimatedClaudePercent.median.toFixed(1)})`
+      `  estimated %5h (claude, calibrated from seeded points): ${estimate.estimatedClaudePercent.low.toFixed(1)}-${estimate.estimatedClaudePercent.high.toFixed(1)} (median ${estimate.estimatedClaudePercent.median.toFixed(1)})`
+    );
+  }
+
+  if (estimate.estimatedCodexPercent) {
+    console.log(
+      `  estimated %5h (codex, calibrated from this project's own real runs): ${estimate.estimatedCodexPercent.low.toFixed(1)}-${estimate.estimatedCodexPercent.high.toFixed(1)} (median ${estimate.estimatedCodexPercent.median.toFixed(1)})`
     );
   }
 

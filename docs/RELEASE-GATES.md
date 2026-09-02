@@ -79,12 +79,26 @@ account, meaning there is no dollar ledger to report from in this billing mode. 
 combined economic verdict is therefore still `inconclusive`, same as P2-A, but now for
 exactly one isolated, well-understood reason instead of two conflated ones.
 
+Quota-percent decision, 2026-09-02: both Codex and Claude are used here on flat-rate
+($20/mo) subscriptions, not pay-per-token API billing - `costUsd` was never going to
+reflect a real marginal cost, and for Codex it structurally does not exist at all (see
+above). `economicVerdict` (`ai-code-worker`'s `assessUsageTotals`, see
+`docs/USAGE-TELEMETRY-V1.md`) is redefined to depend on knowing a task/run's 5-hour
+quota-percent instead - `measured` directly from Codex's rollout (`rate_limits`,
+already present, just never read before) or `estimated` for Claude from a real token
+count via a calibrated ratio; either counts as comparable. Both P2-A and P2-B were
+reprocessed from their original, already-saved local data (no new live invocation) and
+now report **`economicVerdict: comparable`** - Codex measured 75% (P2-A) and a 4-6%
+range (P2-B) of its 5-hour window across these runs; Claude's estimated equivalents are
+2.5% (P2-A) and a 20.1% cumulative estimate across P2-B's 5 tasks. The Codex figures
+are cumulative account-wide gauges at the moment each reading was taken, not a
+per-task amount (P2-A's 75% in particular reflects other account activity, not that
+one smoke task's own cost - see `validation/p2-a/LIVE-REPORT.md`); Claude's are
+genuinely per-task since each is derived from that task's own tokens.
+
 **P2 is closed**: both the 2-invocation preflight (P2-A) and the 10-task live pilot
-(P2-B) are functional PASS, with complete token-level usage on both engines. The
-economic verdict will remain `inconclusive` until either this account switches to
-API-key billing (a real, separate cost decision) or OpenAI's Codex CLI adds its own
-subscription-equivalent shadow price, the way Anthropic's Claude Code CLI already
-does; this is an accepted, documented limitation, not an open release gate. Enabling
+(P2-B) are functional PASS, with complete token-level usage on both engines, and now
+`economicVerdict: comparable` on both under the quota-percent definition. Enabling
 `GRAPH-06` parallel reviewers is a distinct, separately-gated decision (a
 preregistered A/B experiment) that this pilot supplies the sequential baseline for
 but does not itself authorize — it remains disabled pending its own explicit

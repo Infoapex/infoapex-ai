@@ -272,6 +272,11 @@
         },
         "onUnknownUsage": {
           "enum": ["allow", "warn", "block", "block-if-cost-required"]
+        },
+        "maximumRunFiveHourPercent": {
+          "description": "Optional post-hoc quota-percent gate (see docs/USAGE-TELEMETRY-V1.md): evaluated after the run's real 5-hour quota reading is known, not enforced mid-run like the token/cost budgets above. Absent or null means no quota budget is declared.",
+          "type": ["number", "null"],
+          "minimum": 0
         }
       }
     }

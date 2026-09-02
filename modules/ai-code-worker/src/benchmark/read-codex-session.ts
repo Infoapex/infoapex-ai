@@ -15,9 +15,18 @@ export interface CodexSessionTokenUsage {
 
 export interface CodexSessionUsageSummary {
   readonly totalTokenUsage: CodexSessionTokenUsage | null;
+  /** `rate_limits.primary` - the short rolling window (300 minutes = 5h on every
+   *  real rollout observed so far). */
   readonly usedPercent: number | null;
   readonly windowMinutes: number | null;
   readonly resetsAt: number | null;
+  /** `rate_limits.secondary` - the long rolling window (10080 minutes = 7 days on
+   *  every real rollout observed so far). Added 2026-09-02; older sanitized fixtures
+   *  predating that date don't have it, same "absent, not unsupported" convention as
+   *  cacheWriteTokens above. */
+  readonly secondaryUsedPercent: number | null;
+  readonly secondaryWindowMinutes: number | null;
+  readonly secondaryResetsAt: number | null;
   readonly planType: string | null;
   readonly sessionId: string | null;
   readonly model: string | null;
@@ -50,6 +59,11 @@ interface CodexRolloutEvent {
         readonly window_minutes?: unknown;
         readonly resets_at?: unknown;
       };
+      readonly secondary?: {
+        readonly used_percent?: unknown;
+        readonly window_minutes?: unknown;
+        readonly resets_at?: unknown;
+      };
       readonly plan_type?: unknown;
     };
   };
@@ -60,6 +74,9 @@ const EMPTY_SUMMARY: CodexSessionUsageSummary = {
   usedPercent: null,
   windowMinutes: null,
   resetsAt: null,
+  secondaryUsedPercent: null,
+  secondaryWindowMinutes: null,
+  secondaryResetsAt: null,
   planType: null,
   sessionId: null,
   model: null,
@@ -125,6 +142,9 @@ export function parseCodexSessionLog(content: string): CodexSessionUsageSummary 
       usedPercent: rateLimits?.primary ? readNumber(rateLimits.primary.used_percent) : last.usedPercent,
       windowMinutes: rateLimits?.primary ? readNumber(rateLimits.primary.window_minutes) : last.windowMinutes,
       resetsAt: rateLimits?.primary ? readNumber(rateLimits.primary.resets_at) : last.resetsAt,
+      secondaryUsedPercent: rateLimits?.secondary ? readNumber(rateLimits.secondary.used_percent) : last.secondaryUsedPercent,
+      secondaryWindowMinutes: rateLimits?.secondary ? readNumber(rateLimits.secondary.window_minutes) : last.secondaryWindowMinutes,
+      secondaryResetsAt: rateLimits?.secondary ? readNumber(rateLimits.secondary.resets_at) : last.secondaryResetsAt,
       planType: typeof rateLimits?.plan_type === "string" ? rateLimits.plan_type : last.planType,
       sessionId,
       model,

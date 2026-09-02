@@ -58,6 +58,11 @@ export interface CodexRunOptions {
    *  (block immediately on review failure) is unchanged when no provider
    *  is given. */
   readonly independentReview?: CodexIndependentReviewIntegration;
+  /** Test-only override for the real-quota lookup in report/run-report.ts (which
+   *  defaults to the real `~/.codex/sessions`) - without this, every test that runs
+   *  through this engine would read whatever real Codex rollout history happens to
+   *  exist on the machine running the tests. Production callers never set this. */
+  readonly codexSessionsDir?: string;
 }
 
 export interface CodexIndependentReviewIntegration {
@@ -147,6 +152,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
   const hasPerTaskRouting = manifest.tasks.some((task) => task.routing !== undefined);
   if (doctor.status === "BLOCKED" && !hasPerTaskRouting) {
     return blockRunningRun({
+      codexSessionsDir: options.codexSessionsDir,
       compile,
       eventLog,
       code: doctor.findings[0]?.code ?? "CODEX_UNAVAILABLE",
@@ -229,6 +235,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
 
     if (worktree.status === "BLOCKED" || !worktree.worktree) {
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: worktree.findings[0]?.code ?? "WORKTREE_CREATE_FAILED",
@@ -352,6 +359,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
 
     if (execution.result.runId !== compile.runId || execution.result.taskId !== taskId) {
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: "ENGINE_RESULT_MISMATCH",
@@ -366,6 +374,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
 
     if (execution.result.status !== "DONE") {
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: "ENGINE_TASK_FAILED",
@@ -391,6 +400,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
 
     if (commit.status === "BLOCKED" || !commit.commit) {
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: commit.findings[0]?.code ?? "TASK_COMMIT_FAILED",
@@ -430,6 +440,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
 
     if (taskGateReport.status === "BLOCKED") {
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: taskGateReport.finding?.code ?? "TASK_GATE_FAILED",
@@ -475,7 +486,8 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
         taskCommits,
         gateResults,
         usageTotals,
-        blockedReason: finding.message
+        blockedReason: finding.message,
+        codexSessionsDir: options.codexSessionsDir
       });
 
       return {
@@ -517,6 +529,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
 
   if (globalGateReport.status === "BLOCKED") {
     return blockRunningRun({
+      codexSessionsDir: options.codexSessionsDir,
       compile,
       eventLog,
       code: globalGateReport.finding?.code ?? "GLOBAL_GATE_FAILED",
@@ -554,6 +567,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
   if (review.status !== "PASS") {
     if (!options.independentReview) {
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: "REVIEW_FAILED",
@@ -581,6 +595,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
 
     if (repairBaseWorktree.status === "BLOCKED" || !repairBaseWorktree.worktree) {
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: repairBaseWorktree.findings[0]?.code ?? "REPAIR_BASE_WORKTREE_FAILED",
@@ -605,6 +620,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
       writeJson(conflictReportPath, repairBaseIntegration.conflictReport);
 
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: "REPAIR_BASE_INTEGRATION_CONFLICT",
@@ -669,6 +685,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
       });
 
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: "REPAIR_DID_NOT_RESOLVE_REVIEW",
@@ -703,6 +720,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
     });
     if (!sourceMap.coverage.complete) {
       return blockRunningRun({
+        codexSessionsDir: options.codexSessionsDir,
         compile,
         eventLog,
         code: "SOURCE_MAP_ENFORCEMENT_FAILED",
@@ -723,7 +741,8 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
     taskCommits,
     gateResults,
     usageTotals,
-    blockedReason: null
+    blockedReason: null,
+    codexSessionsDir: options.codexSessionsDir
   });
 
   eventLog.append({
@@ -1085,6 +1104,7 @@ function blockRunningRun(input: {
   readonly usageTotals: UsageTotals;
   readonly now: string;
   readonly repairUnresolvedFindingIds?: readonly string[];
+  readonly codexSessionsDir?: string;
 }): CodexRunReport {
   input.eventLog.append({
     eventId: `${input.compile.runId}-${String(input.eventLog.read().events.length).padStart(4, "0")}-run-blocked`,
@@ -1100,7 +1120,8 @@ function blockRunningRun(input: {
     taskCommits: input.taskCommits,
     gateResults: input.gateResults,
     usageTotals: input.usageTotals,
-    blockedReason: input.message
+    blockedReason: input.message,
+    codexSessionsDir: input.codexSessionsDir
   });
 
   if (input.compile.state.runRoot) {
