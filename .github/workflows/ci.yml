@@ -9,7 +9,11 @@ on:
 
 jobs:
   clean-clone:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Infoapex AI bundle
         uses: actions/checkout@v4
@@ -59,3 +63,6 @@ jobs:
         run: |
           dotnet test modules/ai-code-control/tools/ai-code-control/AiCodeControl.sln --nologo
           npm run build --prefix modules/ai-code-control/tools/ai-code-control/mcp-server
+
+      - name: P3 release smoke test (git-archive ZIP -> clean extract -> setup/build/test -> all gates -> installer both modes)
+        run: npm run release:smoke-test

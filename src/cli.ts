@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -29,11 +30,12 @@ if (command === "init") {
 } else if (command === "status") {
   const repo = resolve(option("--repo") ?? process.cwd());
   const path = join(repo, ".infoapex-ai", "config.json");
+  const modules = readPinnedModuleVersions();
   if (!existsSync(path)) {
-    console.log(JSON.stringify({ status: "INDEPENDENT", configured: false }, null, 2));
+    console.log(JSON.stringify({ status: "INDEPENDENT", configured: false, modules }, null, 2));
     process.exitCode = 0;
   } else {
-    console.log(JSON.stringify({ status: "DONE", configured: true, config: JSON.parse(readFileSync(path, "utf8")) }, null, 2));
+    console.log(JSON.stringify({ status: "DONE", configured: true, config: JSON.parse(readFileSync(path, "utf8")), modules }, null, 2));
   }
 } else if (command === "handoff") {
   const repo = resolve(option("--repo") ?? process.cwd());
@@ -67,6 +69,36 @@ if (command === "init") {
 function option(name: string): string | null {
   const index = args.indexOf(name);
   return index < 0 ? null : args[index + 1] ?? null;
+}
+
+interface PinnedModuleVersion {
+  readonly name: string;
+  readonly sourceCommit: string;
+  readonly sourceRepository: string;
+}
+
+/** Reports the pinned upstream commit for each vendored module (P3 exit-gate item:
+ *  "toate modulele raportează versiunile fixate" - docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md
+ *  §7). Reads `modules/provenance.json` relative to THIS installed bundle's own root, not
+ *  the target `--repo` - provenance is a fact about the bundle you're running, not
+ *  something a target repository declares. Best-effort: a bundle that somehow lacks the
+ *  file (e.g. a stripped-down fork) reports an empty list rather than crashing `status`. */
+function readPinnedModuleVersions(): readonly PinnedModuleVersion[] {
+  const bundleRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const path = join(bundleRoot, "modules", "provenance.json");
+  if (!existsSync(path)) {
+    return [];
+  }
+  try {
+    const provenance = JSON.parse(readFileSync(path, "utf8")) as { modules?: readonly PinnedModuleVersion[] };
+    return (provenance.modules ?? []).map((entry) => ({
+      name: entry.name,
+      sourceCommit: entry.sourceCommit,
+      sourceRepository: entry.sourceRepository
+    }));
+  } catch {
+    return [];
+  }
 }
 
 function readConfig(repo: string): { mode: "independent" | "integrated"; handoffRoot: string } {

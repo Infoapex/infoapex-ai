@@ -34,11 +34,22 @@ test("installer keeps independent mode isolated and exposes status", () => {
     assert.match(readFileSync(join(repository, ".infoapex-ai", "README.md"), "utf8"), /infoapex-ai init/);
 
     const status = runCli(repository, ["status", "--repo", repository]);
-    const statusBody = JSON.parse(status.stdout) as { configured: boolean; config: { mode: string; planner: { enabled: boolean } } };
+    const statusBody = JSON.parse(status.stdout) as {
+      configured: boolean;
+      config: { mode: string; planner: { enabled: boolean } };
+      modules: readonly { name: string; sourceCommit: string; sourceRepository: string }[];
+    };
     assert.equal(status.status, 0);
     assert.equal(statusBody.configured, true);
     assert.equal(statusBody.config.mode, "independent");
     assert.equal(statusBody.config.planner.enabled, false);
+    // P3 exit gate: "toate modulele raportează versiunile fixate" - status reports the
+    // pinned upstream commit for every vendored module from modules/provenance.json.
+    assert.ok(statusBody.modules.length >= 5, JSON.stringify(statusBody.modules));
+    const worker = statusBody.modules.find((entry) => entry.name === "ai-code-worker");
+    assert.ok(worker);
+    assert.match(worker!.sourceCommit, /^[a-f0-9]{40}$/);
+    assert.match(worker!.sourceRepository, /^https:\/\//);
 
     const payloadPath = join(repository, "payload.json");
     writeFileSync(payloadPath, JSON.stringify({ status: "DONE" }), "utf8");
