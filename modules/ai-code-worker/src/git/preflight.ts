@@ -19,19 +19,22 @@ export interface GitPreflightFailure {
 export type GitPreflightResult = GitPreflight | GitPreflightFailure;
 
 export function gitPreflight(repositoryPath: string): GitPreflightResult {
-  // realpathSync, not a plain resolve: `git rev-parse --show-toplevel` below returns
-  // git's own canonicalized path, which is not guaranteed to be the same STRING as
-  // whatever form the caller passed in. Confirmed live on GitHub Actions
-  // windows-latest, 2026-09-02: os.tmpdir() there returns the short (8.3) form of the
-  // runner's home directory (`C:\Users\RUNNER~1\...`), while git resolves the same
-  // real directory to its long form with forward slashes
-  // (`C:/Users/runneradmin/...`). Every later comparison in this codebase
-  // (compile.ts's isPathInside(worktreeRoot, planAbsolutePath), state-root.ts's
-  // repositoryHash) assumes `requestedPath` and `worktreeRoot` denote the exact same
-  // string for the exact same directory - realpathSync here is what actually
+  // realpathSync.native (not the default JS realpathSync, and not a plain resolve):
+  // `git rev-parse --show-toplevel` below returns git's own canonicalized path, which
+  // is not guaranteed to be the same STRING as whatever form the caller passed in.
+  // Confirmed live on GitHub Actions windows-latest, 2026-09-02: os.tmpdir() there
+  // returns the short (8.3) form of the runner's home directory
+  // (`C:\Users\RUNNER~1\...`), while git resolves the same real directory to its long
+  // form with forward slashes (`C:/Users/runneradmin/...`). The default
+  // `fs.realpathSync` does NOT expand 8.3 short names on Windows (verified directly:
+  // it returns the short form unchanged) - only `fs.realpathSync.native` (which calls
+  // through to the OS's own path-resolution API) does. Every later comparison in this
+  // codebase (compile.ts's isPathInside(worktreeRoot, planAbsolutePath),
+  // state-root.ts's repositoryHash) assumes `requestedPath` and `worktreeRoot` denote
+  // the exact same string for the exact same directory - this is what actually
   // guarantees that, since path.resolve() is pure string manipulation and cannot
   // reconcile two different real-filesystem aliases of the same directory.
-  const requestedPath = realpathSync(resolve(repositoryPath));
+  const requestedPath = realpathSync.native(resolve(repositoryPath));
 
   try {
     const worktreeRoot = git(["rev-parse", "--show-toplevel"], requestedPath);

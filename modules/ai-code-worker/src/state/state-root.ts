@@ -57,10 +57,15 @@ export function repositoryHash(repoRoot: string): string {
  * before hashing, closing that gap at the source. Falls back to the syntactic path when
  * the directory does not exist yet (e.g. `doctor` probing a path before `init`) - never
  * throws for a caller that has not created the repo yet.
+ *
+ * Uses `realpathSync.native`, not the default JS `realpathSync`: verified directly
+ * that the default does NOT expand Windows 8.3 short path names (e.g.
+ * `C:\Users\RUNNER~1\...`) while `.native` (which calls through to the OS's own
+ * path-resolution API) does - see the identical finding in git/preflight.ts.
  */
 function canonicalRepoRootForHash(repoRoot: string): string {
   try {
-    return realpathSync(repoRoot);
+    return realpathSync.native(repoRoot);
   } catch {
     return repoRoot;
   }
