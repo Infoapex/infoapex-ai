@@ -103,3 +103,22 @@ genuinely per-task since each is derived from that task's own tokens.
 preregistered A/B experiment) that this pilot supplies the sequential baseline for
 but does not itself authorize — it remains disabled pending its own explicit
 go-ahead.
+
+P3 update 2026-09-02 (local steps 1-6 of `docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md`
+section 7): `scripts/build-release-zip.mjs` builds the release artifact with
+`git archive`, not a directory copy - it reads directly from the git object database
+at a given ref, so a dirty working tree or stray local files structurally cannot leak
+in (the script also refuses to archive `HEAD` with uncommitted changes unless
+`--allow-dirty` is passed, to make that guarantee explicit rather than silent).
+`scripts/release-smoke-test.mjs` extracts the resulting ZIP into a fresh temp
+directory with no `node_modules/`, `dist/`, or `.git`, then runs, from scratch:
+`npm run setup` → `npm run build` → `npm test`, all four internal gates
+(`value-gate`, `pilot:icm-graph`, `review-gate`, `docs-gate` - covering all five
+modules: planner, worker, review, docs, control), and the root installer's own
+`init`/`status` (independent mode) and `init`/`handoff`×2/`status` (integrated mode)
+against disposable target directories. **All 10 steps passed** (~6m20s total, see
+`npm run release:smoke-test`). Still open from the roadmap's step 7-9: a Windows+Linux
+CI matrix (today Linux-only, single job), a root `LICENSE` file, a
+`status`-exposed report of pinned module versions, release notes, and the tag/publish
+step itself - none of these were in this session's scope and none require an external
+or hard-to-reverse action to close the ones that are purely local.

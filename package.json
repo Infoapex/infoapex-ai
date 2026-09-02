@@ -22,7 +22,9 @@
     "p2b:pilot": "node scripts/p2-b-live-pilot.mjs --fixture --json",
     "p2b:pilot:live": "node scripts/p2-b-live-pilot.mjs --live --json",
     "review-gate:internal": "node scripts/review-gate.mjs",
-    "docs-gate:internal": "node scripts/docs-gate.mjs"
+    "docs-gate:internal": "node scripts/docs-gate.mjs",
+    "release:build-zip": "node scripts/build-release-zip.mjs",
+    "release:smoke-test": "node scripts/release-smoke-test.mjs"
   },
   "dependencies": {
     "ajv": "^8.20.0",
@@ -30,6 +32,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "adm-zip": "^0.6.0",
     "typescript": "^5.8.0"
   }
 }

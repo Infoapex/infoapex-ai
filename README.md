@@ -370,7 +370,7 @@ trebuie pornite explicit.
 | **P0** | Integrare și publicare ICM + Graph în modulele canonice | ✅ închis |
 | **P1** | Telemetrie de consum completă și comparabilă | ✅ implementat, sincronizat prin provenance |
 | **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, tokeni compleți pe ambele motoare, verdict economic **comparable** (procent din cota de 5 ore, nu cost USD — vezi mai jos) |
-| **P3** | Bundle ZIP, clean install, release privat | 🟡 deschis |
+| **P3** | Bundle ZIP, clean install, release privat | 🟡 în lucru — smoke test complet dintr-un ZIP curat trece (10/10 pași), rămân matricea CI Windows/Linux și publicarea |
 | **P4** | CLI root unificat | ⚪ planificat |
 | **P5** | SDK-uri și operare avansată | ⚪ post-stabilizare |
 
@@ -389,8 +389,12 @@ De ce `0.1.0` este pre-release și nu producție:
   **`comparable`**, nu `inconclusive`;
 - invocarea Codex necesită încă `--codex-sandbox danger-full-access` explicit;
   invocarea implicită `workspace-write` e blocată de politica locală de aprobare;
-- publicarea primului bundle cere încă un smoke test dintr-un ZIP extras într-un proiect
-  curat.
+- smoke test-ul complet dintr-un ZIP construit cu `git archive` (deci fără posibilitate
+  de contaminare cu fișiere locale necomise) trece integral — extragere, `setup`/
+  `build`/`test` de la zero, toate cele 4 gate-uri interne (planner, worker, review,
+  docs, control) și instalatorul root în ambele moduri (`npm run release:smoke-test`);
+  rămân deschise matricea CI Windows/Linux, `LICENSE` la rădăcina bundle-ului, release
+  notes și publicarea propriu-zisă.
 
 Detalii și dovezi: [`docs/RELEASE-GATES.md`](docs/RELEASE-GATES.md),
 [`docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md`](docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md),
