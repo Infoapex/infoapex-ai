@@ -304,6 +304,8 @@ rezultatul într-un envelope JSON comun (`schemaVersion`, `command`, `module`, `
 `exitCode`, `body`):
 
 ```bash
+npx --package . infoapex-ai help   # listă completă de comenzi, usage și ce deleagă fiecare
+
 npx --package . infoapex-ai doctor --repo /cale/catre/proiect --engine codex
 npx --package . infoapex-ai plan "Implementează funcționalitatea X cu teste" --repo /cale/catre/proiect
 npx --package . infoapex-ai run --repo /cale/catre/proiect --plan Plan/FEATURE-X.md --run-id FEATURE-X --engine codex
@@ -397,7 +399,7 @@ trebuie pornite explicit.
 | **P1** | Telemetrie de consum completă și comparabilă | ✅ implementat, sincronizat prin provenance |
 | **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, tokeni compleți pe ambele motoare, verdict economic **comparable** (procent din cota de 5 ore, nu cost USD — vezi mai jos) |
 | **P3** | Bundle ZIP, clean install, release privat | ✅ închis — smoke test complet dintr-un ZIP curat (10/10 pași), CI matrice Windows + Linux verde, `v0.1.0` publicat ca GitHub Release privat |
-| **P4** | CLI root unificat | 🟡 în lucru — ADR-0003, registry, mecanism de delegare, comenzile `doctor`/`plan`/`run`/`resume`/`review`/`docs` și testele lor sunt gata; rămân help/diagnostic finisate și review-ul final de compatibilitate |
+| **P4** | CLI root unificat | ✅ închis — ADR-0003, registry, mecanism de delegare, comenzile `doctor`/`plan`/`run`/`resume`/`review`/`docs`, `infoapex-ai help` și testele lor sunt gata; fiecare modul rămâne complet utilizabil de sine stătător (niciun modul nu a fost modificat pentru delegare) |
 | **P5** | SDK-uri și operare avansată | ⚪ post-stabilizare |
 
 De ce `0.1.0` este pre-release și nu producție:

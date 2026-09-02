@@ -185,3 +185,13 @@ test("an unrecognized top-level command is rejected with a usage message, not a 
     rmSync(repository, { recursive: true, force: true });
   }
 });
+
+test("help, --help, and -h all print the full command reference and exit 0", () => {
+  for (const flag of ["help", "--help", "-h"]) {
+    const result = runRootCli(process.cwd(), [flag]);
+    assert.equal(result.status, 0, result.stderr);
+    for (const command of ["doctor", "plan", "run", "resume", "review", "docs", "init", "status", "handoff"]) {
+      assert.match(result.stdout, new RegExp(`  ${command}\\b`), `help output is missing '${command}'`);
+    }
+  }
+});

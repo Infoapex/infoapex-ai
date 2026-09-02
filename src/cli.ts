@@ -6,11 +6,62 @@ import { fileURLToPath } from "node:url";
 import { delegate, type RootEnvelope } from "./delegate.js";
 import { MODULE_REGISTRY, modulesForCommand, moduleSubcommand, type RootCommand } from "./registry.js";
 
+interface CommandHelp {
+  readonly usage: string;
+  readonly summary: string;
+  readonly delegatesTo: string | null;
+}
+
+/** One entry per root command (ADR-0003 roadmap item 6: "Help, diagnostic și erori
+ *  coerente"). Kept here, not in registry.ts, because it is presentation text for a
+ *  human reading `infoapex-ai help` - the registry's job is machine-readable command
+ *  ownership, not prose. A delegated command's own required/optional flags are not
+ *  restated here: they are the target module's contract, and an incomplete invocation
+ *  already surfaces that module's own usage message inside the BLOCKED envelope. */
+const COMMAND_HELP: Readonly<Record<string, CommandHelp>> = {
+  init: { usage: "infoapex-ai init --repo <path> [--mode independent|integrated]", summary: "Bootstrap .infoapex-ai/ for a target repository.", delegatesTo: null },
+  status: { usage: "infoapex-ai status --repo <path>", summary: "Report this repository's integration mode and each vendored module's pinned commit. Not run state - see 'resume' for that.", delegatesTo: null },
+  handoff: { usage: "infoapex-ai handoff --repo <path> --direction <planner-to-worker|worker-to-planner> --run-id <id> --payload <json>", summary: "Publish a versioned handoff file between planner and worker (integrated mode only).", delegatesTo: null },
+  doctor: { usage: "infoapex-ai doctor --repo <path> [module flags...]", summary: "Aggregate: run doctor on every module present (ai-code-worker, ai-code-review, ai-code-docs) and report the worst status.", delegatesTo: "ai-code-worker, ai-code-review, ai-code-docs (doctor)" },
+  plan: { usage: "infoapex-ai plan <prompt> --repo <path> [--out <path>]", summary: "Produce a draft task plan. Does not chain into inspect/compile - those stay separate, human-reviewed steps.", delegatesTo: "ai-code-planner (propose)" },
+  run: { usage: "infoapex-ai run --repo <path> --plan <path> --engine <fake|codex|claude> [--run-id <id>]", summary: "Execute an accepted plan.", delegatesTo: "ai-code-worker (run)" },
+  resume: { usage: "infoapex-ai resume --repo <path> --run-id <id> --plan <path> --engine <fake|codex|claude>", summary: "Continue a run that has already started. Rejects with RUN_NOT_FOUND if --run-id does not match an existing run, rather than silently starting a new one.", delegatesTo: "ai-code-worker (status, then run)" },
+  review: { usage: "infoapex-ai review --repo <path> --request <path> [--no-planner] [--no-control]", summary: "Run an independent, read-only review against accepted criteria.", delegatesTo: "ai-code-review (run)" },
+  docs: { usage: "infoapex-ai docs --repo <path> --request <path>", summary: "Generate documentation through the planner -> worker -> review cycle.", delegatesTo: "ai-code-docs (generate)" }
+};
+
+function printHelp(): void {
+  const lines: string[] = [
+    "infoapex-ai - local governance layer over Codex CLI / Claude Code coding agents",
+    "",
+    "Usage: infoapex-ai <command> [flags...]",
+    "",
+    "Commands:"
+  ];
+  for (const [name, help] of Object.entries(COMMAND_HELP)) {
+    lines.push(`  ${name}`);
+    lines.push(`    ${help.usage}`);
+    lines.push(`    ${help.summary}`);
+    if (help.delegatesTo) {
+      lines.push(`    Delegates to: ${help.delegatesTo}`);
+    }
+    lines.push("");
+  }
+  lines.push("Every delegated command (doctor/plan/run/resume/review/docs) spawns the target");
+  lines.push("module's own built CLI as a subprocess and normalizes its result into");
+  lines.push("{schemaVersion, command, module, status, exitCode, body} - see");
+  lines.push("docs/adr/0003-unified-root-cli-delegation.md for the full contract.");
+  console.log(lines.join("\n"));
+}
+
 const args = process.argv.slice(2);
 const command = args[0];
 const DELEGATED_COMMANDS: readonly RootCommand[] = ["doctor", "plan", "run", "resume", "review", "docs"];
 
-if (command === "init") {
+if (command === "help" || command === "--help" || command === "-h") {
+  printHelp();
+  process.exitCode = 0;
+} else if (command === "init") {
   const repo = resolve(option("--repo") ?? process.cwd());
   const mode = option("--mode") ?? "independent";
   if (mode !== "independent" && mode !== "integrated") {
@@ -87,7 +138,7 @@ if (command === "init") {
     printEnvelope(delegate({ command, module: module!, subcommand: moduleSubcommand(module!, command), bundleRoot: bundleRoot(), args: forwardedArgs }));
   }
 } else {
-  console.error(`Usage: infoapex-ai <init|status|handoff|${DELEGATED_COMMANDS.join("|")}>`);
+  console.error(`Usage: infoapex-ai <init|status|handoff|${DELEGATED_COMMANDS.join("|")}>. Run 'infoapex-ai help' for details on each command.`);
   process.exitCode = 1;
 }
 
