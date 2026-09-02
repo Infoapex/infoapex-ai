@@ -227,7 +227,7 @@ scheme versionate, ceea ce le face utilizabile și testabile independent.
 
 | Modul | Ce face | Ce nu face |
 |---|---|---|
-| `infoapex-ai` | Bootstrap: `init`, `status`, `handoff`. Configurează modul independent sau integrat. | Nu este încă un CLI unificat pentru toate comenzile. |
+| `infoapex-ai` | Bootstrap (`init`, `status`, `handoff`) plus CLI root unificat: `doctor` (agregă doctor-ul fiecărui modul), `plan`, `run`, `resume`, `review`, `docs` — toate deleagă la CLI-ul propriu, deja construit, al modulului corespunzător. | Nu importă cod sursă din module (deleagă mereu prin subproces); `status` rămâne separat de starea unui run (vezi `resume`). |
 | `ai-code-planner` | Transformă un prompt în plan structurat, îl validează și îl lint-uiește, propune rutarea logică, îl compilează în formatul worker-ului. | Nu scrie cod. Nu produce manifestul final înghețat. Nu îți proiectează arhitectura. |
 | `ai-code-worker` | Îngheață manifestul, construiește DAG-ul, rezolvă profilul logic, invocă motorul, aplică gate-uri, bugete și cicluri limitate de reparare, comite. | Nu importă cod de planner. Nu decide singur criteriile de acceptare. |
 | `ai-code-review` | Orchestrare read-only pentru criterii și diferențe între commit-uri. `run` este fail-closed. | Nu scrie în repository-ul țintă. Nu primește capacitate de reparare. |
@@ -295,6 +295,32 @@ node modules/ai-code-worker/dist/src/cli.js run \
 
 Începe cu `--engine fake`: este determinist, nu consumă provider și verifică tot
 wiring-ul de orchestrare.
+
+### CLI root unificat
+
+Pașii 2-4 de mai sus pot fi rulați și prin CLI-ul root, care deleagă la CLI-ul propriu al
+fiecărui modul ca subproces (niciodată prin import de cod sursă) și normalizează
+rezultatul într-un envelope JSON comun (`schemaVersion`, `command`, `module`, `status`,
+`exitCode`, `body`):
+
+```bash
+npx --package . infoapex-ai doctor --repo /cale/catre/proiect --engine codex
+npx --package . infoapex-ai plan "Implementează funcționalitatea X cu teste" --repo /cale/catre/proiect
+npx --package . infoapex-ai run --repo /cale/catre/proiect --plan Plan/FEATURE-X.md --run-id FEATURE-X --engine codex
+npx --package . infoapex-ai resume --repo /cale/catre/proiect --run-id FEATURE-X --plan Plan/FEATURE-X.md --engine codex
+npx --package . infoapex-ai review --repo /cale/catre/proiect --request review-request.json
+npx --package . infoapex-ai docs --repo /cale/catre/proiect --request docs-request.json
+```
+
+`doctor` este singura comandă agregată: rulează doctor-ul fiecărui modul prezent
+(`ai-code-worker`, `ai-code-review`, `ai-code-docs`) și raportează starea cea mai proastă
+dintre ele — un modul neinițializat sau lipsă blochează rezultatul agregat, nu e sărit
+tacit. `resume` cere explicit `--run-id` și verifică întâi, prin `status`-ul propriu al
+worker-ului, că acel run chiar există, înainte să delege la `run` — altfel respinge cu
+`RUN_NOT_FOUND` în loc să pornească tacit un run nou sub acel id. Fiecare modul rămâne
+complet utilizabil și testabil de sine stătător prin propriul CLI (comenzile de mai sus
+sunt echivalente cu apelurile directe din pașii 2-4). Detalii complete: ADR
+[`docs/adr/0003-unified-root-cli-delegation.md`](docs/adr/0003-unified-root-cli-delegation.md).
 
 ## Moduri de integrare
 
@@ -370,8 +396,8 @@ trebuie pornite explicit.
 | **P0** | Integrare și publicare ICM + Graph în modulele canonice | ✅ închis |
 | **P1** | Telemetrie de consum completă și comparabilă | ✅ implementat, sincronizat prin provenance |
 | **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, tokeni compleți pe ambele motoare, verdict economic **comparable** (procent din cota de 5 ore, nu cost USD — vezi mai jos) |
-| **P3** | Bundle ZIP, clean install, release privat | 🟡 în lucru — smoke test complet dintr-un ZIP curat trece (10/10 pași), rămân matricea CI Windows/Linux și publicarea |
-| **P4** | CLI root unificat | ⚪ planificat |
+| **P3** | Bundle ZIP, clean install, release privat | ✅ închis — smoke test complet dintr-un ZIP curat (10/10 pași), CI matrice Windows + Linux verde, `v0.1.0` publicat ca GitHub Release privat |
+| **P4** | CLI root unificat | 🟡 în lucru — ADR-0003, registry, mecanism de delegare, comenzile `doctor`/`plan`/`run`/`resume`/`review`/`docs` și testele lor sunt gata; rămân help/diagnostic finisate și review-ul final de compatibilitate |
 | **P5** | SDK-uri și operare avansată | ⚪ post-stabilizare |
 
 De ce `0.1.0` este pre-release și nu producție:
@@ -393,8 +419,7 @@ De ce `0.1.0` este pre-release și nu producție:
   de contaminare cu fișiere locale necomise) trece integral — extragere, `setup`/
   `build`/`test` de la zero, toate cele 4 gate-uri interne (planner, worker, review,
   docs, control) și instalatorul root în ambele moduri (`npm run release:smoke-test`);
-  rămân deschise matricea CI Windows/Linux, `LICENSE` la rădăcina bundle-ului, release
-  notes și publicarea propriu-zisă.
+  CI Windows/Linux e verde, iar `v0.1.0` e publicat ca GitHub Release privat.
 
 Detalii și dovezi: [`docs/RELEASE-GATES.md`](docs/RELEASE-GATES.md),
 [`docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md`](docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md),
@@ -434,13 +459,14 @@ handoff între agenți, cerințe de audit sau nevoia de a reproduce procesul în
 - Worktree-urile și verificarea scope-ului **nu echivalează singure cu un sandbox de
   sistem de operare**.
 - Configurarea greșită a comenzilor de validare poate executa procese locale nedorite.
-- Interfața root `infoapex-ai` este un bootstrap subțire, nu un CLI unificat.
+- CLI-ul root deleagă la modulele deja construite (nu importă cod sursă), dar nu
+  re-validează contractele lor — o comandă malformată e respinsă de modulul țintă, nu
+  de root.
 - Integrarea live, securizarea distribuției și măsurarea A/B față de agenții direcți
   necesită validare suplimentară înaintea unui release de producție.
 
 ## Direcții de dezvoltare
 
-- CLI unificat pentru `plan`, `run`, `review`, `docs`, `status` și `resume`;
 - backend real de izolare la nivel de sistem/VM/container, cu capabilități probate;
 - validarea strictă a fiecărui mesaj la toate granițele dintre procese;
 - teste Windows și Linux, smoke test automat al bundle-ului ZIP, artefacte semnate;
@@ -453,7 +479,7 @@ handoff între agenți, cerințe de audit sau nevoia de a reproduce procesul în
 
 ```text
 infoapex-ai/
-├── src/                         # CLI-ul root: init, status, handoff
+├── src/                         # CLI-ul root: init, status, handoff, doctor, plan, run, resume, review, docs
 ├── schemas/                     # contractele root de integrare
 ├── modules/
 │   ├── ai-code-planner/         # plan, lint, rutare logică
