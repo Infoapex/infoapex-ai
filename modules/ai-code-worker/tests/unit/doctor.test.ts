@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, describe, it } from "node:test";
@@ -21,7 +21,11 @@ describe("doctor preflight", () => {
     const preflight = gitPreflight(repo);
 
     assert.equal(preflight.ok, true);
-    assert.equal(preflight.requestedPath, repo);
+    // requestedPath is realpathSync.native()'d (see git/preflight.ts), so it may
+    // differ from the raw `repo` string on a host where that path has a distinct
+    // short-name alias (confirmed live on GitHub Actions windows-latest) - compare
+    // against the same canonicalization, not the raw input.
+    assert.equal(preflight.requestedPath, realpathSync.native(repo));
 
     const report = runDoctor({ repositoryPath: repo });
 
