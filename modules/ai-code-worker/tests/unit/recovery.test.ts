@@ -73,7 +73,13 @@ describe("recovery: process kill at specific pipeline points", () => {
       "__integration__",
       "attempt-1"
     );
-    assert.equal(existsSync(integrationWorktreePath), true, "fixture must actually reach the integration step");
+    assert.equal(
+      existsSync(integrationWorktreePath),
+      true,
+      `fixture must actually reach the integration step - path=${integrationWorktreePath}, ` +
+        `runRoot exists=${existsSync(first.state.runRoot!)}, ` +
+        `worktreesDirExists=${existsSync(join(resolveStateRoot({ repoRoot: repo }).path, "worktrees"))}`
+    );
 
     const events = readEvents(first.state.eventLogPath!);
     const lastFinishedIndex = findLastIndex(events, (event) => event.type === "task.finished");

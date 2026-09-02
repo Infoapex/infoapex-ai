@@ -162,7 +162,7 @@ describe("fake run coordinator - independent review + repair wiring", () => {
     // First attempt: repair never resolves (simulates the state left behind
     // right before/during a process kill mid-repair - the run never reaches
     // run.done). We only need its event log, not its returned status.
-    runFake({
+    const firstAttempt = runFake({
       repositoryPath: repo,
       planPath: "Plan/RUN.md",
       runId,
@@ -181,7 +181,11 @@ describe("fake run coordinator - independent review + repair wiring", () => {
     const lastOriginalTaskFinished = events.findLastIndex(
       (event) => event.type === "task.finished" && event.payload.taskId === "CONTRACT-01"
     );
-    assert.ok(lastOriginalTaskFinished >= 0, "fixture must reach the original task's completion");
+    assert.ok(
+      lastOriginalTaskFinished >= 0,
+      `fixture must reach the original task's completion - first attempt status=${firstAttempt.status}, ` +
+        `findings=${JSON.stringify(firstAttempt.findings)}, eventTypes=${JSON.stringify(events.map((event) => event.type))}`
+    );
     writeFileSync(
       eventLogPath,
       `${events

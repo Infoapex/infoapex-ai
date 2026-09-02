@@ -30,7 +30,7 @@ describe("status command", () => {
       now: "2026-08-01T10:01:10Z"
     });
 
-    assert.equal(report.status, "PASS");
+    assert.equal(report.status, "PASS", JSON.stringify(report));
     assert.equal(report.run.status, "AUTHORIZED");
     assert.equal(report.eventLog.eventCount, 2);
     assert.equal(report.lease.state, "missing");

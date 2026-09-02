@@ -12,7 +12,7 @@
     "phase0:demo": "node scripts/phase0-demo.mjs",
     "phase2:demo": "node scripts/phase2-demo.mjs",
     "pretest": "npm run build",
-    "test": "node --test dist/tests/**/*.test.js",
+    "test": "node --import ./scripts/clear-sync-root-env.mjs --test dist/tests/**/*.test.js",
     "posttest": "npm run validate:json",
     "validate:json": "node scripts/validate-json.mjs"
   },
