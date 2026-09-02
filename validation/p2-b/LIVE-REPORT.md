@@ -19,21 +19,36 @@ engine fallbacks triggered — every task ran on its originally requested engine
 |---|---|---|
 | Uncached input tokens | 48,863 | 30 |
 | Cache-read tokens | 262,528 | 188,568 |
-| Cache-write tokens | unknown (`null` ×5) | 42,364 |
+| Cache-write tokens | 0 (all 5 tasks) | 42,364 |
 | Output tokens | 2,364 | 3,263 |
 | USD cost | unknown (`null` ×5) | $0.3658 total |
-| Usage completeness | `partial` ×5 | `complete` ×5 |
+| Usage completeness | `partial` ×5 (cost only) | `complete` ×5 |
 | Wall time | 149.6s total (~29.9s/task) | 97.0s total (~19.4s/task) |
 
 Codex's `exec --json` again omitted usage entirely on 0.147.0 (same gap as P2-A); every
-Codex figure above is the sanitized local-rollout fallback, still missing cache-write
-and cost. Claude's usage is complete and directly comparable across all 5 tasks.
+Codex figure above is the sanitized local-rollout fallback.
 
-**Combined economic verdict stays `inconclusive`** — not because any task failed, but
-because Codex CLI 0.147.0 structurally does not report cache-write tokens or USD cost.
-This is an external CLI limitation, not a defect in this pilot or in `ai-code-worker`'s
-usage parsing (already verified correct against the real envelope shape in P2-A and
-again here). It will remain `inconclusive` until Codex's own CLI exposes those fields.
+**Correction, 2026-09-02**: the raw rollout files (`~/.codex/sessions/**`) actually
+contain `cache_write_input_tokens` (value 0 for all 5 tasks here) - `ai-code-worker`'s
+Codex usage parser simply never read that field, a stale assumption carried over from
+an earlier CLI version that genuinely omitted it. The parser is now fixed
+(`codex-cli.ts`, `read-codex-session.ts`) and this report was reprocessed from the
+original rollout files already on disk - no new live invocation was needed. Token-level
+usage for Codex is therefore now complete in the `totalTokens` sense (all 4 token fields
+known); only USD cost remains unavailable, and for a structural reason confirmed
+directly in the same rollout files: `rate_limits.credits` reports `has_credits: false,
+balance: "0"` for this ChatGPT-Plus-subscription-authenticated account - there is no
+dollar ledger to report from in this billing mode, independent of anything this
+project's code does or doesn't parse. Claude's usage is complete and directly
+comparable across all 5 tasks.
+
+**Combined economic verdict stays `inconclusive`** - not because any task failed, and no
+longer because of a cache-write gap (that was our own parsing bug, now fixed), but
+because Codex CLI 0.147.0 under ChatGPT-subscription auth has no USD figure to report at
+all. It would remain `inconclusive` under this auth mode regardless of future CLI
+updates; the only ways to close it are switching this account to API-key billing (a
+real, separate cost decision) or OpenAI adding its own subscription-equivalent shadow
+price the way Anthropic's Claude Code CLI already does.
 
 Claude's own economic comparability is real and usable on its own: 5/5 complete reports,
 ~$0.073/task, ~45.6k tokens/task uncached+cache-read+cache-write+output combined.

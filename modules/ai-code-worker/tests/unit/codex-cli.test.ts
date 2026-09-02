@@ -244,6 +244,27 @@ describe("codex cli adapter", () => {
     });
   });
 
+  it("parses cache_write_input_tokens when the CLI includes it (confirmed present on real CLI 0.147.0, P2-B live run 2026-09-02)", () => {
+    const cli = fakeCli("0.147.0", { usage: { cacheWriteInputTokens: 128 } });
+    const adapter = new CodexCliAdapter({
+      executable: process.execPath,
+      baseArgs: [cli],
+      testedVersionRanges: ["0.147.0"],
+      requiresCapabilitySmokeTest: false
+    });
+    const execution = adapter.start({
+      runId: "run-codex",
+      taskId: "TASK-01",
+      executionId: "exec-1",
+      sessionId: "session-1",
+      worktreePath: process.cwd(),
+      prompt: "Implement task.",
+      startedAt: "2026-08-01T10:00:00Z"
+    });
+
+    assert.equal(execution.usage.cacheWriteTokens, 128);
+  });
+
   it("parses token usage against a captured real rollout sample, taking the last (cumulative) token_count event", () => {
     const cli = fakeCliReplaying("0.146.0-alpha.3.1", "tests/fixtures/engine-usage/codex-rollout-token-count.sample.jsonl");
     const adapter = new CodexCliAdapter({
@@ -366,7 +387,7 @@ function fakeCli(
     readonly touchedFile?: string;
     readonly wrapResultInProse?: boolean;
     readonly delayMs?: number;
-    readonly usage?: { readonly inputTokens?: number; readonly cachedInputTokens?: number; readonly outputTokens?: number } | null;
+    readonly usage?: { readonly inputTokens?: number; readonly cachedInputTokens?: number; readonly cacheWriteInputTokens?: number; readonly outputTokens?: number } | null;
   } = {}
 ): string {
   const root = mkdtempSync(join(tmpdir(), "aicw-fake-codex-"));

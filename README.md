@@ -172,9 +172,11 @@ verdict separat — `complete`, `partial` sau `unavailable`. Doar un raport comp
 susține o comparație economică.
 
 Distincția nu este teoretică: un PASS funcțional nu implică comparabilitate economică.
-Codex, de exemplu, nu raportează în prezent numărul de cache-write sau costul în USD,
-deci consumul lui normalizat rămâne `partial` — suficient pentru a valida execuția,
-insuficient pentru a susține o afirmație de cost.
+Codex, de exemplu, nu raportează în prezent costul în USD pentru conturi autentificate
+prin abonament ChatGPT (confirmat direct: `rate_limits.credits` din rollout-ul local
+arată `has_credits: false` — nu există un cont în dolari de raportat în acest mod de
+facturare), deci consumul lui normalizat rămâne `partial` — suficient pentru a valida
+execuția, insuficient pentru a susține o afirmație de cost.
 
 ## Anatomia unui task
 
@@ -367,7 +369,7 @@ trebuie pornite explicit.
 |:--|:--|:--|
 | **P0** | Integrare și publicare ICM + Graph în modulele canonice | ✅ închis |
 | **P1** | Telemetrie de consum completă și comparabilă | ✅ implementat, sincronizat prin provenance |
-| **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, verdict economic combinat rămâne inconclusive (Codex nu raportează cost/cache-write) |
+| **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, tokeni compleți pe ambele motoare, verdict economic combinat rămâne inconclusive (Codex nu raportează cost în USD pentru cont pe abonament) |
 | **P3** | Bundle ZIP, clean install, release privat | 🟡 deschis |
 | **P4** | CLI root unificat | ⚪ planificat |
 | **P5** | SDK-uri și operare avansată | ⚪ post-stabilizare |
@@ -377,10 +379,11 @@ De ce `0.1.0` este pre-release și nu producție:
 - gate-ul intern generic trece, dar nu măsoară încă valoarea comparativă față de
   folosirea directă a agentului;
 - gate-urile live P2-A (2 invocări) și P2-B (10 task-uri reale, secvențial, 5 Codex + 5
-  Claude) au trecut funcțional 10/10 — vezi `validation/p2-b/LIVE-REPORT.md` — dar
-  verdictul economic combinat rămâne `inconclusive`, permanent, cât timp CLI-ul Codex nu
-  raportează cache-write și cost în `exec --json`; aceasta e o limitare externă,
-  documentată, nu un gate deschis;
+  Claude) au trecut funcțional 10/10, cu tokeni compleți pe ambele motoare — vezi
+  `validation/p2-b/LIVE-REPORT.md` — dar verdictul economic combinat rămâne
+  `inconclusive`, deoarece Codex nu raportează cost în USD pentru un cont autentificat
+  prin abonament ChatGPT (confirmat: nu există cont în dolari de raportat în acest mod
+  de facturare); aceasta e o limitare externă, documentată, nu un gate deschis;
 - invocarea Codex necesită încă `--codex-sandbox danger-full-access` explicit;
   invocarea implicită `workspace-write` e blocată de politica locală de aprobare;
 - publicarea primului bundle cere încă un smoke test dintr-un ZIP extras într-un proiect

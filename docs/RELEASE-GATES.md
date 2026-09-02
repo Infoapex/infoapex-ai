@@ -63,14 +63,29 @@ The live run executed 2026-09-02 (`validation/p2-b/live-report.json`,
 `LIVE-REPORT.md`): **10/10 DONE, 10/10 accurate, zero engine fallbacks**, 4m10s total
 wall time. Claude usage is complete for all 5 tasks (~$0.073/task, ~$0.3658 total).
 Codex again omitted usage from `exec --json` on 0.147.0; the sanitized rollout
-fallback covers input/cache-read/output but cache-write and USD cost remain unknown
-for all 5 Codex tasks. The combined economic verdict is therefore `inconclusive`,
-same as P2-A and for the same external, CLI-side reason — not a functional defect.
+fallback covers all 4 token fields.
+
+Correction, same day: the raw Codex rollout files were found to contain
+`cache_write_input_tokens` (value 0 for every task in this run) that
+`ai-code-worker`'s usage parser had never read — a stale assumption from an earlier
+CLI version that genuinely omitted the field, not a current CLI limitation. Fixed in
+`codex-cli.ts`/`read-codex-session.ts` (392/392 worker tests still pass) and both
+P2-A's and P2-B's reports were reprocessed from their original, still-present local
+rollout files — no new live invocation was needed. Token-level Codex usage is
+therefore now complete; **only `costUsd` remains unavailable, for a confirmed
+structural reason**: the same rollout's `rate_limits.credits` reports
+`has_credits: false, balance: "0"` for this ChatGPT-Plus-subscription-authenticated
+account, meaning there is no dollar ledger to report from in this billing mode. The
+combined economic verdict is therefore still `inconclusive`, same as P2-A, but now for
+exactly one isolated, well-understood reason instead of two conflated ones.
 
 **P2 is closed**: both the 2-invocation preflight (P2-A) and the 10-task live pilot
-(P2-B) are functional PASS. The economic verdict will remain `inconclusive` until
-Codex's own CLI reports cache-write tokens and USD cost; this is an accepted,
-documented limitation, not an open release gate. Enabling `GRAPH-06` parallel
-reviewers is a distinct, separately-gated decision (a preregistered A/B experiment)
-that this pilot supplies the sequential baseline for but does not itself
-authorize — it remains disabled pending its own explicit go-ahead.
+(P2-B) are functional PASS, with complete token-level usage on both engines. The
+economic verdict will remain `inconclusive` until either this account switches to
+API-key billing (a real, separate cost decision) or OpenAI's Codex CLI adds its own
+subscription-equivalent shadow price, the way Anthropic's Claude Code CLI already
+does; this is an accepted, documented limitation, not an open release gate. Enabling
+`GRAPH-06` parallel reviewers is a distinct, separately-gated decision (a
+preregistered A/B experiment) that this pilot supplies the sequential baseline for
+but does not itself authorize — it remains disabled pending its own explicit
+go-ahead.

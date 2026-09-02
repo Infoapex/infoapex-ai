@@ -5,6 +5,10 @@ import { join } from "node:path";
 export interface CodexSessionTokenUsage {
   readonly inputTokens: number | null;
   readonly cachedInputTokens: number | null;
+  /** Present on real CLI 0.147.0 rollouts as of 2026-09-02 (P2-B live run); older
+   *  sanitized fixtures captured before that date omit it, in which case this is null
+   *  the same way any other absent field would be - not a permanent CLI limitation. */
+  readonly cacheWriteTokens: number | null;
   readonly outputTokens: number | null;
   readonly totalTokens: number | null;
 }
@@ -35,6 +39,7 @@ interface CodexRolloutEvent {
       readonly total_token_usage?: {
         readonly input_tokens?: unknown;
         readonly cached_input_tokens?: unknown;
+        readonly cache_write_input_tokens?: unknown;
         readonly output_tokens?: unknown;
         readonly total_tokens?: unknown;
       };
@@ -112,6 +117,7 @@ export function parseCodexSessionLog(content: string): CodexSessionUsageSummary 
         ? {
             inputTokens: readNumber(totals.input_tokens),
             cachedInputTokens: readNumber(totals.cached_input_tokens),
+            cacheWriteTokens: readNumber(totals.cache_write_input_tokens),
             outputTokens: readNumber(totals.output_tokens),
             totalTokens: readNumber(totals.total_tokens)
           }

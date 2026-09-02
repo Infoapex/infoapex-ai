@@ -40,7 +40,8 @@ TUI-only interactive slash-commands with no CLI or API surface.** They report th
 |---|---|---|
 | `accurate` | worker `status === "DONE"` **and** an independent re-read of the evidence file | Read via `git show <taskCommit>:<evidencePath>` from `run-report.json`'s `taskCommits` — task work lands on a dedicated `aiw/task/<runId>/<taskId>/attempt-N` branch in its own worktree, never checked out into the shared repo's main working tree, so reading the path directly from the repo root always misses it. |
 | `fallbacksTriggered` (retries) | `engineProvenance.engineFallbackTriggered` | Doctor-level `--fallback-engine` activation before a task starts (already live-validated, P2-A/#19). Not a mid-task or repair-cycle retry — see above. |
-| `uncachedContextTotal` / total tokens | `usage.inputUncachedTokens` + the other 3 categories | Claude: complete, from `--output-format json`'s `usage` object. Codex: `exec --json` omits usage on 0.147.0 (confirmed live in P2-A and again in this pilot's own doctor checks); falls back to the sanitized local rollout (`~/.codex/sessions/**`), which is missing `cacheWriteTokens`/`costUsd` — always `null`, never guessed. `totalTokens` for a group is only computed when every task in it has complete usage. |
+| `uncachedContextTotal` / total tokens | `usage.inputUncachedTokens` + the other 3 categories | Claude: complete, from `--output-format json`'s `usage` object. Codex: `exec --json` omits usage on 0.147.0 (confirmed live in P2-A and again here); falls back to the sanitized local rollout (`~/.codex/sessions/**`), which does include `cache_write_input_tokens` (fixed 2026-09-02 — a prior version of this parser wrongly treated it as never-surfaced) but never `costUsd`. `totalTokens` for a group is only computed when every task in it has complete usage. |
+| `costUsd` | `--output-format json`'s `total_cost_usd` (Claude only) | Structurally unavailable for Codex under this account's ChatGPT-Plus-subscription auth, not a parsing gap: the same rollout's `rate_limits.credits` reports `has_credits: false, balance: "0"` — there is no dollar ledger to report from in this billing mode. |
 | explanation time | wall-clock `elapsedMs` of the `run` invocation | No installed CLI exposes a separate reasoning-only timer; documented as a proxy, not a measured quantity. |
 
 ## Running it
@@ -59,7 +60,9 @@ node scripts/p2-b-live-pilot.mjs --live --json --out validation/p2-b/live-report
 ```
 
 As with P2-A, the combined `economicVerdict` stays `inconclusive` unless every task in
-the run has complete usage — which today means Codex's known cache-write/cost gap keeps
-the combined verdict `inconclusive` even when every task functionally passes. Per-engine
-summaries in the report split this out, so Claude's own economic comparability is not
-hidden behind Codex's gap.
+the run has complete usage — which today means Codex's `costUsd` gap keeps the combined
+verdict `inconclusive` even when every task functionally passes and every token field is
+known. Per-engine summaries in the report split this out, so Claude's own economic
+comparability is not hidden behind Codex's gap. See `LIVE-REPORT.md` for the full
+account of the 2026-09-02 cache-write parser fix and why cost specifically, not tokens,
+is the part that remains structurally unavailable.

@@ -47,14 +47,14 @@
         "agentInvocations": 1,
         "inputUncachedTokens": 9059,
         "cacheReadTokens": 52224,
-        "cacheWriteTokens": null,
+        "cacheWriteTokens": 0,
         "outputTokens": 377,
         "costUsd": null
       },
       "usageAssessment": {
         "completeness": "partial",
         "economicVerdict": "inconclusive",
-        "unknownFields": ["cacheWriteTokens", "costUsd"]
+        "unknownFields": ["costUsd"]
       },
       "stderrTail": ""
     },

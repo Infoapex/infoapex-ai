@@ -21,12 +21,35 @@ describe("read-codex-session", () => {
     assert.deepEqual(summary.totalTokenUsage, {
       inputTokens: 83421,
       cachedInputTokens: 71200,
+      cacheWriteTokens: null,
       outputTokens: 2114,
       totalTokens: 85535
     });
     assert.equal(summary.usedPercent, 86.0);
     assert.equal(summary.windowMinutes, 10080);
     assert.equal(summary.planType, "plus");
+  });
+
+  it("parses cache_write_input_tokens when present (confirmed on a real CLI 0.147.0 rollout, P2-B live run 2026-09-02)", () => {
+    const summary = parseCodexSessionLog(
+      JSON.stringify({
+        type: "event_msg",
+        payload: {
+          type: "token_count",
+          info: {
+            total_token_usage: {
+              input_tokens: 62370,
+              cached_input_tokens: 56320,
+              cache_write_input_tokens: 0,
+              output_tokens: 432,
+              total_tokens: 62802
+            }
+          }
+        }
+      })
+    );
+
+    assert.equal(summary.totalTokenUsage?.cacheWriteTokens, 0);
   });
 
   it("returns an empty summary when there is no token_count event", () => {

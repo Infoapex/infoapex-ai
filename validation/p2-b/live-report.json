@@ -31,8 +31,8 @@
       "accuracyRate": 1,
       "fallbacksTriggered": 0,
       "uncachedContextTotal": 48893,
-      "totalTokens": null,
-      "totalTokensComplete": false,
+      "totalTokens": 548980,
+      "totalTokensComplete": true,
       "elapsedMsTotal": 246596
     },
     "codex": {
@@ -41,8 +41,8 @@
       "accuracyRate": 1,
       "fallbacksTriggered": 0,
       "uncachedContextTotal": 48863,
-      "totalTokens": null,
-      "totalTokensComplete": false,
+      "totalTokens": 313755,
+      "totalTokensComplete": true,
       "elapsedMsTotal": 149597
     },
     "claude": {
@@ -81,7 +81,7 @@
         "agentInvocations": 1,
         "inputUncachedTokens": 6050,
         "cacheReadTokens": 56320,
-        "cacheWriteTokens": null,
+        "cacheWriteTokens": 0,
         "outputTokens": 432,
         "costUsd": null
       },
@@ -89,7 +89,6 @@
         "completeness": "partial",
         "economicVerdict": "inconclusive",
         "unknownFields": [
-          "cacheWriteTokens",
           "costUsd"
         ]
       },
@@ -154,7 +153,7 @@
         "agentInvocations": 1,
         "inputUncachedTokens": 10128,
         "cacheReadTokens": 52224,
-        "cacheWriteTokens": null,
+        "cacheWriteTokens": 0,
         "outputTokens": 440,
         "costUsd": null
       },
@@ -162,7 +161,6 @@
         "completeness": "partial",
         "economicVerdict": "inconclusive",
         "unknownFields": [
-          "cacheWriteTokens",
           "costUsd"
         ]
       },
@@ -227,7 +225,7 @@
         "agentInvocations": 1,
         "inputUncachedTokens": 6232,
         "cacheReadTokens": 56320,
-        "cacheWriteTokens": null,
+        "cacheWriteTokens": 0,
         "outputTokens": 525,
         "costUsd": null
       },
@@ -235,7 +233,6 @@
         "completeness": "partial",
         "economicVerdict": "inconclusive",
         "unknownFields": [
-          "cacheWriteTokens",
           "costUsd"
         ]
       },
@@ -300,7 +297,7 @@
         "agentInvocations": 1,
         "inputUncachedTokens": 6058,
         "cacheReadTokens": 56320,
-        "cacheWriteTokens": null,
+        "cacheWriteTokens": 0,
         "outputTokens": 449,
         "costUsd": null
       },
@@ -308,7 +305,6 @@
         "completeness": "partial",
         "economicVerdict": "inconclusive",
         "unknownFields": [
-          "cacheWriteTokens",
           "costUsd"
         ]
       },
@@ -373,7 +369,7 @@
         "agentInvocations": 1,
         "inputUncachedTokens": 20395,
         "cacheReadTokens": 41344,
-        "cacheWriteTokens": null,
+        "cacheWriteTokens": 0,
         "outputTokens": 518,
         "costUsd": null
       },
@@ -381,7 +377,6 @@
         "completeness": "partial",
         "economicVerdict": "inconclusive",
         "unknownFields": [
-          "cacheWriteTokens",
           "costUsd"
         ]
       },

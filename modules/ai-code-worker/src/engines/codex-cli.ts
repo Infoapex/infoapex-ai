@@ -501,6 +501,7 @@ interface CodexTokenCountEvent {
       readonly total_token_usage?: {
         readonly input_tokens?: unknown;
         readonly cached_input_tokens?: unknown;
+        readonly cache_write_input_tokens?: unknown;
         readonly output_tokens?: unknown;
       };
     };
@@ -512,9 +513,16 @@ interface CodexTokenCountEvent {
 // docs/HANDOFF-BENCHMARK-TOOL-AND-PHASE-4.md) - the LAST such event is the final total,
 // no summing across events needed. cached_input_tokens is a subset of input_tokens (same
 // convention as OpenAI's Responses API usage object, not an additional amount), so it is
-// subtracted out to get the uncached count. Codex CLI does not surface a cache-write
-// token count or a dollar cost (only a rate-limit percentage, a different unit than
-// EngineUsage) - those stay null rather than guessed.
+// subtracted out to get the uncached count. cache_write_input_tokens was confirmed present
+// in a real CLI 0.147.0 rollout on 2026-09-02 (P2-B live run) - an earlier sanitized
+// fixture captured before that date did not have the field, which is why this was
+// previously treated as never-surfaced; that was a stale assumption, not a current CLI
+// limitation, so it is now read like any other real field. A dollar cost is still not
+// surfaced anywhere in the stream for a ChatGPT-subscription-authenticated account
+// (confirmed live: the same rollout's `rate_limits.credits` reports `has_credits: false`,
+// `balance: "0"` - there is no dollar ledger to report from in this billing mode, only a
+// rate-limit percentage, a different unit than EngineUsage) - costUsd stays null rather
+// than guessed.
 export const CODEX_USAGE_PARSER_VERSION = "codex-token-count.v1";
 
 export function parseCodexUsage(stdout: unknown): EngineUsage {
@@ -522,7 +530,7 @@ export function parseCodexUsage(stdout: unknown): EngineUsage {
     return unknownUsage();
   }
 
-  let lastTotal: { input_tokens?: unknown; cached_input_tokens?: unknown; output_tokens?: unknown } | null = null;
+  let lastTotal: { input_tokens?: unknown; cached_input_tokens?: unknown; cache_write_input_tokens?: unknown; output_tokens?: unknown } | null = null;
 
   for (const line of stdout.split("\n")) {
     const trimmed = line.trim();
@@ -553,7 +561,7 @@ export function parseCodexUsage(stdout: unknown): EngineUsage {
   return {
     inputUncachedTokens: inputTokens === null ? null : Math.max(0, inputTokens - (cachedTokens ?? 0)),
     cacheReadTokens: cachedTokens,
-    cacheWriteTokens: null,
+    cacheWriteTokens: readNumber(lastTotal.cache_write_input_tokens),
     outputTokens: readNumber(lastTotal.output_tokens),
     costUsd: null
   };
@@ -578,7 +586,15 @@ export function writeFakeCodexCli(
      *  event_msg/token_count shape. Defaults to a realistic non-zero sample so
      *  usage-parsing tests exercise real field extraction. Pass null to omit the
      *  token_count event entirely (simulates an older CLI that doesn't emit it). */
-    readonly usage?: { readonly inputTokens?: number; readonly cachedInputTokens?: number; readonly outputTokens?: number } | null;
+    readonly usage?: {
+      readonly inputTokens?: number;
+      readonly cachedInputTokens?: number;
+      /** Omitted by default (not merely 0) so existing tests that assert `cacheWriteTokens:
+       *  null` keep documenting the "field absent from this CLI/response" case; pass 0 or a
+       *  positive number to exercise the "field present" case added 2026-09-02. */
+      readonly cacheWriteInputTokens?: number;
+      readonly outputTokens?: number;
+    } | null;
   }
 ): void {
   const supportsExecHelp = options.supportsExecHelp ?? true;
@@ -588,6 +604,9 @@ export function writeFakeCodexCli(
       : {
           input_tokens: options.usage?.inputTokens ?? 5300,
           cached_input_tokens: options.usage?.cachedInputTokens ?? 4200,
+          ...(options.usage?.cacheWriteInputTokens !== undefined
+            ? { cache_write_input_tokens: options.usage.cacheWriteInputTokens }
+            : {}),
           output_tokens: options.usage?.outputTokens ?? 340,
           total_tokens: (options.usage?.inputTokens ?? 5300) + (options.usage?.outputTokens ?? 340)
         };

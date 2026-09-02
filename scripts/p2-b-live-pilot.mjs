@@ -328,7 +328,7 @@ function recoverCodexRolloutUsage(startedAt, finishedAt) {
         agentInvocations: 1,
         inputUncachedTokens: total.cachedInputTokens === null ? total.inputTokens : Math.max(0, total.inputTokens - total.cachedInputTokens),
         cacheReadTokens: total.cachedInputTokens,
-        cacheWriteTokens: null,
+        cacheWriteTokens: total.cacheWriteTokens,
         outputTokens: total.outputTokens,
         costUsd: null
       }
