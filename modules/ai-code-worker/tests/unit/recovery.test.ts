@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
 import { runFake } from "../../src/run/fake-run.js";
 import { EventLog, type RunEvent } from "../../src/persistence/event-log.js";
@@ -66,8 +66,14 @@ describe("recovery: process kill at specific pipeline points", () => {
 
     assert.equal(first.status, "DONE");
 
+    // Use the run's OWN returned state root rather than recomputing it via
+    // resolveStateRoot({ repoRoot: repo }) - see the identical comment in
+    // fake-run-repair.test.ts. Confirmed live on GitHub Actions windows-latest,
+    // 2026-09-02: a second, independently-recomputed hash pointed at a directory
+    // whose "worktrees" subdirectory did not even exist.
+    const stateRoot = dirname(dirname(first.state.runRoot!));
     const integrationWorktreePath = join(
-      resolveStateRoot({ repoRoot: repo }).path,
+      stateRoot,
       "worktrees",
       "run-kill-during-integration",
       "__integration__",
@@ -77,8 +83,7 @@ describe("recovery: process kill at specific pipeline points", () => {
       existsSync(integrationWorktreePath),
       true,
       `fixture must actually reach the integration step - path=${integrationWorktreePath}, ` +
-        `runRoot exists=${existsSync(first.state.runRoot!)}, ` +
-        `worktreesDirExists=${existsSync(join(resolveStateRoot({ repoRoot: repo }).path, "worktrees"))}`
+        `runRoot exists=${existsSync(first.state.runRoot!)}, worktreesDirExists=${existsSync(join(stateRoot, "worktrees"))}`
     );
 
     const events = readEvents(first.state.eventLogPath!);

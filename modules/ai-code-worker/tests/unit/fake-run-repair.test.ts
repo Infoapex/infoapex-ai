@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
 import { runFake } from "../../src/run/fake-run.js";
 import { createTaskWorktree } from "../../src/git/worktree.js";
@@ -157,7 +157,6 @@ describe("fake run coordinator - independent review + repair wiring", () => {
     const repo = createReviewFailingRepository();
     const baseCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
     const runId = "run-repair-kill-resume";
-    const stateRoot = resolveStateRoot({ repoRoot: repo }).path;
 
     // First attempt: repair never resolves (simulates the state left behind
     // right before/during a process kill mid-repair - the run never reaches
@@ -176,7 +175,15 @@ describe("fake run coordinator - independent review + repair wiring", () => {
       }
     });
 
-    const eventLogPath = join(stateRoot, "runs", runId, "events.jsonl");
+    // Use the run's OWN returned paths rather than recomputing them via
+    // resolveStateRoot({ repoRoot: repo }) - gitPreflight() resolves `repo` through
+    // `git rev-parse --show-toplevel`, which is not guaranteed to be the same string
+    // as the raw fixture path on every platform, and resolveStateRoot() hashes
+    // whatever string it is given. A second, independently-recomputed hash can
+    // therefore point at a different (empty) state directory than the one the run
+    // actually used - confirmed live on GitHub Actions windows-latest, 2026-09-02.
+    const eventLogPath = firstAttempt.state.eventLogPath!;
+    const stateRoot = dirname(dirname(firstAttempt.state.runRoot!));
     const events = new EventLog(eventLogPath, registry).read().events;
     const lastOriginalTaskFinished = events.findLastIndex(
       (event) => event.type === "task.finished" && event.payload.taskId === "CONTRACT-01"

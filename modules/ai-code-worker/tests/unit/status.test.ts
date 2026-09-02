@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { after, describe, it } from "node:test";
+import { gitPreflight } from "../../src/git/preflight.js";
 import { EventLog } from "../../src/persistence/event-log.js";
 import { createLease, writeLease } from "../../src/persistence/lease.js";
 import { runStatus } from "../../src/status/status.js";
@@ -101,6 +102,17 @@ function eventLogFor(repo: string, runId: string): EventLog {
   return new EventLog(path);
 }
 
+// runStatus() (src/status/status.ts) resolves the state root from
+// gitPreflight(repositoryPath).worktreeRoot (git's own `rev-parse --show-toplevel`),
+// not from the raw `repo` string - `resolveStateRoot({ repoRoot: repo })` here must
+// match that exact input, or this fixture writes to a different state directory than
+// the one runStatus() reads from. Confirmed live on GitHub Actions windows-latest,
+// 2026-09-02: git's resolved toplevel and the raw mkdtempSync() string are not always
+// the same value, and resolveStateRoot() hashes whatever string it is given.
 function runRootFor(repo: string, runId: string): string {
-  return join(resolveStateRoot({ repoRoot: repo }).path, "runs", runId);
+  const preflight = gitPreflight(repo);
+  if (!preflight.ok) {
+    throw new Error(`gitPreflight failed for fixture repo ${repo}: ${preflight.reason}`);
+  }
+  return join(resolveStateRoot({ repoRoot: preflight.worktreeRoot }).path, "runs", runId);
 }
