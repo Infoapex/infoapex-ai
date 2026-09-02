@@ -1,0 +1,427 @@
+{
+  "schemaVersion": "1.0",
+  "experimentId": "INFOAPEX-P2-B",
+  "mode": "live",
+  "usageConsuming": true,
+  "startedAt": "2026-09-02T12:06:08.113Z",
+  "finishedAt": "2026-09-02T12:10:18.540Z",
+  "frozen": {
+    "sourceBaselineCommit": "22c2d6a4abfcdb55dd64de967742682b9efb2e23",
+    "graph06Enabled": false,
+    "maximumLiveInvocations": 10,
+    "taskGoalHashes": [
+      "5938dddcaabd51642e1f63dd5c18665999d5ae81c18154ef5ad8aa88a565c2f9",
+      "060dc96835ec7575ef65ebf4a746c8cd44d39c30bd44015eedda3f8e6f9bb483",
+      "bb3f57537c5c645d0bca636c1ceb64d2148f10f6237d60a3e05c482b1f19f9c0",
+      "a75556c9f3936e8659a775986c3589be0a0c3bc23b694836bc65165a5732abd1",
+      "9c1c1d16aca88dfc3cb18303815d275a7d6c19e73c42609712aff250954794a2",
+      "cadf9b9dd6a82992fb10b2ef1b69df2b52e17b020d720e426f7af9a628598de0",
+      "6fd9f28d15448d86a02b08b29db723290f2f0b24c2584e175c1767219d8ff584",
+      "1d9f277d1d95aa639a7304cd0ff40ff7328276134434882cbd0774e255cf85b7",
+      "94d72f98981508935d0b9b0c50db569e806bfd6dd21fc37da9aeb2a9171267d0",
+      "6320b4011b572a67723c9018b6440f74340d23a3caafa0b24b8927a52254d643"
+    ]
+  },
+  "functionalVerdict": "PASS",
+  "economicVerdict": "inconclusive",
+  "summary": {
+    "overall": {
+      "tasks": 10,
+      "accurate": 10,
+      "accuracyRate": 1,
+      "fallbacksTriggered": 0,
+      "uncachedContextTotal": 48893,
+      "totalTokens": null,
+      "totalTokensComplete": false,
+      "elapsedMsTotal": 246596
+    },
+    "codex": {
+      "tasks": 5,
+      "accurate": 5,
+      "accuracyRate": 1,
+      "fallbacksTriggered": 0,
+      "uncachedContextTotal": 48863,
+      "totalTokens": null,
+      "totalTokensComplete": false,
+      "elapsedMsTotal": 149597
+    },
+    "claude": {
+      "tasks": 5,
+      "accurate": 5,
+      "accuracyRate": 1,
+      "fallbacksTriggered": 0,
+      "uncachedContextTotal": 30,
+      "totalTokens": 235225,
+      "totalTokensComplete": true,
+      "elapsedMsTotal": 96999
+    }
+  },
+  "tasks": [
+    {
+      "taskId": "PILOT-B-01",
+      "requestedEngine": "codex",
+      "fallbackEngine": "claude",
+      "requestedModel": "gpt-5.6-sol",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "codex",
+        "engineUsed": "codex",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 29209,
+      "runId": "p2-b-pilot-b-01-live",
+      "usageSource": "sanitized-local-rollout-fallback",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 6050,
+        "cacheReadTokens": 56320,
+        "cacheWriteTokens": null,
+        "outputTokens": 432,
+        "costUsd": null
+      },
+      "usageAssessment": {
+        "completeness": "partial",
+        "economicVerdict": "inconclusive",
+        "unknownFields": [
+          "cacheWriteTokens",
+          "costUsd"
+        ]
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "PILOT-B-02",
+      "requestedEngine": "claude",
+      "fallbackEngine": "codex",
+      "requestedModel": "sonnet",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "claude",
+        "engineUsed": "claude",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 18402,
+      "runId": "p2-b-pilot-b-02-live",
+      "usageSource": "worker-run-report",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 6,
+        "cacheReadTokens": 37681,
+        "cacheWriteTokens": 8656,
+        "outputTokens": 647,
+        "costUsd": 0.0729633
+      },
+      "usageAssessment": {
+        "completeness": "complete",
+        "economicVerdict": "comparable",
+        "unknownFields": []
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "PILOT-B-03",
+      "requestedEngine": "codex",
+      "fallbackEngine": "claude",
+      "requestedModel": "gpt-5.6-sol",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "codex",
+        "engineUsed": "codex",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 29304,
+      "runId": "p2-b-pilot-b-03-live",
+      "usageSource": "sanitized-local-rollout-fallback",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 10128,
+        "cacheReadTokens": 52224,
+        "cacheWriteTokens": null,
+        "outputTokens": 440,
+        "costUsd": null
+      },
+      "usageAssessment": {
+        "completeness": "partial",
+        "economicVerdict": "inconclusive",
+        "unknownFields": [
+          "cacheWriteTokens",
+          "costUsd"
+        ]
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "PILOT-B-04",
+      "requestedEngine": "claude",
+      "fallbackEngine": "codex",
+      "requestedModel": "sonnet",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "claude",
+        "engineUsed": "claude",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 21414,
+      "runId": "p2-b-pilot-b-04-live",
+      "usageSource": "worker-run-report",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 6,
+        "cacheReadTokens": 37723,
+        "cacheWriteTokens": 8680,
+        "outputTokens": 668,
+        "costUsd": 0.0734349
+      },
+      "usageAssessment": {
+        "completeness": "complete",
+        "economicVerdict": "comparable",
+        "unknownFields": []
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "PILOT-B-05",
+      "requestedEngine": "codex",
+      "fallbackEngine": "claude",
+      "requestedModel": "gpt-5.6-sol",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "codex",
+        "engineUsed": "codex",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 30959,
+      "runId": "p2-b-pilot-b-05-live",
+      "usageSource": "sanitized-local-rollout-fallback",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 6232,
+        "cacheReadTokens": 56320,
+        "cacheWriteTokens": null,
+        "outputTokens": 525,
+        "costUsd": null
+      },
+      "usageAssessment": {
+        "completeness": "partial",
+        "economicVerdict": "inconclusive",
+        "unknownFields": [
+          "cacheWriteTokens",
+          "costUsd"
+        ]
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "PILOT-B-06",
+      "requestedEngine": "claude",
+      "fallbackEngine": "codex",
+      "requestedModel": "sonnet",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "claude",
+        "engineUsed": "claude",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 19988,
+      "runId": "p2-b-pilot-b-06-live",
+      "usageSource": "worker-run-report",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 6,
+        "cacheReadTokens": 37740,
+        "cacheWriteTokens": 8694,
+        "outputTokens": 667,
+        "costUsd": 0.07350899999999999
+      },
+      "usageAssessment": {
+        "completeness": "complete",
+        "economicVerdict": "comparable",
+        "unknownFields": []
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "PILOT-B-07",
+      "requestedEngine": "codex",
+      "fallbackEngine": "claude",
+      "requestedModel": "gpt-5.6-sol",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "codex",
+        "engineUsed": "codex",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 28272,
+      "runId": "p2-b-pilot-b-07-live",
+      "usageSource": "sanitized-local-rollout-fallback",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 6058,
+        "cacheReadTokens": 56320,
+        "cacheWriteTokens": null,
+        "outputTokens": 449,
+        "costUsd": null
+      },
+      "usageAssessment": {
+        "completeness": "partial",
+        "economicVerdict": "inconclusive",
+        "unknownFields": [
+          "cacheWriteTokens",
+          "costUsd"
+        ]
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "PILOT-B-08",
+      "requestedEngine": "claude",
+      "fallbackEngine": "codex",
+      "requestedModel": "sonnet",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "claude",
+        "engineUsed": "claude",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 19539,
+      "runId": "p2-b-pilot-b-08-live",
+      "usageSource": "worker-run-report",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 6,
+        "cacheReadTokens": 37713,
+        "cacheWriteTokens": 8661,
+        "outputTokens": 631,
+        "costUsd": 0.0727629
+      },
+      "usageAssessment": {
+        "completeness": "complete",
+        "economicVerdict": "comparable",
+        "unknownFields": []
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "PILOT-B-09",
+      "requestedEngine": "codex",
+      "fallbackEngine": "claude",
+      "requestedModel": "gpt-5.6-sol",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "codex",
+        "engineUsed": "codex",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 31853,
+      "runId": "p2-b-pilot-b-09-live",
+      "usageSource": "sanitized-local-rollout-fallback",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 20395,
+        "cacheReadTokens": 41344,
+        "cacheWriteTokens": null,
+        "outputTokens": 518,
+        "costUsd": null
+      },
+      "usageAssessment": {
+        "completeness": "partial",
+        "economicVerdict": "inconclusive",
+        "unknownFields": [
+          "cacheWriteTokens",
+          "costUsd"
+        ]
+      },
+      "stderrTail": ""
+    },
+    {
+      "taskId": "PILOT-B-10",
+      "requestedEngine": "claude",
+      "fallbackEngine": "codex",
+      "requestedModel": "sonnet",
+      "status": "DONE",
+      "accurate": true,
+      "gatePassed": true,
+      "contentIndependentlyVerified": true,
+      "fallbackTriggered": false,
+      "engineProvenance": {
+        "requestedEngine": "claude",
+        "engineUsed": "claude",
+        "engineFallbackTriggered": false,
+        "reviewEngine": null
+      },
+      "blockedReason": null,
+      "elapsedMs": 17656,
+      "runId": "p2-b-pilot-b-10-live",
+      "usageSource": "worker-run-report",
+      "usage": {
+        "agentInvocations": 1,
+        "inputUncachedTokens": 6,
+        "cacheReadTokens": 37711,
+        "cacheWriteTokens": 8673,
+        "outputTokens": 650,
+        "costUsd": 0.0731193
+      },
+      "usageAssessment": {
+        "completeness": "complete",
+        "economicVerdict": "comparable",
+        "unknownFields": []
+      },
+      "stderrTail": ""
+    }
+  ],
+  "methodologyNote": "'accurate' requires both a worker DONE status (script-verified gate) and an independent re-check of pilot/evidence-NN.json content by this script. 'fallbacksTriggered' counts doctor-level --fallback-engine activations (quota/availability failure of the requested engine before the task started); no repair-cycle retries are measured here because --independent-review is not enabled (it would add a second live invocation per task, breaking the frozen 10-invocation budget). Wall-clock elapsedMs is used as the explanation-time proxy: no installed CLI (verified via --help on claude 2.1.235 and codex 0.147.0) exposes a separate reasoning-only timer. /usage and /context are Claude Code TUI-only session commands and are not applicable to headless per-task invocations; they are intentionally not used here."
+}

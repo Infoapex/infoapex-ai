@@ -19,6 +19,8 @@
     "p2:preflight": "node scripts/p2-live-preflight.mjs --fixture --json",
     "p2:preflight:live": "node scripts/p2-live-preflight.mjs --live --json",
     "pilot:icm-graph:internal": "node scripts/icm-graph-pilot.mjs",
+    "p2b:pilot": "node scripts/p2-b-live-pilot.mjs --fixture --json",
+    "p2b:pilot:live": "node scripts/p2-b-live-pilot.mjs --live --json",
     "review-gate:internal": "node scripts/review-gate.mjs",
     "docs-gate:internal": "node scripts/docs-gate.mjs"
   },

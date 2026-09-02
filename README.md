@@ -367,7 +367,7 @@ trebuie pornite explicit.
 |:--|:--|:--|
 | **P0** | Integrare și publicare ICM + Graph în modulele canonice | ✅ închis |
 | **P1** | Telemetrie de consum completă și comparabilă | ✅ implementat, sincronizat prin provenance |
-| **P2** | Gate-uri live și comparație controlată | 🟡 în lucru — P2-A preflight aterizat, P2-B comparația deschisă |
+| **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, verdict economic combinat rămâne inconclusive (Codex nu raportează cost/cache-write) |
 | **P3** | Bundle ZIP, clean install, release privat | 🟡 deschis |
 | **P4** | CLI root unificat | ⚪ planificat |
 | **P5** | SDK-uri și operare avansată | ⚪ post-stabilizare |
@@ -376,10 +376,13 @@ De ce `0.1.0` este pre-release și nu producție:
 
 - gate-ul intern generic trece, dar nu măsoară încă valoarea comparativă față de
   folosirea directă a agentului;
-- execuția live Codex a fost validată într-un task controlat, cu `--codex-sandbox
-  danger-full-access` explicit; invocarea implicită `workspace-write` a fost blocată de
-  politica locală de aprobare;
-- gate-ul live cu Claude rămâne blocat de execuția externă și de quota disponibilă;
+- gate-urile live P2-A (2 invocări) și P2-B (10 task-uri reale, secvențial, 5 Codex + 5
+  Claude) au trecut funcțional 10/10 — vezi `validation/p2-b/LIVE-REPORT.md` — dar
+  verdictul economic combinat rămâne `inconclusive`, permanent, cât timp CLI-ul Codex nu
+  raportează cache-write și cost în `exec --json`; aceasta e o limitare externă,
+  documentată, nu un gate deschis;
+- invocarea Codex necesită încă `--codex-sandbox danger-full-access` explicit;
+  invocarea implicită `workspace-write` e blocată de politica locală de aprobare;
 - publicarea primului bundle cere încă un smoke test dintr-un ZIP extras într-un proiect
   curat.
 

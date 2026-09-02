@@ -1,0 +1,121 @@
+{
+  "schemaVersion": "1.0",
+  "experimentId": "INFOAPEX-P2-B",
+  "sourceBaselineCommit": "22c2d6a4abfcdb55dd64de967742682b9efb2e23",
+  "graph06Enabled": false,
+  "maximumLiveInvocations": 10,
+  "providers": {
+    "codex": {
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "cliVersion": "0.147.0"
+    },
+    "claude": {
+      "model": "sonnet",
+      "effort": null,
+      "cliVersion": "2.1.235"
+    }
+  },
+  "tasks": [
+    {
+      "taskId": "PILOT-B-01",
+      "engine": "codex",
+      "fallbackEngine": "claude",
+      "contractIndex": 1,
+      "goal": "Read src/pilot-1.ts and contracts/pilot-1.schema.json in this repository. Write pilot/evidence-01.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-1.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-1.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "5938dddcaabd51642e1f63dd5c18665999d5ae81c18154ef5ad8aa88a565c2f9",
+      "expectedContractRef": "contracts/pilot-1.schema.json",
+      "expectedExportedFunctions": ["pilotTarget1", "pilotCaller1"]
+    },
+    {
+      "taskId": "PILOT-B-02",
+      "engine": "claude",
+      "fallbackEngine": "codex",
+      "contractIndex": 2,
+      "goal": "Read src/pilot-2.ts and contracts/pilot-2.schema.json in this repository. Write pilot/evidence-02.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-2.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-2.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "060dc96835ec7575ef65ebf4a746c8cd44d39c30bd44015eedda3f8e6f9bb483",
+      "expectedContractRef": "contracts/pilot-2.schema.json",
+      "expectedExportedFunctions": ["pilotTarget2", "pilotCaller2"]
+    },
+    {
+      "taskId": "PILOT-B-03",
+      "engine": "codex",
+      "fallbackEngine": "claude",
+      "contractIndex": 3,
+      "goal": "Read src/pilot-3.ts and contracts/pilot-3.schema.json in this repository. Write pilot/evidence-03.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-3.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-3.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "bb3f57537c5c645d0bca636c1ceb64d2148f10f6237d60a3e05c482b1f19f9c0",
+      "expectedContractRef": "contracts/pilot-3.schema.json",
+      "expectedExportedFunctions": ["pilotTarget3", "pilotCaller3"]
+    },
+    {
+      "taskId": "PILOT-B-04",
+      "engine": "claude",
+      "fallbackEngine": "codex",
+      "contractIndex": 4,
+      "goal": "Read src/pilot-4.ts and contracts/pilot-4.schema.json in this repository. Write pilot/evidence-04.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-4.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-4.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "a75556c9f3936e8659a775986c3589be0a0c3bc23b694836bc65165a5732abd1",
+      "expectedContractRef": "contracts/pilot-4.schema.json",
+      "expectedExportedFunctions": ["pilotTarget4", "pilotCaller4"]
+    },
+    {
+      "taskId": "PILOT-B-05",
+      "engine": "codex",
+      "fallbackEngine": "claude",
+      "contractIndex": 5,
+      "goal": "Read src/pilot-5.ts and contracts/pilot-5.schema.json in this repository. Write pilot/evidence-05.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-5.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-5.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "9c1c1d16aca88dfc3cb18303815d275a7d6c19e73c42609712aff250954794a2",
+      "expectedContractRef": "contracts/pilot-5.schema.json",
+      "expectedExportedFunctions": ["pilotTarget5", "pilotCaller5"]
+    },
+    {
+      "taskId": "PILOT-B-06",
+      "engine": "claude",
+      "fallbackEngine": "codex",
+      "contractIndex": 1,
+      "goal": "Read src/pilot-1.ts and contracts/pilot-1.schema.json in this repository. Write pilot/evidence-06.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-1.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-1.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "cadf9b9dd6a82992fb10b2ef1b69df2b52e17b020d720e426f7af9a628598de0",
+      "expectedContractRef": "contracts/pilot-1.schema.json",
+      "expectedExportedFunctions": ["pilotTarget1", "pilotCaller1"]
+    },
+    {
+      "taskId": "PILOT-B-07",
+      "engine": "codex",
+      "fallbackEngine": "claude",
+      "contractIndex": 2,
+      "goal": "Read src/pilot-2.ts and contracts/pilot-2.schema.json in this repository. Write pilot/evidence-07.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-2.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-2.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "6fd9f28d15448d86a02b08b29db723290f2f0b24c2584e175c1767219d8ff584",
+      "expectedContractRef": "contracts/pilot-2.schema.json",
+      "expectedExportedFunctions": ["pilotTarget2", "pilotCaller2"]
+    },
+    {
+      "taskId": "PILOT-B-08",
+      "engine": "claude",
+      "fallbackEngine": "codex",
+      "contractIndex": 3,
+      "goal": "Read src/pilot-3.ts and contracts/pilot-3.schema.json in this repository. Write pilot/evidence-08.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-3.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-3.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "1d9f277d1d95aa639a7304cd0ff40ff7328276134434882cbd0774e255cf85b7",
+      "expectedContractRef": "contracts/pilot-3.schema.json",
+      "expectedExportedFunctions": ["pilotTarget3", "pilotCaller3"]
+    },
+    {
+      "taskId": "PILOT-B-09",
+      "engine": "codex",
+      "fallbackEngine": "claude",
+      "contractIndex": 4,
+      "goal": "Read src/pilot-4.ts and contracts/pilot-4.schema.json in this repository. Write pilot/evidence-09.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-4.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-4.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "94d72f98981508935d0b9b0c50db569e806bfd6dd21fc37da9aeb2a9171267d0",
+      "expectedContractRef": "contracts/pilot-4.schema.json",
+      "expectedExportedFunctions": ["pilotTarget4", "pilotCaller4"]
+    },
+    {
+      "taskId": "PILOT-B-10",
+      "engine": "claude",
+      "fallbackEngine": "codex",
+      "contractIndex": 5,
+      "goal": "Read src/pilot-5.ts and contracts/pilot-5.schema.json in this repository. Write pilot/evidence-10.json containing exactly one JSON object with two keys in this order: \"contractRef\" set to the exact string value of the \"$id\" field in contracts/pilot-5.schema.json, and \"exportedFunctions\" set to a JSON array of every exported function name declared in src/pilot-5.ts, listed in the order they appear in the file. Do not modify any other file.",
+      "goalSha256": "6320b4011b572a67723c9018b6440f74340d23a3caafa0b24b8927a52254d643",
+      "expectedContractRef": "contracts/pilot-5.schema.json",
+      "expectedExportedFunctions": ["pilotTarget5", "pilotCaller5"]
+    }
+  ]
+}
