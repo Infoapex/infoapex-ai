@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { normalize, posix, win32 } from "node:path";
 
@@ -22,7 +23,7 @@ export interface ResolvedStateRoot {
 export function resolveStateRoot(options: ResolveStateRootOptions): ResolvedStateRoot {
   const pathApi = pathApiFor(options.platform ?? process.platform);
   const repoRoot = pathApi.resolve(options.repoRoot);
-  const repoHash = repositoryHash(repoRoot);
+  const repoHash = repositoryHash(canonicalRepoRootForHash(repoRoot));
   const configured = options.configuredStateRoot;
 
   const stateRoot = configured
@@ -39,6 +40,30 @@ export function resolveStateRoot(options: ResolveStateRootOptions): ResolvedStat
 
 export function repositoryHash(repoRoot: string): string {
   return createHash("sha256").update(normalize(repoRoot).toLowerCase(), "utf8").digest("hex").slice(0, 16);
+}
+
+/**
+ * Different callers arrive at "the repo root" through different paths that are not
+ * always the same string: `gitPreflight()` uses `git rev-parse --show-toplevel`
+ * (compile.ts, doctor.ts, status.ts), while a few call sites and most tests pass a raw
+ * `--repo`/`mkdtempSync()` string directly (usage-checkpoint.ts, cli.ts). `path.resolve`
+ * alone cannot reconcile them - it is pure string manipulation, not filesystem-aware -
+ * so on a host where the OS/shell resolves one of those forms to a different real path
+ * (confirmed live on GitHub Actions windows-latest, 2026-09-02: five ai-code-worker
+ * tests failed because two `resolveStateRoot()` calls for the "same" repo produced two
+ * different hashes and thus two different state directories), the hash silently
+ * diverges and a run's own state becomes unfindable by a second, differently-phrased
+ * lookup. `realpathSync` resolves both forms to the same canonical filesystem path
+ * before hashing, closing that gap at the source. Falls back to the syntactic path when
+ * the directory does not exist yet (e.g. `doctor` probing a path before `init`) - never
+ * throws for a caller that has not created the repo yet.
+ */
+function canonicalRepoRootForHash(repoRoot: string): string {
+  try {
+    return realpathSync(repoRoot);
+  } catch {
+    return repoRoot;
+  }
 }
 
 export function isPathInside(parent: string, child: string, pathApi: PathApi = pathApiFor(process.platform)): boolean {
