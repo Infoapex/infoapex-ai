@@ -400,7 +400,7 @@ trebuie pornite explicit.
 | **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, tokeni compleți pe ambele motoare, verdict economic **comparable** (procent din cota de 5 ore, nu cost USD — vezi mai jos) |
 | **P3** | Bundle ZIP, clean install, release privat | ✅ închis — smoke test complet dintr-un ZIP curat (10/10 pași), CI matrice Windows + Linux verde, `v0.1.0` publicat ca GitHub Release privat |
 | **P4** | CLI root unificat | ✅ închis — ADR-0003, registry, mecanism de delegare, comenzile `doctor`/`plan`/`run`/`resume`/`review`/`docs`, `infoapex-ai help` și testele lor sunt gata; fiecare modul rămâne complet utilizabil de sine stătător (niciun modul nu a fost modificat pentru delegare) |
-| **P5** | SDK-uri și operare avansată | ⚪ post-stabilizare |
+| **P5** | SDK-uri și operare avansată (9 subproiecte independente, fiecare cu ADR + threat model propriu — nu un singur milestone) | 🟡 început — subproiectul 1 (OpenTelemetry redactat pentru `ai-code-worker`, ADR-0012) e complet și pinned; niciun consumator real încă (gate-ul din roadmap "P5 începe numai după feedback real" e explicit neîndeplinit — pornit oricum, scoped la elementele cu risc scăzut din ordinea recomandată) |
 
 De ce `0.1.0` este pre-release și nu producție:
 
