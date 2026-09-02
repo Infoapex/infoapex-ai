@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -14,7 +14,10 @@ function run(command, args, cwd) {
   return spawnSync(command, args, { cwd, encoding: "utf8", windowsHide: true, maxBuffer: 4 * 1024 * 1024 });
 }
 
-const root = mkdtempSync(join(tmpdir(), "apex-review-gate-"));
+// realpathSync.native: see the identical, fuller comment in docs-gate.mjs - Windows
+// 8.3 short-name aliases on GitHub Actions runners otherwise diverge from what
+// modules' own git preflight resolves.
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), "apex-review-gate-")));
 try {
   const planner = join(root, "planner.mjs");
   const control = join(root, "control.mjs");

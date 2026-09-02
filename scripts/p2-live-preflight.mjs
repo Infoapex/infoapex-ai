@@ -1,6 +1,6 @@
 import { spawnSync, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,7 +24,8 @@ const timeoutMs = Number(process.env.APEX_P2A_TIMEOUT_MS ?? 600_000);
 const experiment = JSON.parse(readFileSync(experimentPath, "utf8"));
 validateExperiment(experiment);
 const startedAt = new Date().toISOString();
-const workspace = mkdtempSync(join(tmpdir(), "infoapex-p2-a-"));
+// realpathSync.native: see the identical, fuller comment in docs-gate.mjs.
+const workspace = realpathSync.native(mkdtempSync(join(tmpdir(), "infoapex-p2-a-")));
 const emptyCodexSessionsDir = fixture ? mkdtempSync(join(workspace, "empty-codex-sessions-")) : null;
 
 try {

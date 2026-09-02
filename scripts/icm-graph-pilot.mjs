@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -37,7 +37,8 @@ function nodeRef(nodeType, canonicalRef) { return { nodeType, canonicalRef }; }
 function endpoint(type, canonicalRef) { return { type, canonicalRef }; }
 
 function createFixture() {
-  const repository = mkdtempSync(join(tmpdir(), "infoapex-common-pilot-"));
+  // realpathSync.native: see the identical, fuller comment in docs-gate.mjs.
+  const repository = realpathSync.native(mkdtempSync(join(tmpdir(), "infoapex-common-pilot-")));
   execFileSync("git", ["init", "--initial-branch", "main"], { cwd: repository, stdio: "ignore" });
   execFileSync("git", ["config", "user.email", "pilot@example.invalid"], { cwd: repository });
   execFileSync("git", ["config", "user.name", "Infoapex Common Pilot"], { cwd: repository });

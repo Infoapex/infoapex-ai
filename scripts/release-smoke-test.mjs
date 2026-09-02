@@ -1,6 +1,6 @@
 import AdmZip from "adm-zip";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,8 @@ const keep = process.argv.includes("--keep");
 const explicitZip = option("--zip");
 const timeoutMs = Number(process.env.APEX_RELEASE_SMOKE_TIMEOUT_MS ?? 20 * 60_000);
 
-const workspace = mkdtempSync(join(tmpdir(), "infoapex-release-smoke-"));
+// realpathSync.native: see the identical, fuller comment in docs-gate.mjs.
+const workspace = realpathSync.native(mkdtempSync(join(tmpdir(), "infoapex-release-smoke-")));
 const extractedRoot = join(workspace, "extracted");
 const steps = [];
 

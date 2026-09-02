@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -96,7 +96,8 @@ console.log(JSON.stringify({
 }
 
 function createTargetRepository() {
-  const repository = mkdtempSync(join(tmpdir(), "apex-value-gate-"));
+  // realpathSync.native: see the identical, fuller comment in docs-gate.mjs.
+  const repository = realpathSync.native(mkdtempSync(join(tmpdir(), "apex-value-gate-")));
   execFileSync("git", ["init", "--initial-branch", "main"], { cwd: repository, stdio: "ignore" });
   execFileSync("git", ["config", "user.email", "apex-gate@example.invalid"], { cwd: repository });
   execFileSync("git", ["config", "user.name", "Infoapex AI Value Gate"], { cwd: repository });
@@ -127,7 +128,8 @@ function main() {
   }
 
   const repository = createTargetRepository();
-  const workspace = mkdtempSync(join(tmpdir(), "apex-value-gate-tools-"));
+  // realpathSync.native: see the identical, fuller comment in docs-gate.mjs.
+  const workspace = realpathSync.native(mkdtempSync(join(tmpdir(), "apex-value-gate-tools-")));
   const plans = Object.fromEntries(taskSeeds.map((seed) => [seed.goal, planFor(seed)]));
   const fakeClaude = live ? null : createFakeClaude(workspace, plans);
   const results = [];

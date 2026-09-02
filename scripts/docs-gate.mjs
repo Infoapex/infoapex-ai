@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,14 @@ const workerCli = join(apexRoot, "modules", "ai-code-worker", "dist", "src", "cl
 const reviewCli = join(apexRoot, "modules", "ai-code-review", "dist", "src", "cli.js");
 const fixture = join(apexRoot, "modules", "ai-code-worker", "tests", "fixtures", "review", "pass-no-findings.json");
 
-const root = mkdtempSync(join(tmpdir(), "apex-docs-gate-"));
+// realpathSync.native (not a plain mkdtempSync result): on GitHub Actions
+// windows-latest, os.tmpdir() resolves through a short (8.3) alias of the runner's
+// home directory (C:\Users\RUNNER~1\...), while `git rev-parse --show-toplevel`
+// inside ai-code-worker resolves the same real directory to its long form
+// (C:/Users/runneradmin/...). Canonicalizing here, once, means every path this
+// script passes to any module's CLI already agrees with what that module's own git
+// preflight will compute - confirmed live, 2026-09-02 (see git/preflight.ts).
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), "apex-docs-gate-")));
 try {
   mkdirSync(join(root, "Plan"), { recursive: true });
   mkdirSync(join(root, "scripts"), { recursive: true });
