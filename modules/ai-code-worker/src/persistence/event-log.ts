@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { SchemaRegistry } from "../schema/json-schema.js";
+import type { RunTelemetry } from "../telemetry/run-telemetry.js";
 
 export type RunEventType =
   | "run.created"
@@ -73,7 +74,8 @@ export class EventLogError extends Error {
 export class EventLog {
   constructor(
     readonly path: string,
-    private readonly registry = SchemaRegistry.load()
+    private readonly registry = SchemaRegistry.load(),
+    private readonly telemetry: RunTelemetry | null = null
   ) {}
 
   append(input: AppendRunEventInput): AppendRunEventResult {
@@ -92,6 +94,10 @@ export class EventLog {
     this.registry.assertValid("event.schema.json", event);
     ensureDirectory(dirname(this.path));
     writeFileSync(this.path, `${JSON.stringify(event)}\n`, { flag: "a", encoding: "utf8" });
+    // Redacted OpenTelemetry export (ADR-0012), opt-in and no-op by default - see
+    // src/telemetry/run-telemetry.ts. Runs after the durable write so telemetry can
+    // never affect whether an event was recorded.
+    this.telemetry?.onEvent(event);
 
     return { event, path: this.path };
   }

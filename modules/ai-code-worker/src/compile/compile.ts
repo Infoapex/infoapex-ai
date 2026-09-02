@@ -6,6 +6,7 @@ import { gitPreflight, type GitPreflightResult } from "../git/preflight.js";
 import { freezeManifest, sha256 } from "../manifest/normalize.js";
 import { EventLog } from "../persistence/event-log.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
+import { createRunTelemetry } from "../telemetry/run-telemetry.js";
 import { isPathInside, resolveStateRoot } from "../state/state-root.js";
 import { parsePlanMarkdown } from "./plan-parser.js";
 import { resolveRoutingProfile } from "../routing/routing-policy.js";
@@ -145,7 +146,8 @@ export function runCompile(options: CompileOptions): CompileReport {
   const manifestPath = join(runRoot, "manifest.json");
   const authorizationPath = join(runRoot, "authorization.json");
   const intentPath = join(runRoot, "run-intent.json");
-  const eventLog = new EventLog(join(runRoot, "events.jsonl"), registry);
+  const telemetry = createRunTelemetry({ runId, runRoot, registry });
+  const eventLog = new EventLog(join(runRoot, "events.jsonl"), registry, telemetry);
   const existing = readExistingRun({
     runId,
     repository,

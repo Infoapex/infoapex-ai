@@ -15,6 +15,7 @@ import { createTaskWorktree } from "../git/worktree.js";
 import { buildTaskGraph, getTask, type ManifestTask, type TaskRuntimeState } from "../graph/task-graph.js";
 import { EventLog } from "../persistence/event-log.js";
 import { recoverRunCheckpoints, type RunCheckpoints } from "../persistence/recovery.js";
+import { createRunTelemetry } from "../telemetry/run-telemetry.js";
 import { normalizePolicyPath } from "../policy/scope-policy.js";
 import {
   addUsage,
@@ -91,7 +92,8 @@ export function runFake(options: FakeRunOptions): FakeRunReport {
     return blocked(compile, "COMPILE_BLOCKED", compile.findings[0]?.message ?? "Compile did not pass.");
   }
 
-  const eventLog = new EventLog(compile.state.eventLogPath, registry);
+  const telemetry = createRunTelemetry({ runId: compile.runId, runRoot: compile.state.runRoot, registry });
+  const eventLog = new EventLog(compile.state.eventLogPath, registry, telemetry);
   const currentEvents = eventLog.read().events;
   const manifest = JSON.parse(readFileSync(compile.state.manifestPath, "utf8")) as RunManifest;
   const graph = buildTaskGraph(manifest.tasks);

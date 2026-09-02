@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:infoapex:ai-code:ai-code-worker:schemas:otel-span.schema.json",
+  "title": "ai-code-worker local OpenTelemetry span export",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "traceId",
+    "spanId",
+    "parentSpanId",
+    "name",
+    "kind",
+    "startTimeUnixMillis",
+    "endTimeUnixMillis",
+    "attributes",
+    "events",
+    "status"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "traceId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "spanId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "parentSpanId": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string"
+    },
+    "startTimeUnixMillis": {
+      "type": "number"
+    },
+    "endTimeUnixMillis": {
+      "type": "number"
+    },
+    "attributes": {
+      "type": "object"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "timeUnixMillis", "attributes"],
+        "properties": {
+          "name": { "type": "string" },
+          "timeUnixMillis": { "type": "number" },
+          "attributes": { "type": "object" }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "integer" },
+        "message": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

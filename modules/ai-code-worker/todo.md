@@ -2,7 +2,27 @@
 
 ## Historical status (superseded by the current status below)
 
-## Current status (2026-08-25)
+## Current status (2026-09-03)
+
+Implemented in this batch (bundle-side P5, "OpenTelemetry fără conținut sensibil" -
+`infoapex-ai/docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md` section 9):
+
+- ADR-0012: redacted OpenTelemetry tracing over the existing event log. Disabled by
+  default (`INFOAPEX_OTEL_ENABLED=1` to enable); no call site's control flow changes
+  beyond one extra `EventLog` constructor argument.
+- `src/telemetry/redact-attributes.ts`: allowlist-based span attribute redaction -
+  drops any payload key not explicitly reviewed as safe, converts `changedPaths` to a
+  count instead of exporting raw paths, drops any allowlisted value that still looks
+  secret-shaped.
+- `src/telemetry/run-telemetry.ts` + `src/telemetry/local-file-span-exporter.ts`:
+  every RunEvent becomes an immediately-exported span (paired lifecycle events get a
+  real duration; everything else is a point span), offline by default to
+  `<runRoot>/otel-spans.jsonl`, schema-validated against the new
+  `schemas/otel-span.schema.json`.
+- Real OTLP-collector export is an intentional non-goal for this batch (network/async
+  export would need the run functions to stop being synchronous) - see the ADR.
+
+## Previous status (2026-08-25)
 
 Implemented in this batch:
 
