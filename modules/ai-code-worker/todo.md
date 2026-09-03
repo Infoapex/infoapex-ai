@@ -2,6 +2,26 @@
 
 ## Historical status (superseded by the current status below)
 
+## Real-world feedback: usage persistence (consumer project Orders pilot, 2026-08-30)
+
+A real consumer pilot hit a Codex rate limit mid-run and reported the worker "retained
+only the rate-limited task's invocation... the usage result is, correctly,
+`inconclusive`." Traced to two bugs in `codex-run.ts`/`claude-run.ts`: a task's own usage
+was discarded when that task itself failed (only added to `usageTotals` after full
+success), and resuming a run replaced an already-finished task's real usage with
+`unknownUsage()` (poisoning the whole run's total to null via `addUsage`'s fail-closed
+null propagation). Both fixed — see ADR-0013
+(`docs/adr/0013-usage-persistence-across-task-failure-and-resume.md`) for the full
+analysis, the fix, and two narrower resume paths (`continueFromCommittedTask`,
+`recoveredTerminalRun`) left as an acknowledged, not-yet-fixed gap.
+
+Broader open item this surfaced: `src/usage/normalized-usage.ts`'s sample-based
+aggregator was built to solve exactly this class of problem (survives retries/resume
+without losing or double-counting data) but has never been wired into the actual run
+pipeline — only a small classification helper from it is reused. Migrating
+`codex-run.ts`/`claude-run.ts` to use it as the real accumulation mechanism would subsume
+both fixes above more generally. Not attempted here; flagged for a future pass.
+
 ## Current status (2026-09-03)
 
 Implemented in this batch (bundle-side P5, "OpenTelemetry fără conținut sensibil" -

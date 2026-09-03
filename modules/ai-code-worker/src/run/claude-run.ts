@@ -175,7 +175,7 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
       taskCommits[taskId] = checkpoint.finishedCommit;
       evidenceByTask[taskId] = `tasks/${taskId}/evidence.json`;
       executedTasks.push(taskId);
-      usageTotals = addUsage(usageTotals, unknownUsage());
+      usageTotals = addUsage(usageTotals, usageFromTaskEvidence(taskRoot));
       tick += 1;
       continue;
     }
@@ -294,6 +294,11 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
     const execution = taskExecution.execution;
     const activeEngine = taskExecution.candidate.engine;
     const activeVersion = activeEngine === "claude" ? doctor.version : null;
+    // Recorded as soon as the engine returns, regardless of what this task does next
+    // (mismatch/failure/gate-block below all return BLOCKED before this task's usage
+    // was previously folded in) - a task that consumed real, billable tokens before
+    // failing must not have that consumption silently discarded from the run's total.
+    usageTotals = addUsage(usageTotals, execution.usage);
 
     checkpointLog.append({
       checkpointId: `${compile.runId}-${taskId}-start`,
@@ -458,7 +463,6 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
     states.set(taskId, { status: "PASSED", commit: taskCommit });
     taskCommits[taskId] = taskCommit;
     executedTasks.push(taskId);
-    usageTotals = addUsage(usageTotals, execution.usage);
 
     const budgetEvaluation = evaluateUsageBudget(usageTotals, budget);
     if (budgetEvaluation.status === "BLOCK") {
@@ -1239,6 +1243,41 @@ function unknownUsage(): EngineUsage {
     outputTokens: null,
     costUsd: null
   };
+}
+
+interface PersistedTaskEvidence {
+  readonly input?: {
+    readonly uncachedTokens?: number | null;
+    readonly cacheReadTokens?: number | null;
+    readonly cacheWriteTokens?: number | null;
+  };
+  readonly output?: {
+    readonly standardTokens?: number | null;
+  };
+  readonly cost?: {
+    readonly reportedCostUsd?: number | null;
+  };
+}
+
+/** Recovers a previously-finished task's real usage from its persisted evidence.json
+ *  on resume, instead of discarding it as unknownUsage() (all-null). A task.finished
+ *  event (the only thing that makes recovery mark a task as finishedCommit) is only
+ *  ever appended after evidenceFor()'s writeJson() call for that task, so the file is
+ *  guaranteed to exist for any task this is called for. Falls back to unknownUsage()
+ *  defensively if it is somehow missing or unparseable - never throws. */
+function usageFromTaskEvidence(taskRoot: string): EngineUsage {
+  try {
+    const evidence = JSON.parse(readFileSync(join(taskRoot, "evidence.json"), "utf8")) as PersistedTaskEvidence;
+    return {
+      inputUncachedTokens: evidence.input?.uncachedTokens ?? null,
+      cacheReadTokens: evidence.input?.cacheReadTokens ?? null,
+      cacheWriteTokens: evidence.input?.cacheWriteTokens ?? null,
+      outputTokens: evidence.output?.standardTokens ?? null,
+      costUsd: evidence.cost?.reportedCostUsd ?? null
+    };
+  } catch {
+    return unknownUsage();
+  }
 }
 
 function stateRootFromRunRoot(runRoot: string): string {
