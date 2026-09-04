@@ -7,6 +7,7 @@ dist-release/
 .logs/
 .env
 validation/benchmark/pilot/.local/
+validation/benchmark/eurocarscan/.local/authorization-*.json
 
 # Generated Obsidian code-map projection; source code and SQLite remain canonical.
 docs/code-map/generated/
