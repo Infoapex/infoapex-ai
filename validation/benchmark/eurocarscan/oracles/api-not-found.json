@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"src/eurocarscan/app.py","contains":"error_handler"},{"type":"file-contains","path":"src/eurocarscan/app.py","contains":"not_found"}]}

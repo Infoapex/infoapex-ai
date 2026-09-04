@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "id": "exp-70ea4de8-a619-4759-bf56-fdc1745a3733",
+  "suiteId": "eurocarscan-consumer",
+  "suiteHash": "8c19c252f1c61e6bfc5ed77dbadf0ff0b1c4b0b2b251d158a6c8574813983837",
+  "taskHashes": {
+    "health-service-field": "ca5cf95738c1513f58c6816719342a72e0028dc14a3a41fd078f367cdf131779",
+    "health-environment-field": "644a3610ad95eeae4a4650d6d5ab2c5fa819835f738bb175d0b1199bc99f1687",
+    "money-from-cents": "33d2217cbd8a30ca135854ab976bfb5d42d6e0bec20c4f4591d0082773b3498f",
+    "money-zero": "ea19d62c88e33a1dfb75d5e4b118f48029773584ab1f1e785bef645d497d8939",
+    "time-local-format": "f6c10102330d0de45dd09ed1e78b1cbf3337783bde5968fa034715ae7701c620",
+    "config-database-default": "016b61c56e0411c4206511f1e452d0630ea00efac9d7dcc07db51e4ae999d90a",
+    "dashboard-count": "25be8f2bd38a40346ce34b0b7d887f743f8407b0bbbcb81be2a29dfe7b20a962",
+    "api-not-found": "ac2df21647572de7924d5238579fc741ba1ab6424abf1950aca11c8038dc184f",
+    "migration-index": "c241e606c7457a8d37f193310ba24fd964074646becd083dcfbae37d093b18d7",
+    "negative-secret": "1041e04d2bbf86292db79cd9cd34c2a23b40425d2c8cf97fc2787f7432a5adf1"
+  },
+  "environment": {
+    "schemaVersion": "1.0",
+    "id": "local-win32-x64",
+    "os": "win32",
+    "architecture": "x64",
+    "toolchain": {
+      "node": "v22.14.0"
+    },
+    "hardware": null,
+    "cliVersions": {},
+    "modulePins": {},
+    "redactedConfiguration": {}
+  },
+  "arms": [
+    {
+      "id": "direct",
+      "kind": "direct",
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "medium"
+    },
+    {
+      "id": "full-icm",
+      "kind": "full-icm",
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "medium"
+    },
+    {
+      "id": "candidate",
+      "kind": "candidate",
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "medium"
+    }
+  ],
+  "repetitions": 1,
+  "status": "FROZEN",
+  "experimentHash": "dafa00cdaa4849f160e76bd77c324a712ae355f7c1ec7e2f3b10eb2588ce88a7"
+}

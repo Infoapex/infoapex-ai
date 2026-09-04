@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"src/eurocarscan/web/routes.py","contains":"environment"},{"type":"file-contains","path":"src/eurocarscan/web/routes.py","contains":"local"}]}

@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"src/eurocarscan/config.py","contains":"sqlite:///eurocarscan.db"},{"type":"file-contains","path":"src/eurocarscan/config.py","contains":"DATABASE_URL"}]}

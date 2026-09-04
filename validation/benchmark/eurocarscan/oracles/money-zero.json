@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"src/eurocarscan/domain/money.py","contains":"is_zero"},{"type":"file-contains","path":"src/eurocarscan/domain/money.py","contains":"cents == 0"}]}

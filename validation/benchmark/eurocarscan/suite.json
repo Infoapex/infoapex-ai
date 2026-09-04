@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0",
+  "id": "eurocarscan-consumer",
+  "version": "v1",
+  "kind": "private-manifest",
+  "taskFiles": [
+    "tasks/health-service-field.json",
+    "tasks/health-environment-field.json",
+    "tasks/money-from-cents.json",
+    "tasks/money-zero.json",
+    "tasks/time-local-format.json",
+    "tasks/config-database-default.json",
+    "tasks/dashboard-count.json",
+    "tasks/api-not-found.json",
+    "tasks/migration-index.json",
+    "tasks/negative-secret.json"
+  ],
+  "arms": [
+    { "id": "direct", "kind": "direct", "provider": "codex", "model": "gpt-5.6-luna", "effort": "medium" },
+    { "id": "full-icm", "kind": "full-icm", "provider": "codex", "model": "gpt-5.6-luna", "effort": "medium" },
+    { "id": "candidate", "kind": "candidate", "provider": "codex", "model": "gpt-5.6-luna", "effort": "medium" }
+  ],
+  "repetitions": 1,
+  "metrics": ["verified-task-success", "first-pass-success", "scope-safety", "latency", "tokens", "cost-usd"],
+  "thresholds": { "minimumValidObservations": 0.9 },
+  "budgets": { "maximumInvocations": 30, "maximumMinutes": 180, "maximumCostUsd": null },
+  "oracleAccess": "evaluator-only",
+  "labels": { "cohort": "eurocarscan-greenfield", "purpose": "p5-consumer-validation" }
+}

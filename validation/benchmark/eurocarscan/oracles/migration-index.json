@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"migrations/001_initial.sql","contains":"idx_lots_status"},{"type":"file-contains","path":"migrations/001_initial.sql","contains":"ON lots(status)"}]}
