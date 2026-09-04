@@ -24,8 +24,8 @@
 > `ai-code-benchmark`, iar rerun-ul BENCH-09 R5 din 2026-09-04 a închis matricea
 > live: 30/30 observații valide, 10 perechi complete și zero incidente critice.
 > Baseline-ul pre-P5 este stabilit pentru evaluarea candidaților; verdictul rămâne
-> intenționat `INCONCLUSIVE` până când o ipoteză P5 este înghețată. Publicarea și
-> pin-ul standalone al modulului rămân gate-ul extern P4.5. Vezi
+> intenționat `INCONCLUSIVE` până când o ipoteză P5 este înghețată. Modulul
+> standalone este publicat și pinned; următorul gate este evaluarea candidatului P5. Vezi
 > [Unde se află proiectul](#unde-se-află-proiectul).
 
 ---
@@ -406,7 +406,7 @@ trebuie pornite explicit.
 | **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, tokeni compleți pe ambele motoare, verdict economic **comparable** (procent din cota de 5 ore, nu cost USD — vezi mai jos) |
 | **P3** | Bundle ZIP, clean install, release privat | ✅ închis — smoke test complet dintr-un ZIP curat (10/10 pași), CI matrice Windows + Linux verde, `v0.1.0` publicat ca GitHub Release privat |
 | **P4** | CLI root unificat | ✅ închis — ADR-0003, registry, mecanism de delegare, comenzile `doctor`/`plan`/`run`/`resume`/`review`/`docs`, `infoapex-ai help` și testele lor sunt gata; fiecare modul rămâne complet utilizabil de sine stătător (niciun modul nu a fost modificat pentru delegare) |
-| **P4.5 / BENCH** | [`ai-code-benchmark`](docs/plans/AI-CODE-BENCHMARK-IMPLEMENTATION-PLAN.md): direct vs. orchestration-only vs. full ICM | 🟡 baseline live complet — modul integrat, root `benchmark`, CI și ZIP smoke cu BENCH-D, plus BENCH-09 R5 30/30 valid; publicarea și pin-ul standalone rămân gate-ul extern |
+| **P4.5 / BENCH** | [`ai-code-benchmark`](docs/plans/AI-CODE-BENCHMARK-IMPLEMENTATION-PLAN.md): direct vs. orchestration-only vs. full ICM | ✅ închis — modul standalone publicat și pinned, integrare root/CI/ZIP cu BENCH-D și BENCH-09 R5 live 30/30 valid |
 | **P5** | SDK-uri și operare avansată (9 subproiecte independente, fiecare cu ADR + threat model propriu — nu un singur milestone) | ▶️ pregătit pentru evaluare — OpenTelemetry redactat este primul candidat retrospectiv și trebuie rulat cu ipoteză, experiment și autorizare noi |
 
 De ce `0.1.0` este pre-release și nu producție:
@@ -479,7 +479,7 @@ handoff între agenți, cerințe de audit sau nevoia de a reproduce procesul în
 - backend real de izolare la nivel de sistem/VM/container, cu capabilități probate;
 - validarea strictă a fiecărui mesaj la toate granițele dintre procese;
 - teste Windows și Linux, smoke test automat al bundle-ului ZIP, artefacte semnate;
-- publicarea standalone și pin-ul public pentru `ai-code-benchmark`, plus evaluarea fiecărui candidat P5 față de baseline-ul A/B/C;
+- evaluarea fiecărui candidat P5 față de baseline-ul A/B/C prin ipoteză și experiment separat;
 - adaptoare pentru motoare suplimentare fără a cupla contractele de un provider;
 - UI local pentru DAG, bugete, evenimente, dovezi și aprobări umane;
 - politici de echipă și aprobări explicite înaintea execuțiilor cu privilegii ridicate.

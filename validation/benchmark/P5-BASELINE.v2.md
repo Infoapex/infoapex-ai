@@ -20,4 +20,5 @@ Before the first candidate invocation, complete and freeze
 `modules/ai-code-benchmark/templates/candidate-hypothesis.template.json`. A P5
 candidate requires a fresh experiment identity and authorization and may not
 rewrite this baseline. Standalone publication and provenance pinning of
-`ai-code-benchmark` remain a separate external P4.5 release gate.
+`ai-code-benchmark` are complete at
+`899d14894444121f5f7141f6850eb62841b33152`.

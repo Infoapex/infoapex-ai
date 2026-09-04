@@ -53,8 +53,11 @@
     "requiresMetricSpecificVerdict": true,
     "mustPreserveBaseline": true
   },
-  "remainingExternalGate": {
-    "standalonePublication": "Commit, test, merge and publish ai-code-benchmark on its standalone main branch, then replace the local candidate provenance with the public SHA."
+  "standalonePublication": {
+    "status": "COMPLETE",
+    "repository": "https://github.com/Infoapex/ai-code-benchmark",
+    "branch": "main",
+    "commit": "899d14894444121f5f7141f6850eb62841b33152"
   },
   "limitations": [
     "This register establishes an internal pre-P5 comparison baseline, not an authoritative public value claim.",

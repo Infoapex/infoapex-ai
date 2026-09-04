@@ -77,10 +77,9 @@
       "bundlePath": "modules/ai-code-benchmark",
       "sourceRepository": "https://github.com/Infoapex/ai-code-benchmark.git",
       "sourceBranch": "main",
-      "sourceCommit": null,
-      "provenanceStatus": "local-candidate-unpublished",
-      "publicationGate": "Create, test, merge, and publish the standalone repository commit on Infoapex/ai-code-benchmark main; then replace null with that public 40-character SHA before a release.",
-      "syncMode": "local-candidate-unpublished",
+      "sourceCommit": "899d14894444121f5f7141f6850eb62841b33152",
+      "provenanceStatus": "published",
+      "syncMode": "generic-bundle-projection",
       "allowedAdaptations": []
     }
   ]

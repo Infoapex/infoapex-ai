@@ -317,13 +317,11 @@ repetitivă. Nu recomand implementarea întregii etape exclusiv cu Sol.
 
 ## 9. P4.5 / BENCH — `ai-code-benchmark`
 
-**Stare integrare 2026-09-04: baseline live complet, candidat local nepublicat
-standalone.** Modulul este
+**Stare integrare 2026-09-04: baseline live complet și modul standalone publicat.** Modulul este
 al șaselea modul al bundle-ului și este acoperit de setup/build/CI/release smoke,
-inclusiv BENCH-D deterministic. Pinul de provenance este intenționat
-`local-candidate-unpublished` cu `sourceCommit: null`; publicarea unui commit
-standalone pe `Infoapex/ai-code-benchmark` `main` și înlocuirea lui cu SHA-ul public
-este un gate extern rămas. BENCH-D nu este un baseline live P5. Campania BENCH-09
+inclusiv BENCH-D deterministic. Repository-ul standalone
+`Infoapex/ai-code-benchmark` este publicat pe `main`, iar bundle-ul este pinned la
+`899d14894444121f5f7141f6850eb62841b33152`. BENCH-D nu este un baseline live P5. Campania BENCH-09
 R5, înghețată și autorizată separat, a închis 30/30 observații valide, zece perechi
 și zero incidente critice; `P5-BASELINE.v2` poate fi folosit pentru evaluarea
 candidaților. Raportul este `INCONCLUSIVE` numai pentru că nu conține încă o

@@ -19,11 +19,10 @@ ZIP smoke install/build/test it; ZIP smoke also executes BENCH-D. The root entry
 point is `infoapex-ai benchmark <subcommand> [...args]` and delegates only through
 the built benchmark CLI.
 
-Its provenance is intentionally `local-candidate-unpublished`: `sourceCommit` is
-`null`, not a fabricated public SHA. Before a release can claim a standalone pin,
-the module must be committed, tested, merged and published on
-`Infoapex/ai-code-benchmark` `main`, then that public SHA must replace the candidate
-record. This external publication gate is not satisfied by local tests.
+Its standalone source is published on `Infoapex/ai-code-benchmark` `main` and the
+bundle provenance is pinned to
+`899d14894444121f5f7141f6850eb62841b33152`. The standalone publication gate is
+satisfied; future module changes must preserve the publish-then-pin order.
 
 The first authorized BENCH-P campaign and its fail-closed **REJECT** remain
 immutable. The separately frozen R5 rerun corrected the harness/runtime causes and

@@ -22,15 +22,15 @@ paths are packaging adaptations. They must not change runtime semantics. Active
 scope manifests are repository-specific governance state and are not copied
 between repositories.
 
-`ai-code-review` and `ai-code-docs` are pinned the same way as the other three
-modules. The five published canonical modules — `ai-code-control`, `ai-code-worker`,
-`ai-code-planner`, `ai-code-review`, `ai-code-docs` — are required by
+`ai-code-review`, `ai-code-docs`, and `ai-code-benchmark` are pinned the same way
+as the other modules. The six published canonical modules — `ai-code-control`,
+`ai-code-worker`, `ai-code-planner`, `ai-code-review`, `ai-code-docs`, and
+`ai-code-benchmark` — are required by
 `npm run check:provenance`.
 
-## Local candidate exception
+## Benchmark publication
 
-`ai-code-benchmark` is the sixth required bundle module. Its current record is
-explicitly `local-candidate-unpublished`, so its `sourceCommit` is `null` rather
-than an invented public SHA. The required external gate is to commit, test, merge,
-and publish `Infoapex/ai-code-benchmark` on `main`, then replace the null value with
-the resulting public 40-character SHA before a release.
+`ai-code-benchmark` is the sixth required bundle module. It is published on the
+standalone `Infoapex/ai-code-benchmark` `main` branch and pinned to
+`899d14894444121f5f7141f6850eb62841b33152`. Its bundle projection has no declared
+adaptations.
