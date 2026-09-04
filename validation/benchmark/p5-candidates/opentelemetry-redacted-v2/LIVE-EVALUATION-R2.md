@@ -32,6 +32,7 @@ quality.
 - Protocol hash: `dacbfa03655da75485a197008bc93cbfbc9fe25f07d02491fbcfe63ea3815a54`
 - Hypothesis hash: `1ce234bd1f5fdbb08e93a07b4adee8a7bec55774b17aca683382170e0fb06e32`
 - Registered baseline hash: `aeb52bf31b7602687c585237ddf001bd7c4bd76916773abcde4be66ebaf7cd79`
+- Published benchmark commit: `fa0d39c912505f27248f2ad5edcd6f60058f2a45`
 - Full local report SHA-256: `6c4b81402965ad57c77c3510e28fb1f511677dad225af472544788817a4590ce`
 - Full local trace-evidence SHA-256: `4b8d9574315367a9089d74f9ad589bc62ebae4b5818a7bf316706724a2265054`
 

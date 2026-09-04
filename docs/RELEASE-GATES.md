@@ -21,7 +21,7 @@ the built benchmark CLI.
 
 Its standalone source is published on `Infoapex/ai-code-benchmark` `main` and the
 bundle provenance is pinned to
-`899d14894444121f5f7141f6850eb62841b33152`. The standalone publication gate is
+`fa0d39c912505f27248f2ad5edcd6f60058f2a45`. The standalone publication gate is
 satisfied; future module changes must preserve the publish-then-pin order.
 
 The first authorized BENCH-P campaign and its fail-closed **REJECT** remain

@@ -1,6 +1,7 @@
 {
   "schemaVersion": "p5-otel-live-result.v1",
   "candidateId": "p5-otel-redacted-v2",
+  "benchmarkStandaloneCommit": "fa0d39c912505f27248f2ad5edcd6f60058f2a45",
   "experimentId": "p5-otel-candidate-r2-20260904",
   "experimentHash": "d59e69395cfc4763bc62df4c59a5a34978bd5cd415aa838eb8a673ad3cdc3c11",
   "protocolHash": "dacbfa03655da75485a197008bc93cbfbc9fe25f07d02491fbcfe63ea3815a54",

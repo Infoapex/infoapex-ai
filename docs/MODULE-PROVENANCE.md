@@ -32,5 +32,5 @@ as the other modules. The six published canonical modules — `ai-code-control`,
 
 `ai-code-benchmark` is the sixth required bundle module. It is published on the
 standalone `Infoapex/ai-code-benchmark` `main` branch and pinned to
-`899d14894444121f5f7141f6850eb62841b33152`. Its bundle projection has no declared
+`fa0d39c912505f27248f2ad5edcd6f60058f2a45`. Its bundle projection has no declared
 adaptations.

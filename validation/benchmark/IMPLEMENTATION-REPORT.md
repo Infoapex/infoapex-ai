@@ -31,7 +31,7 @@ The standalone `Infoapex/ai-code-benchmark` repository is published on `main`.
 Accordingly `modules/provenance.json` records:
 
 - `provenanceStatus: published`;
-- `sourceCommit: 899d14894444121f5f7141f6850eb62841b33152`;
+- `sourceCommit: fa0d39c912505f27248f2ad5edcd6f60058f2a45`;
 - `syncMode: generic-bundle-projection` with no bundle adaptations.
 
 The published pin does not by itself make an authoritative live benchmark or P5

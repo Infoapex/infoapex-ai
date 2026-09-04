@@ -77,7 +77,7 @@
       "bundlePath": "modules/ai-code-benchmark",
       "sourceRepository": "https://github.com/Infoapex/ai-code-benchmark.git",
       "sourceBranch": "main",
-      "sourceCommit": "899d14894444121f5f7141f6850eb62841b33152",
+      "sourceCommit": "fa0d39c912505f27248f2ad5edcd6f60058f2a45",
       "provenanceStatus": "published",
       "syncMode": "generic-bundle-projection",
       "allowedAdaptations": []

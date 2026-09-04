@@ -9,6 +9,7 @@
   "candidate": {
     "id": "p5-otel-redacted-v2",
     "change": "INFOAPEX_OTEL_ENABLED=1",
+    "benchmarkStandaloneCommit": "fa0d39c912505f27248f2ad5edcd6f60058f2a45",
     "hypothesis": "p5-candidates/opentelemetry-redacted-v2/candidate-hypothesis.json",
     "preregistration": "p5-candidates/opentelemetry-redacted-v2/PREREGISTRATION.md"
   },
