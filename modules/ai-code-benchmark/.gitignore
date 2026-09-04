@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.ai-code-benchmark-state/
+*.log

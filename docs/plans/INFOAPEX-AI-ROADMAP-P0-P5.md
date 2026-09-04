@@ -6,7 +6,8 @@ Repository canonic: `Infoapex/infoapex-ai`
 Baseline pre-ICM: `92f79b6535da79a0a81695899f98b59ca3869bd8`  
 Branch ICM + Graph curent: `feat/icm-graph-engineering` (`e39ef92`)  
 Pilot consumator: proiectul client activ, etapa curentă, 10 taskuri secvențiale  
-Politică: maximum un writer; `GRAPH-06` rămâne dezactivat până la existența unui baseline live complet și comparabil.
+Politică: maximum un writer; baseline-ul live este complet, dar `GRAPH-06` rămâne
+dezactivat până la propriul experiment A/B preregistrat și autorizat explicit.
 
 ## 1. Scop
 
@@ -19,7 +20,9 @@ Separă explicit:
 - ce model GPT-5.6 și ce nivel de reasoning sunt recomandate pentru fiecare etapă.
 
 P0–P3 formează calea critică spre primul release privat. P4 este următorul increment de produs.
-P5 este post-stabilizare și nu blochează release-ul `v0.1.0`.
+P4.5 introduce evaluatorul independent `ai-code-benchmark` înaintea continuării P5.
+P5 este post-stabilizare și nu blochează release-ul `v0.1.0`, dar fiecare schimbare P5
+ulterioară trebuie evaluată față de baseline-ul P4.5.
 
 ## 2. Principiul de selecție a modelelor
 
@@ -59,6 +62,7 @@ Reguli:
 | P2 | Gate-uri live și comparație controlată | Sol pentru baseline și verdict | high | Terra high ca braț comparativ; Luna doar fixtures | Da |
 | P3 | Bundle ZIP, clean install și release privat | Terra | high | Luna medium; Sol high pentru review final | Da |
 | P4 | CLI root unificat | Sol la design, Terra la implementare | high | Luna medium pentru help/docs/fixtures | Nu |
+| P4.5 | `ai-code-benchmark`: comparație direct / orchestration / full ICM | Sol la metodologie, Terra la implementare | high | Luna medium pentru fixtures | Nu pentru v0.1.0; da înainte de continuarea P5 |
 | P5 | SDK-uri și operare avansată | Selectiv, per subproiect | medium–xhigh | toate trei, în funcție de risc | Nu |
 
 ## 4. P0 — Consolidarea ICM + Graph în produsul generic
@@ -264,6 +268,10 @@ automatizare și verificări reproductibile. Sol rămâne gate-ul final.
 
 ## 8. P4 — CLI root unificat
 
+**Stare implementare: completată pe `main` la 2026-09-03.** CLI-ul root deleagă
+`doctor`, `plan`, `run`, `resume`, `review` și `docs` către modulele standalone prin
+subprocese și păstrează envelope-ul comun definit de ADR-0003.
+
 ### Obiectiv
 
 Extinderea CLI-ului root de la `init | status | handoff` la o interfață coerentă care deleagă,
@@ -307,12 +315,66 @@ repetitivă. Nu recomand implementarea întregii etape exclusiv cu Sol.
 - JSON și exit codes sunt validate la fiecare boundary;
 - absența unui modul produce un diagnostic clar, nu fallback ascuns.
 
-## 9. P5 — SDK-uri și operare avansată
+## 9. P4.5 / BENCH — `ai-code-benchmark`
+
+**Stare integrare 2026-09-04: baseline live complet, candidat local nepublicat
+standalone.** Modulul este
+al șaselea modul al bundle-ului și este acoperit de setup/build/CI/release smoke,
+inclusiv BENCH-D deterministic. Pinul de provenance este intenționat
+`local-candidate-unpublished` cu `sourceCommit: null`; publicarea unui commit
+standalone pe `Infoapex/ai-code-benchmark` `main` și înlocuirea lui cu SHA-ul public
+este un gate extern rămas. BENCH-D nu este un baseline live P5. Campania BENCH-09
+R5, înghețată și autorizată separat, a închis 30/30 observații valide, zece perechi
+și zero incidente critice; `P5-BASELINE.v2` poate fi folosit pentru evaluarea
+candidaților. Raportul este `INCONCLUSIVE` numai pentru că nu conține încă o
+ipoteză P5. Primul BENCH-P respins rămâne imuabil și separat.
+
+### Obiectiv
+
+Construirea unui evaluator independent, înainte de continuarea P5, care compară paired
+aceleași taskuri în minimum trei brațe:
+
+1. Codex/Claude folosit direct;
+2. Infoapex AI orchestration-only, fără enforcement ICM;
+3. Infoapex AI complet, cu ICM, Graph, gate-uri, repair și review.
+
+Benchmark-ul separă calitatea, siguranța, efortul uman, latența și consumul; nu folosește
+un scor compozit opac și nu acceptă self-report-ul agentului ca dovadă suficientă.
+
+Planul canonic complet este
+[`AI-CODE-BENCHMARK-IMPLEMENTATION-PLAN.md`](AI-CODE-BENCHMARK-IMPLEMENTATION-PLAN.md).
+
+### Ordine
+
+1. ADR, threat model și feasibility pentru cele trei brațe.
+2. Repository standalone și contracte JSON versionate.
+3. Dataset generic cu oracole independente.
+4. Adaptoare direct Codex, direct Claude și Infoapex root.
+5. Izolare, persistence, recovery și colectare de metrici.
+6. Evaluator, statistică paired și raport JSON/Markdown.
+7. Harness determinist fără provider.
+8. Pilot live bounded pe 10 taskuri × 3 brațe.
+9. Pin în bundle, comandă root `benchmark` și baseline P5.
+10. Evaluarea retrospectivă a OpenTelemetry, deja implementat.
+
+### Gate de ieșire
+
+- evaluatorul este independent de modulele evaluate;
+- brațele pornesc din același commit și aceeași configurație comparabilă;
+- datele necunoscute rămân `null` și produc verdict `INCONCLUSIVE` unde este cazul;
+- testele deterministe, de recovery și security trec pe Windows/Linux;
+- există minimum un pilot live complet, preregistrat și auditabil;
+- fiecare subproiect P5 primește hypothesis, baseline, candidate și verdict măsurabil.
+
+## 10. P5 — SDK-uri și operare avansată
 
 ### Obiectiv
 
 Capabilități post-stabilizare. Fiecare subproiect cere justificare și pilot separat; P5 nu este
-un singur milestone monolitic.
+un singur milestone monolitic. OpenTelemetry redactat este deja implementat și pinned;
+baseline-ul P4.5 este acum disponibil, iar OpenTelemetry poate fi evaluat
+retrospectiv ca primul candidat P5. Fiecare candidat necesită o ipoteză, un
+experiment și o autorizare noi; acest baseline nu reprezintă acceptarea lui.
 
 ### Subproiecte și modele
 
@@ -344,17 +406,19 @@ un singur milestone monolitic.
 Fiecare subproiect are ADR, threat model, contract versionat, teste negative și dovadă că nu
 slăbește funcționarea standalone sau guardrail-urile existente.
 
-## 10. Politică de execuție recomandată
+## 11. Politică de execuție recomandată
 
 1. P0, P1, P2 și P3 se execută strict în această ordine.
 2. P4 începe numai după ce `v0.1.0` poate fi instalat curat.
-3. P5 începe numai după utilizare reală și feedback din minimum un proiect consumator.
-4. Un singur writer per repository până la finalizarea P3.
-5. Review-ul poate folosi alt model, dar rămâne secvențial; `GRAPH-06` nu se activează implicit.
-6. Orice schimbare de model/effort într-un experiment produce un braț nou, nu modificarea
+3. P4.5 începe după P4 și devine gate obligatoriu înainte de continuarea P5.
+4. OpenTelemetry, deja implementat, se păstrează și se evaluează retrospectiv după P4.5.
+5. Restul P5 începe numai după baseline-ul P4.5, utilizare reală și feedback din minimum un proiect consumator.
+6. Un singur writer per repository până la finalizarea P3.
+7. Review-ul poate folosi alt model, dar rămâne secvențial; `GRAPH-06` nu se activează implicit.
+8. Orice schimbare de model/effort într-un experiment produce un braț nou, nu modificarea
    retroactivă a baseline-ului.
 
-## 11. Configurația recomandată dacă se dorește o singură alegere per etapă
+## 12. Configurația recomandată dacă se dorește o singură alegere per etapă
 
 ```text
 P0  gpt-5.6-sol    high
@@ -362,7 +426,8 @@ P1  gpt-5.6-sol    high
 P2  gpt-5.6-sol    high   # baseline; Terra high este brațul comparativ
 P3  gpt-5.6-terra  high   # Sol high pentru release review
 P4  gpt-5.6-sol    high   # design; Terra high pentru implementare
-P5  per subproiect         # vezi matricea din secțiunea 9
+P4.5 gpt-5.6-sol   high   # metodologie/verdict; Terra high pentru implementare
+P5  per subproiect         # vezi matricea din secțiunea 10
 ```
 
 Această distribuție păstrează Sol acolo unde o eroare de raționament poate crea drift de

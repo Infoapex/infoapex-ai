@@ -1,0 +1,30 @@
+{
+  "adapter": {
+    "executable": "node",
+    "id": "fake-subprocess.v1",
+    "parser": "bench-d-fake.v1"
+  },
+  "armId": "B",
+  "changedPaths": [
+    "src/result.txt"
+  ],
+  "classification": "RECOVERED",
+  "evaluatorVerdict": "PASS",
+  "expected": "RECOVERED",
+  "order": 25,
+  "outputSha256": "71e8117e1f5f14f7ffbcda63cdaa29489ac954c1c7c70b2836ef24b2348b87bb",
+  "passed": true,
+  "recovery": {
+    "resumed": true,
+    "retryCount": 1,
+    "truncatedTailDiscarded": true
+  },
+  "scenario": "recovery",
+  "seed": 1538305886,
+  "taskId": "recovery-cleanup",
+  "termination": {
+    "exitCode": 0,
+    "outputTruncated": false,
+    "timedOut": false
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "commandInjectionRejected": true,
+  "containedPathRejected": true,
+  "environmentSecretDropped": true,
+  "oracleTraversalRejected": true,
+  "redactionApplied": true,
+  "symlinkRejected": true,
+  "unsafeDiffRejected": true
+}

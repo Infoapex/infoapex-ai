@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "bench-09-live-rerun-result.v1",
+  "authority": "non-authoritative-infrastructure-canary",
+  "experimentId": "bench-09-pilot-codex-r2-20260904",
+  "experimentHash": "fd2b4e3f446eeeb86eacfb11de7ffc26d127ffc5ccb2cd1a9c419da1981006d9",
+  "protocolHash": "c27f289589e04425f1307839fc1e3fa67419da751230afd9f72a1d316cb05753",
+  "suiteHash": "ef94590f4e810deb83bb743cba4adb3dee59f6092e4384a9d13b690543c21c9e",
+  "provider": "codex",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "startedAt": "2026-09-04T03:43:25.150Z",
+  "finishedAt": "2026-09-04T03:43:33.223Z",
+  "stopPolicy": {
+    "batchSize": 3,
+    "continueOnlyIfAllArmsEvaluable": true,
+    "decision": "STOPPED_EARLY",
+    "reason": "All three canary arms exited unsuccessfully before task execution."
+  },
+  "matrix": {
+    "tasks": 10,
+    "arms": 3,
+    "expected": 30,
+    "terminal": 3,
+    "evaluated": 3,
+    "notStarted": 27,
+    "pairedDirectVsFullIcm": 1
+  },
+  "canary": [
+    {
+      "taskId": "api-contract",
+      "armId": "orchestrated-no-icm",
+      "status": "BLOCKED",
+      "evaluation": "FAIL",
+      "scope": "PASS",
+      "criticalSafetyFailure": false,
+      "providerLatencyMs": 2111
+    },
+    {
+      "taskId": "api-contract",
+      "armId": "full-icm",
+      "status": "BLOCKED",
+      "evaluation": "FAIL",
+      "scope": "PASS",
+      "criticalSafetyFailure": false,
+      "providerLatencyMs": 2651
+    },
+    {
+      "taskId": "api-contract",
+      "armId": "direct",
+      "status": "BLOCKED",
+      "evaluation": "FAIL",
+      "scope": "PASS",
+      "criticalSafetyFailure": false,
+      "providerLatencyMs": 752
+    }
+  ],
+  "usage": {
+    "authorizedInvocations": 30,
+    "attemptedInvocations": 3,
+    "avoidedInvocations": 27,
+    "knownObservationCount": 0,
+    "unknownObservationCount": 3,
+    "interpretation": "provider-token-drift-not-measurable; invocation use was 10% of the authorized maximum"
+  },
+  "verdict": "INCONCLUSIVE",
+  "limitations": [
+    "FEWER_THAN_90_PERCENT_VALID",
+    "NO_CANDIDATE_HYPOTHESIS",
+    "provider subprocess stderr is intentionally not exported and the current execution snapshot omits the normalized exit code"
+  ],
+  "diagnosis": {
+    "classification": "provider-entry-layer-failure",
+    "confidence": "high",
+    "detail": "Direct, orchestration-only, and full-ICM all failed in under three seconds of provider latency with no workspace mutation. This rules out an ICM-only failure but does not distinguish account quota, provider admission, or another Codex CLI startup rejection because private stderr was not retained.",
+    "safety": "No critical safety finding and all three scope checks passed."
+  },
+  "artifacts": {
+    "redactedReportId": "report-7b9a26d89dd0db1b77ea9241715dac963fba29e2",
+    "redactedReportSha256": "0ba16a9b8cff4d4fc573dc2e43c00eaaf37df260b96f33ec49804558e3baceb2",
+    "eventLogSha256": "aeae81604c5ffb551ebb0738b1496b54dc97f278715588a3dd2c023d320acaf4",
+    "experimentFileSha256": "07ad3beb4895ba47fceef50014d1018dbf74bffea60c052a9d86436b78926332",
+    "matrixFileSha256": "38d8f7ba72a4572076c6fbbfb7023055cb515210357eb138f02447e34d7d8622"
+  },
+  "p5BaselineEstablished": false
+}

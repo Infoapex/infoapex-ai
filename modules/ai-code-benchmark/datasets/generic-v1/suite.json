@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "id": "generic-v1",
+  "version": "v1",
+  "kind": "generic",
+  "taskFiles": ["tasks/rename-local.json", "tasks/fix-boundary.json", "tasks/cross-file-config.json", "tasks/api-contract.json", "tasks/preserve-refactor.json", "tasks/docs-sync.json", "tasks/scope-guard.json", "tasks/dag-order.json", "tasks/recovery-cleanup.json", "tasks/negative-missing-secret.json", "tasks/error-classification.json", "tasks/serialization-roundtrip.json"],
+  "arms": [{"id": "direct", "kind": "direct", "provider": null, "model": null, "effort": null}],
+  "repetitions": 1,
+  "metrics": ["verified-task-success", "first-pass-success", "scope-safety", "human-active-minutes"],
+  "thresholds": {"verified-task-success": 0.0},
+  "budgets": {"maximumInvocations": 0, "maximumMinutes": 0, "maximumCostUsd": null},
+  "oracleAccess": "evaluator-only",
+  "labels": {"purpose": "deterministic-ci", "oracle": "not-visible-to-agent"}
+}

@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/serialization-roundtrip: Preserve optional values across serialization and deserialization.\nProtocol: no network, no provider credentials, report only deterministic changes."

@@ -56,8 +56,8 @@ The Codex CLI adapter contract is now in place:
 - `codex --version` is parsed and checked against tested version ranges;
 - writer mode fails closed when the Codex CLI version is unavailable or untested;
 - capability smoke test verifies `codex exec --help` exposes required non-interactive flags;
-- exec invocations use `codex exec --ignore-user-config --ignore-rules --json --cd <worktree> --sandbox <mode> --output-schema <agent-result.schema.json> --output-last-message <file> -`;
-- the local Windows pilot currently sets `<mode>` to `danger-full-access` because `codex-cli 0.146.0-alpha.3.1` reports `workspace-write` as read-only for file writes; this is a pilot fallback, with worker-owned scope verification still required before commit, not the desired final isolation model;
+- exec invocations use `codex exec --json --cd <worktree> --sandbox <mode> --model <model> -c model_reasoning_effort=<effort> -`; structured results are parsed from the final JSONL `agent_message`;
+- current automation does not pass `--ignore-user-config`/`--ignore-rules`: Codex CLI 0.147.0 mapped that reset to a managed read-only profile on Windows. The 2026-09-04 live pilot verified CLI 0.153.0 with `workspace-write`; this host uses the documented `windows.sandbox=\"unelevated\"` fallback because its elevated sandbox setup cannot launch child commands;
 - adapter output is normalized to the shared engine event and `AgentExecutionResult` contracts;
 - contract tests use a fake Codex CLI so CI does not call a model.
 

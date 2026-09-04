@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/rename-local: Rename the deprecated local helper and update its callers.\nProtocol: no network, no provider credentials, report only deterministic changes."

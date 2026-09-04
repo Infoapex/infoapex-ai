@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"tasks/docs-sync/README.md","contains":"parseNumber"},{"type":"file-contains","path":"tasks/docs-sync/README.md","contains":"Example"}]}

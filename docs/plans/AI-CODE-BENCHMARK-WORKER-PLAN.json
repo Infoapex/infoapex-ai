@@ -1,0 +1,77 @@
+{
+  "goal": "Implement, validate, integrate, and baseline the independent ai-code-benchmark module as Infoapex P4.5 before continuing P5.",
+  "nonGoals": [
+    "Claim statistically authoritative model rankings from the bounded pilot.",
+    "Replace unit, integration, security, or release gates with benchmark scores.",
+    "Allow the system under test to grade its own output."
+  ],
+  "risk": "high",
+  "tasks": [
+    {
+      "id": "BENCH-00",
+      "goal": "Freeze architecture, threat model, experimental protocol, and feasibility of all benchmark arms.",
+      "acceptanceCriteria": [{ "criterionId": "AC-00", "text": "ADR, threat model, preregistration rules, and arm feasibility decision are versioned." }],
+      "gates": [{ "gateId": "G-00", "command": "npm run docs-gate:internal", "evidenceContract": "Documentation gate exits successfully.", "criterionIds": ["AC-00"] }],
+      "dependsOn": [],
+      "scope": { "allowedPaths": ["docs/**", "validation/benchmark/**"], "forbiddenPaths": ["modules/ai-code-control/**"] },
+      "requiredInputs": [{ "kind": "file", "ref": "docs/plans/AI-CODE-BENCHMARK-IMPLEMENTATION-PLAN.md" }],
+      "risk": "high",
+      "executionProfile": "sol-high"
+    },
+    {
+      "id": "BENCH-01-03",
+      "goal": "Create the standalone package, versioned contracts, dataset loader, and subprocess arm adapters.",
+      "acceptanceCriteria": [{ "criterionId": "AC-01-03", "text": "The package builds and contract, dataset, and adapter tests pass." }],
+      "gates": [{ "gateId": "G-01-03", "command": "npm test --prefix modules/ai-code-benchmark", "evidenceContract": "Package tests exit successfully.", "criterionIds": ["AC-01-03"] }],
+      "dependsOn": ["BENCH-00"],
+      "scope": { "allowedPaths": ["modules/ai-code-benchmark/**"], "forbiddenPaths": ["modules/ai-code-control/**", "modules/ai-code-worker/**"] },
+      "requiredInputs": [{ "kind": "file", "ref": "docs/plans/AI-CODE-BENCHMARK-IMPLEMENTATION-PLAN.md" }],
+      "risk": "high",
+      "executionProfile": "terra-high"
+    },
+    {
+      "id": "BENCH-04-07",
+      "goal": "Implement isolated scheduling, recovery, metrics, independent evaluation, statistics, and reports.",
+      "acceptanceCriteria": [{ "criterionId": "AC-04-07", "text": "Runtime and analysis are deterministic, resumable, and covered by failure-path tests." }],
+      "gates": [{ "gateId": "G-04-07", "command": "npm test --prefix modules/ai-code-benchmark", "evidenceContract": "All package tests exit successfully.", "criterionIds": ["AC-04-07"] }],
+      "dependsOn": ["BENCH-01-03"],
+      "scope": { "allowedPaths": ["modules/ai-code-benchmark/**"], "forbiddenPaths": ["modules/ai-code-control/**"] },
+      "requiredInputs": [{ "kind": "file", "ref": "modules/ai-code-benchmark/schemas/experiment.schema.json" }],
+      "risk": "high",
+      "executionProfile": "sol-high"
+    },
+    {
+      "id": "BENCH-08",
+      "goal": "Build and execute the hermetic deterministic benchmark harness.",
+      "acceptanceCriteria": [{ "criterionId": "AC-08", "text": "The deterministic three-arm suite passes with reproducible artifacts and expected score ordering." }],
+      "gates": [{ "gateId": "G-08", "command": "npm run benchmark:deterministic --prefix modules/ai-code-benchmark", "evidenceContract": "Harness exits successfully and writes a verified report.", "criterionIds": ["AC-08"] }],
+      "dependsOn": ["BENCH-04-07"],
+      "scope": { "allowedPaths": ["modules/ai-code-benchmark/**", "validation/benchmark/**"], "forbiddenPaths": ["modules/ai-code-control/**"] },
+      "requiredInputs": [{ "kind": "file", "ref": "modules/ai-code-benchmark/README.md" }],
+      "risk": "medium",
+      "executionProfile": "terra-high"
+    },
+    {
+      "id": "BENCH-09",
+      "goal": "Run a preregistered bounded live pilot and publish an explicitly non-authoritative verdict.",
+      "acceptanceCriteria": [{ "criterionId": "AC-09", "text": "Pilot preflight, raw observations, report, limitations, and verdict are preserved." }],
+      "gates": [{ "gateId": "G-09", "command": "npm run benchmark:pilot:verify --prefix modules/ai-code-benchmark", "evidenceContract": "Pilot evidence verifier exits successfully.", "criterionIds": ["AC-09"] }],
+      "dependsOn": ["BENCH-08"],
+      "scope": { "allowedPaths": ["modules/ai-code-benchmark/**", "validation/benchmark/**"], "forbiddenPaths": ["modules/ai-code-control/**"] },
+      "requiredInputs": [{ "kind": "file", "ref": "validation/benchmark/pilot-preregistration.json" }],
+      "risk": "high",
+      "executionProfile": "sol-high"
+    },
+    {
+      "id": "BENCH-10",
+      "goal": "Integrate the pinned module into the bundle, update release gates and roadmap, and publish the P5 baseline.",
+      "acceptanceCriteria": [{ "criterionId": "AC-10", "text": "Bundle, provenance, documentation, release smoke, and P4.5 gates pass." }],
+      "gates": [{ "gateId": "G-10", "command": "npm test", "evidenceContract": "Root test and bundle gates exit successfully.", "criterionIds": ["AC-10"] }],
+      "dependsOn": ["BENCH-09"],
+      "scope": { "allowedPaths": ["**"], "forbiddenPaths": [] },
+      "requiredInputs": [{ "kind": "file", "ref": "validation/benchmark/IMPLEMENTATION-REPORT.md" }],
+      "risk": "high",
+      "executionProfile": "terra-high"
+    }
+  ]
+}

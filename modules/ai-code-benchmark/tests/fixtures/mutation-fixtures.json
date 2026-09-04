@@ -1,0 +1,6 @@
+[
+  {"id":"missing-boundary-check","defectPresent":true,"evaluatorDetected":true},
+  {"id":"scope-escape","defectPresent":true,"evaluatorDetected":true},
+  {"id":"format-only-change","defectPresent":false,"evaluatorDetected":false},
+  {"id":"unchanged-valid-solution","defectPresent":false,"evaluatorDetected":false}
+]

@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/recovery-cleanup: Handle a failed temporary operation and leave no residual temporary files.\nProtocol: no network, no provider credentials, report only deterministic changes."

@@ -1,0 +1,32 @@
+{
+  "name": "@infoapex/ai-code-benchmark",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Independent, subprocess-bound benchmark harness for AI coding systems.",
+  "type": "module",
+  "bin": {
+    "ai-code-benchmark": "dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/**/*.test.js",
+    "posttest": "npm run validate:json",
+    "validate:json": "node scripts/validate-json.mjs",
+    "benchmark:deterministic": "npm run build && node ../../validation/benchmark/deterministic/harness.mjs",
+    "benchmark:pilot:preflight": "npm run build && node ../../validation/benchmark/pilot/preflight.mjs --fake",
+    "benchmark:pilot:live": "npm run build && node ../../validation/benchmark/pilot/live.mjs",
+    "benchmark:pilot:verify": "npm run build && node ../../validation/benchmark/pilot/verify.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": ["dist", "datasets", "schemas", "scripts", "templates", "docs", "src", "README.md", "LICENSE"],
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
+  }
+}

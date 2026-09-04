@@ -1,0 +1,16 @@
+{
+  "files": {
+    "oracles/rename-local.json": {
+      "assertions": [
+        {
+          "contains": "PASS",
+          "path": "src/result.txt",
+          "type": "file-contains"
+        }
+      ],
+      "schemaVersion": "bench-d-oracle.v1"
+    },
+    "src/result.txt": "BASELINE\n"
+  },
+  "id": "rename-local"
+}

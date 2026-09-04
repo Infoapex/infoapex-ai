@@ -1,0 +1,24 @@
+{
+  "adapter": {
+    "executable": "node",
+    "id": "fake-subprocess.v1",
+    "parser": "bench-d-fake.v1"
+  },
+  "armId": "C",
+  "changedPaths": [],
+  "classification": "FAILED",
+  "evaluatorVerdict": null,
+  "expected": "FAILED",
+  "order": 23,
+  "outputSha256": "2a92be47c69d493ceeb3e8fb120a9e33d03f1bef73025ff6bd8f6d5a3427f19a",
+  "passed": true,
+  "recovery": null,
+  "scenario": "failure",
+  "seed": 1723199677,
+  "taskId": "dag-order",
+  "termination": {
+    "exitCode": 1,
+    "outputTruncated": false,
+    "timedOut": false
+  }
+}

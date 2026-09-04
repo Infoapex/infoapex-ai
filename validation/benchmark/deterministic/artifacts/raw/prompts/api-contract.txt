@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/api-contract: Make the API return a structured validation error while preserving valid responses.\nProtocol: no network, no provider credentials, report only deterministic changes."

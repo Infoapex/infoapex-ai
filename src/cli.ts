@@ -27,7 +27,8 @@ const COMMAND_HELP: Readonly<Record<string, CommandHelp>> = {
   run: { usage: "infoapex-ai run --repo <path> --plan <path> --engine <fake|codex|claude> [--run-id <id>]", summary: "Execute an accepted plan.", delegatesTo: "ai-code-worker (run)" },
   resume: { usage: "infoapex-ai resume --repo <path> --run-id <id> --plan <path> --engine <fake|codex|claude>", summary: "Continue a run that has already started. Rejects with RUN_NOT_FOUND if --run-id does not match an existing run, rather than silently starting a new one.", delegatesTo: "ai-code-worker (status, then run)" },
   review: { usage: "infoapex-ai review --repo <path> --request <path> [--no-planner] [--no-control]", summary: "Run an independent, read-only review against accepted criteria.", delegatesTo: "ai-code-review (run)" },
-  docs: { usage: "infoapex-ai docs --repo <path> --request <path>", summary: "Generate documentation through the planner -> worker -> review cycle.", delegatesTo: "ai-code-docs (generate)" }
+  docs: { usage: "infoapex-ai docs --repo <path> --request <path>", summary: "Generate documentation through the planner -> worker -> review cycle.", delegatesTo: "ai-code-docs (generate)" },
+  benchmark: { usage: "infoapex-ai benchmark <subcommand> [module flags...]", summary: "Run the independent benchmark module; its subcommands and flags are forwarded unchanged.", delegatesTo: "ai-code-benchmark (<subcommand>)" }
 };
 
 function printHelp(): void {
@@ -47,7 +48,7 @@ function printHelp(): void {
     }
     lines.push("");
   }
-  lines.push("Every delegated command (doctor/plan/run/resume/review/docs) spawns the target");
+  lines.push("Every delegated command (doctor/plan/run/resume/review/docs/benchmark) spawns the target");
   lines.push("module's own built CLI as a subprocess and normalizes its result into");
   lines.push("{schemaVersion, command, module, status, exitCode, body} - see");
   lines.push("docs/adr/0003-unified-root-cli-delegation.md for the full contract.");
@@ -56,7 +57,7 @@ function printHelp(): void {
 
 const args = process.argv.slice(2);
 const command = args[0];
-const DELEGATED_COMMANDS: readonly RootCommand[] = ["doctor", "plan", "run", "resume", "review", "docs"];
+const DELEGATED_COMMANDS: readonly RootCommand[] = ["doctor", "plan", "run", "resume", "review", "docs", "benchmark"];
 
 if (command === "help" || command === "--help" || command === "-h") {
   printHelp();
@@ -135,7 +136,16 @@ if (command === "help" || command === "--help" || command === "-h") {
   if (command === "resume") {
     printEnvelope(runResume(module!, forwardedArgs));
   } else {
-    printEnvelope(delegate({ command, module: module!, subcommand: moduleSubcommand(module!, command), bundleRoot: bundleRoot(), args: forwardedArgs }));
+    // `benchmark` is a namespace command: unlike the other root verbs, its first
+    // forwarded token is the benchmark module's own subcommand. The registry uses
+    // an empty prefix so root forwards it verbatim rather than reimplementing that
+    // CLI's public surface. Its mapped `help` command is only the no-subcommand
+    // default; a supplied subcommand is always forwarded unchanged.
+    const subcommand = command === "benchmark"
+      ? forwardedArgs[0] ?? moduleSubcommand(module!, command)
+      : moduleSubcommand(module!, command);
+    const moduleArgs = command === "benchmark" ? forwardedArgs.slice(1) : forwardedArgs;
+    printEnvelope(delegate({ command, module: module!, subcommand, bundleRoot: bundleRoot(), args: moduleArgs }));
   }
 } else {
   console.error(`Usage: infoapex-ai <init|status|handoff|${DELEGATED_COMMANDS.join("|")}>. Run 'infoapex-ai help' for details on each command.`);
@@ -151,8 +161,8 @@ function readForwardedOption(from: readonly string[], name: string): string | nu
   return index < 0 ? null : from[index + 1] ?? null;
 }
 
-function isDelegatedSingleModuleCommand(value: string | undefined): value is "plan" | "run" | "resume" | "review" | "docs" {
-  return value === "plan" || value === "run" || value === "resume" || value === "review" || value === "docs";
+function isDelegatedSingleModuleCommand(value: string | undefined): value is "plan" | "run" | "resume" | "review" | "docs" | "benchmark" {
+  return value === "plan" || value === "run" || value === "resume" || value === "review" || value === "docs" || value === "benchmark";
 }
 
 function bundleRoot(): string {
@@ -231,8 +241,10 @@ function readRunStatus(body: unknown): string | null {
 
 interface PinnedModuleVersion {
   readonly name: string;
-  readonly sourceCommit: string;
+  readonly sourceCommit: string | null;
   readonly sourceRepository: string;
+  readonly provenanceStatus?: "published" | "local-candidate-unpublished";
+  readonly publicationGate?: string;
 }
 
 /** Reports the pinned upstream commit for each vendored module (P3 exit-gate item:
@@ -251,7 +263,9 @@ function readPinnedModuleVersions(): readonly PinnedModuleVersion[] {
     return (provenance.modules ?? []).map((entry) => ({
       name: entry.name,
       sourceCommit: entry.sourceCommit,
-      sourceRepository: entry.sourceRepository
+      sourceRepository: entry.sourceRepository,
+      ...(entry.provenanceStatus ? { provenanceStatus: entry.provenanceStatus } : {}),
+      ...(entry.publicationGate ? { publicationGate: entry.publicationGate } : {})
     }));
   } catch {
     return [];

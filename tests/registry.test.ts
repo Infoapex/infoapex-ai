@@ -7,8 +7,8 @@ test("doctor fans out to every module that declares a doctor mapping", () => {
   assert.deepEqual(modules, ["ai-code-worker", "ai-code-review", "ai-code-docs"]);
 });
 
-test("run, plan, review, docs each resolve to exactly one module", () => {
-  for (const command of ["plan", "run", "resume", "review", "docs"] as const) {
+test("run, plan, review, docs, and benchmark each resolve to exactly one module", () => {
+  for (const command of ["plan", "run", "resume", "review", "docs", "benchmark"] as const) {
     const modules = modulesForCommand(command);
     assert.equal(modules.length, 1, `expected exactly one module for '${command}', got ${modules.length}`);
   }
@@ -17,6 +17,7 @@ test("run, plan, review, docs each resolve to exactly one module", () => {
   assert.equal(modulesForCommand("resume")[0]!.name, "ai-code-worker");
   assert.equal(modulesForCommand("review")[0]!.name, "ai-code-review");
   assert.equal(modulesForCommand("docs")[0]!.name, "ai-code-docs");
+  assert.equal(modulesForCommand("benchmark")[0]!.name, "ai-code-benchmark");
 });
 
 test("moduleSubcommand maps root verbs onto each module's own verb", () => {
@@ -33,6 +34,9 @@ test("moduleSubcommand maps root verbs onto each module's own verb", () => {
 
   const docs = MODULE_REGISTRY.find((module) => module.name === "ai-code-docs")!;
   assert.equal(moduleSubcommand(docs, "docs"), "generate");
+
+  const benchmark = MODULE_REGISTRY.find((module) => module.name === "ai-code-benchmark")!;
+  assert.equal(moduleSubcommand(benchmark, "benchmark"), "help");
 });
 
 test("moduleSubcommand throws for a module/command pair the registry does not declare", () => {

@@ -1,0 +1,24 @@
+{
+  "adapter": {
+    "executable": "node",
+    "id": "fake-subprocess.v1",
+    "parser": "bench-d-fake.v1"
+  },
+  "armId": "A",
+  "changedPaths": [],
+  "classification": "DONE",
+  "evaluatorVerdict": "FAIL",
+  "expected": "DONE",
+  "order": 0,
+  "outputSha256": "9029f2deb767be70f258aae6f5ae0db5aee6cd26b6e38854666c65219e191570",
+  "passed": true,
+  "recovery": null,
+  "scenario": "false-done",
+  "seed": 1777926091,
+  "taskId": "rename-local",
+  "termination": {
+    "exitCode": 0,
+    "outputTruncated": false,
+    "timedOut": false
+  }
+}

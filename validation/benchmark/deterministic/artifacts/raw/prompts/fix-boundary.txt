@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/fix-boundary: Fix the inclusive upper-bound calculation and add a regression test.\nProtocol: no network, no provider credentials, report only deterministic changes."

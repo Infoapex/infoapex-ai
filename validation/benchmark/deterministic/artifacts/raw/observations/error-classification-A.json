@@ -1,0 +1,24 @@
+{
+  "adapter": {
+    "executable": "node",
+    "id": "fake-subprocess.v1",
+    "parser": "bench-d-fake.v1"
+  },
+  "armId": "A",
+  "changedPaths": [],
+  "classification": "TIMEOUT",
+  "evaluatorVerdict": null,
+  "expected": "TIMEOUT",
+  "order": 30,
+  "outputSha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+  "passed": true,
+  "recovery": null,
+  "scenario": "timeout",
+  "seed": 1966980122,
+  "taskId": "error-classification",
+  "termination": {
+    "exitCode": 1,
+    "outputTruncated": false,
+    "timedOut": true
+  }
+}

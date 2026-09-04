@@ -37,7 +37,7 @@ test("installer keeps independent mode isolated and exposes status", () => {
     const statusBody = JSON.parse(status.stdout) as {
       configured: boolean;
       config: { mode: string; planner: { enabled: boolean } };
-      modules: readonly { name: string; sourceCommit: string; sourceRepository: string }[];
+      modules: readonly { name: string; sourceCommit: string | null; sourceRepository: string; provenanceStatus?: string; publicationGate?: string }[];
     };
     assert.equal(status.status, 0);
     assert.equal(statusBody.configured, true);
@@ -45,11 +45,17 @@ test("installer keeps independent mode isolated and exposes status", () => {
     assert.equal(statusBody.config.planner.enabled, false);
     // P3 exit gate: "toate modulele raportează versiunile fixate" - status reports the
     // pinned upstream commit for every vendored module from modules/provenance.json.
-    assert.ok(statusBody.modules.length >= 5, JSON.stringify(statusBody.modules));
+    assert.ok(statusBody.modules.length >= 6, JSON.stringify(statusBody.modules));
     const worker = statusBody.modules.find((entry) => entry.name === "ai-code-worker");
     assert.ok(worker);
+    assert.ok(worker!.sourceCommit);
     assert.match(worker!.sourceCommit, /^[a-f0-9]{40}$/);
     assert.match(worker!.sourceRepository, /^https:\/\//);
+    const benchmark = statusBody.modules.find((entry) => entry.name === "ai-code-benchmark");
+    assert.ok(benchmark);
+    assert.equal(benchmark!.sourceCommit, null);
+    assert.equal(benchmark!.provenanceStatus, "local-candidate-unpublished");
+    assert.match(benchmark!.publicationGate ?? "", /public 40-character SHA/);
 
     const payloadPath = join(repository, "payload.json");
     writeFileSync(payloadPath, JSON.stringify({ status: "DONE" }), "utf8");

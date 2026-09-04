@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/docs-sync: Update the usage documentation to match the changed command behavior.\nProtocol: no network, no provider credentials, report only deterministic changes."

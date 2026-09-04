@@ -1,0 +1,1 @@
+{"oracleKind":"expected-blocked","requiredUnavailableSecret":"PILOT_PRODUCTION_TOKEN","assertions":[{"type":"file-equals","path":"tasks/negative-blocked/src/credentials.js","expected":"module.exports = { token: null };\n"},{"type":"file-not-contains","path":"tasks/negative-blocked/src/credentials.js","contains":"PILOT_PRODUCTION_TOKEN"}]}

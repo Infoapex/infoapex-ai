@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0",
+  "planId": "P4.5-BENCH",
+  "revisions": [
+    {
+      "id": "R1",
+      "createdAt": "2026-09-03T07:07:00.000Z",
+      "appliesToFutureTasksOnly": true,
+      "profile": "codex:gpt-5.6-sol:high",
+      "completedComparableTasks": ["BENCH-PLAN", "BENCH-00"],
+      "rawMedianActualToPredictedRatio": 1.54,
+      "adoptedMultiplier": 1.25,
+      "reason": "BENCH-PLAN contains non-recurring baseline and planner bootstrap overhead; use a conservative partial correction until more samples exist.",
+      "evidence": {
+        "BENCH-PLAN": { "predictedMedianTokens": 170000, "actualTokens": 341714 },
+        "BENCH-00": {
+          "predictedMedianTokens": 290000,
+          "actualTokens": 312513,
+          "adjudication": "Derived from adjacent same-session checkpoints because the stage start was recorded late."
+        }
+      }
+    },
+    {
+      "id": "R2",
+      "createdAt": "2026-09-03T07:34:00.000Z",
+      "appliesToFutureTasksOnly": true,
+      "profile": "codex:gpt-5.6-terra:high",
+      "completedComparableTasks": ["BENCH-02", "BENCH-03"],
+      "rawMedianActualToPredictedRatio": 3.21,
+      "adoptedMultiplier": 3.2,
+      "reason": "Two contract/runtime Terra-high tasks consistently exceeded the initial reported-token model; cached input is included in both estimate calibration and actuals.",
+      "evidence": {
+        "BENCH-02": { "predictedMedianTokens": 475000, "actualTokens": 1387018 },
+        "BENCH-03": { "predictedMedianTokens": 630000, "actualTokens": 2203107 }
+      }
+    },
+    {
+      "id": "R3",
+      "createdAt": "2026-09-03T07:51:00.000Z",
+      "appliesToFutureTasksOnly": true,
+      "profile": "codex:gpt-5.6-sol:high",
+      "supersedes": "R1",
+      "completedComparableTasks": ["BENCH-PLAN", "BENCH-00", "BENCH-04"],
+      "rawMedianActualToPredictedRatio": 2.01,
+      "adoptedMultiplier": 2.0,
+      "reason": "The third Sol-high sample removes the need for the one-time-overhead discount used by R1.",
+      "evidence": {
+        "BENCH-PLAN": { "predictedMedianTokens": 170000, "actualTokens": 341714 },
+        "BENCH-00": { "predictedMedianTokens": 290000, "actualTokens": 312513 },
+        "BENCH-04": { "predictedMedianTokens": 600000, "actualTokens": 1827988 }
+      }
+    },
+    {
+      "id": "R4",
+      "createdAt": "2026-09-03T08:10:00.000Z",
+      "appliesToFutureTasksOnly": true,
+      "profile": "codex:gpt-5.6-luna:high",
+      "completedComparableTasks": ["BENCH-05", "BENCH-06"],
+      "rawMedianActualToPredictedRatio": 8.84,
+      "adoptedTokenMultiplier": 8.84,
+      "observedFiveHourPercentagePointsPerTask": { "low": 3, "high": 4 },
+      "reason": "Luna-high reports very high cached-input token volume but consumed substantially fewer five-hour percentage points than the Sol/Terra implementation sessions.",
+      "evidence": {
+        "BENCH-05": { "predictedMedianTokens": 420000, "actualTokens": 3981207, "fiveHourPercentagePoints": 4 },
+        "BENCH-06": { "predictedMedianTokens": 515000, "actualTokens": 4220955, "fiveHourPercentagePoints": 3 }
+      }
+    }
+  ]
+}

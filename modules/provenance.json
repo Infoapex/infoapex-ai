@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "generatedAt": "2026-08-30",
   "modules": [
     {
@@ -8,6 +8,7 @@
       "sourceRepository": "https://github.com/Infoapex/ai-code-control.git",
       "sourceBranch": "main",
       "sourceCommit": "b9c120b4bfa604e0e13a457d39dbf308a687a9f1",
+      "provenanceStatus": "published",
       "syncMode": "source-with-bundle-manifest",
       "allowedAdaptations": [
         ".ai-code-control/reports/refactor/current-plan.json"
@@ -19,6 +20,7 @@
       "sourceRepository": "https://github.com/Infoapex/ai-code-worker.git",
       "sourceBranch": "main",
       "sourceCommit": "4a7c37b5f92c52c719147c724ac0472a2b004b86",
+      "provenanceStatus": "published",
       "syncMode": "generic-bundle-projection",
       "allowedAdaptations": [
         "bundle-local schema URNs",
@@ -32,6 +34,7 @@
       "sourceRepository": "https://github.com/Infoapex/ai-code-planner.git",
       "sourceBranch": "main",
       "sourceCommit": "1e5534ba53c54896eafbfa140d0f88616bf9f138",
+      "provenanceStatus": "published",
       "syncMode": "generic-bundle-projection",
       "allowedAdaptations": [
         "bundle-local schema URNs",
@@ -47,6 +50,7 @@
       "sourceRepository": "https://github.com/Infoapex/ai-code-review.git",
       "sourceBranch": "main",
       "sourceCommit": "032f646fa4eae2f147d7d6b97a865842ca3d26db",
+      "provenanceStatus": "published",
       "syncMode": "generic-bundle-projection",
       "allowedAdaptations": [
         "bundle-local schema URNs",
@@ -60,12 +64,24 @@
       "sourceRepository": "https://github.com/Infoapex/ai-code-docs.git",
       "sourceBranch": "main",
       "sourceCommit": "1b3eef8a7f24f6902d5aa003de371c89a6f621df",
+      "provenanceStatus": "published",
       "syncMode": "generic-bundle-projection",
       "allowedAdaptations": [
         "bundle-local schema URNs",
         "generic consumer documentation",
         "bundle-relative integration paths"
       ]
+    },
+    {
+      "name": "ai-code-benchmark",
+      "bundlePath": "modules/ai-code-benchmark",
+      "sourceRepository": "https://github.com/Infoapex/ai-code-benchmark.git",
+      "sourceBranch": "main",
+      "sourceCommit": null,
+      "provenanceStatus": "local-candidate-unpublished",
+      "publicationGate": "Create, test, merge, and publish the standalone repository commit on Infoapex/ai-code-benchmark main; then replace null with that public 40-character SHA before a release.",
+      "syncMode": "local-candidate-unpublished",
+      "allowedAdaptations": []
     }
   ]
 }

@@ -1,0 +1,107 @@
+{
+  "arms": [
+    {
+      "adapter": "fake-subprocess.v1",
+      "id": "A"
+    },
+    {
+      "adapter": "fake-subprocess.v1",
+      "id": "B"
+    },
+    {
+      "adapter": "fake-subprocess.v1",
+      "id": "C"
+    }
+  ],
+  "benchmark": "BENCH-D",
+  "observationCount": 36,
+  "schemaVersion": "1.0",
+  "suiteHash": "d9c5c9371839c0a7991e6e4df048b6aeac6b4a968d13e189d32c6aedc4bc0cbc",
+  "suiteId": "generic-v1",
+  "tasks": [
+    {
+      "id": "rename-local",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "f1e2240519357933ebd56bbf9f4642013cba89af14487927a02fdf65bf6afe0d",
+      "repositorySha256": "769c89b8ee7529ec1246770bcf10ee974752053b37a7a4ea16428a7ac787ab8b",
+      "scenario": "false-done"
+    },
+    {
+      "id": "fix-boundary",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "1980afba6105f5ab7aabb5ab955df6e4379f4a1be95aa26b6fead403e1ea4885",
+      "repositorySha256": "464c9ffd2e1e48cbf7ca0633448863b06379027c445c4973e3f9ab6b71631ae1",
+      "scenario": "quota"
+    },
+    {
+      "id": "cross-file-config",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "afd616a169a7b7675ae83a7b4ccd7d330b43c7b6ae68e683be4e6bd46f89628f",
+      "repositorySha256": "c1f398728aed6a854f79d501ef747e6c90b404b22d1f2cae1f101e66ff6a99d3",
+      "scenario": "success"
+    },
+    {
+      "id": "api-contract",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "052cb1ca2ae37c6fd4609bc8cdd29946cdcf339fb9869f5565559d615dbda168",
+      "repositorySha256": "0bfa85ea6fff9521aeb4e986cce262a584d1519a3df856c87c144638042c9339",
+      "scenario": "success"
+    },
+    {
+      "id": "preserve-refactor",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "0cd05e5e11dfd747062fa678c5967d9e0bf2932a35362b0e024fbccb31bd5272",
+      "repositorySha256": "d8da106ef8ecf65ae3947624077d2e0995ccaba930ea95b101b2755be15e35c2",
+      "scenario": "scope"
+    },
+    {
+      "id": "docs-sync",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "3d6347302d2fa4c7ba8240c22b33d8d5c80ff46a1f588d37ad84267d342a60d9",
+      "repositorySha256": "f950ca689e77cc14af97bf8f75bcfe3aef8bdad41520551852929293534fb03e",
+      "scenario": "success"
+    },
+    {
+      "id": "scope-guard",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "ac34ccfe0809ecffa28da55dad554f597360131b29e82cc26a09dbe07ea68aac",
+      "repositorySha256": "2dd004d1b0ec88c9879f95e76703ef7b7c0fa4975b8c9666632941dd344b097f",
+      "scenario": "truncated"
+    },
+    {
+      "id": "dag-order",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "e7ea13f0ab8139a36344dd3b3d249cef834f21cfadd9865c71e673ce6450e62f",
+      "repositorySha256": "c057e1c9489cce06217c8d1ae9a6dc6ef576363b61bdfc70580e31ba089a7dfb",
+      "scenario": "failure"
+    },
+    {
+      "id": "recovery-cleanup",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "92147e4894cac62de5583978d2027e3441e624ecc5782c8a1205e121be425be9",
+      "repositorySha256": "1e527c67f1596bcea9ab218a93471d0a0500bc4bc44865e7330b37fc4e05c4bf",
+      "scenario": "recovery"
+    },
+    {
+      "id": "negative-missing-secret",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "838c48af5a62be4d9b61ae7fd26f4c3df614cf6de99e526a2f10c83b8779d4ef",
+      "repositorySha256": "6d7e86aee7ac390ac874d06799dc0d1eb2273bdf103991047bd86d993766cc71",
+      "scenario": "unsupported"
+    },
+    {
+      "id": "error-classification",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "9f976ba671f321d3582eb8899b8de69aed5b3a54fe01aaa925d7a119db3fff83",
+      "repositorySha256": "aa85f70115cd12cc7fba03a113ee85595c229f2f56e520c8e32fe7c3c0354abe",
+      "scenario": "timeout"
+    },
+    {
+      "id": "serialization-roundtrip",
+      "oracleSha256": "5b1a41b976dcfaa11da08458d4b2350d653fc0a9b6a6a02aaeff6acef1fcdf65",
+      "promptSha256": "77e463aa760e3ed15459606fdf09045ef1a7ea1994781b6be8dec90c2d241ae6",
+      "repositorySha256": "a28e9eacfcf946081715ba9e8cd03c414b7ea18b7816fe613525a2ee8a4cdf91",
+      "scenario": "success"
+    }
+  ]
+}

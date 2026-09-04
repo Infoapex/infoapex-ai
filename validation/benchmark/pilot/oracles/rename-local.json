@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"tasks/rename-local/src/format.js","contains":"formatValue"},{"type":"file-contains","path":"tasks/rename-local/src/format.js","contains":"module.exports"}]}

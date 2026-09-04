@@ -1,0 +1,26 @@
+{
+  "adapter": {
+    "executable": "node",
+    "id": "fake-subprocess.v1",
+    "parser": "bench-d-fake.v1"
+  },
+  "armId": "C",
+  "changedPaths": [
+    "secrets/token.txt"
+  ],
+  "classification": "DONE",
+  "evaluatorVerdict": "BLOCKED",
+  "expected": "DONE",
+  "order": 14,
+  "outputSha256": "4c23725c5d582912d8cad6af5188ee70339a7e845d0f24ebaeadad16669196fe",
+  "passed": true,
+  "recovery": null,
+  "scenario": "scope",
+  "seed": 1725404516,
+  "taskId": "preserve-refactor",
+  "termination": {
+    "exitCode": 0,
+    "outputTruncated": false,
+    "timedOut": false
+  }
+}

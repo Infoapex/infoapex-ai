@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infoapex.dev/schemas/ai-code-benchmark/benchmark-experiment-1.0.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "id", "suiteId", "suiteHash", "taskHashes", "environment", "arms", "repetitions", "status", "experimentHash"],
+  "properties": {"schemaVersion": {"const": "1.0"}, "id": {"$ref": "#/$defs/id"}, "suiteId": {"$ref": "#/$defs/id"}, "suiteHash": {"$ref": "#/$defs/hash"}, "taskHashes": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/hash"}}, "environment": {"$ref": "https://infoapex.dev/schemas/ai-code-benchmark/benchmark-environment-1.0.json"}, "arms": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["id", "kind", "provider", "model", "effort"], "properties": {"id": {"$ref": "#/$defs/id"}, "kind": {"enum": ["direct", "orchestrated-no-icm", "full-icm", "candidate"]}, "provider": {"type": ["string", "null"]}, "model": {"type": ["string", "null"]}, "effort": {"type": ["string", "null"]}}}}, "repetitions": {"type": "integer", "minimum": 1}, "status": {"enum": ["FROZEN", "STARTED", "COMPLETE", "BLOCKED"]}, "protocolHash": {"$ref": "#/$defs/hash"}, "protocol": {"type": "object", "additionalProperties": true}, "nonAuthoritative": {"type": "boolean"}, "maximumInvocations": {"type": "integer", "minimum": 1}, "validityGate": {"type": "number", "minimum": 0, "maximum": 1}, "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}}, "experimentHash": {"$ref": "#/$defs/hash"}},
+  "$defs": {"id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"}, "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}
+}

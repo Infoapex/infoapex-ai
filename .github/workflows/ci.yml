@@ -50,6 +50,12 @@ jobs:
       - name: Run docs tests and JSON validation
         run: npm test --prefix modules/ai-code-docs
 
+      - name: Run benchmark tests, contracts, recovery, and security validation
+        run: npm test --prefix modules/ai-code-benchmark
+
+      - name: Run hermetic BENCH-D deterministic harness
+        run: npm run benchmark:deterministic --prefix modules/ai-code-benchmark
+
       - name: Run internal review gate
         run: npm run review-gate:internal
 

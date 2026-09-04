@@ -19,9 +19,14 @@
 </p>
 
 > [!IMPORTANT]
-> **Stare: candidat implementat, pre-release.** Fluxurile deterministe interne sunt
-> funcționale și testate. Rămân deschise gate-ul live cu consum real de provider și
-> smoke test-ul bundle-ului ZIP. Vezi [Unde se află proiectul](#unde-se-află-proiectul).
+> **Stare: private beta, pre-release.** P0–P4, pilotul live P2 și smoke test-ul ZIP
+> sunt închise. P4.5 are un candidat local integrat, evaluatorul independent
+> `ai-code-benchmark`, iar rerun-ul BENCH-09 R5 din 2026-09-04 a închis matricea
+> live: 30/30 observații valide, 10 perechi complete și zero incidente critice.
+> Baseline-ul pre-P5 este stabilit pentru evaluarea candidaților; verdictul rămâne
+> intenționat `INCONCLUSIVE` până când o ipoteză P5 este înghețată. Publicarea și
+> pin-ul standalone al modulului rămân gate-ul extern P4.5. Vezi
+> [Unde se află proiectul](#unde-se-află-proiectul).
 
 ---
 
@@ -312,6 +317,7 @@ npx --package . infoapex-ai run --repo /cale/catre/proiect --plan Plan/FEATURE-X
 npx --package . infoapex-ai resume --repo /cale/catre/proiect --run-id FEATURE-X --plan Plan/FEATURE-X.md --engine codex
 npx --package . infoapex-ai review --repo /cale/catre/proiect --request review-request.json
 npx --package . infoapex-ai docs --repo /cale/catre/proiect --request docs-request.json
+npx --package . infoapex-ai benchmark validate --suite modules/ai-code-benchmark/datasets/generic-v1/suite.json
 ```
 
 `doctor` este singura comandă agregată: rulează doctor-ul fiecărui modul prezent
@@ -400,7 +406,8 @@ trebuie pornite explicit.
 | **P2** | Gate-uri live și comparație controlată | ✅ închis — P2-A + P2-B PASS funcțional, tokeni compleți pe ambele motoare, verdict economic **comparable** (procent din cota de 5 ore, nu cost USD — vezi mai jos) |
 | **P3** | Bundle ZIP, clean install, release privat | ✅ închis — smoke test complet dintr-un ZIP curat (10/10 pași), CI matrice Windows + Linux verde, `v0.1.0` publicat ca GitHub Release privat |
 | **P4** | CLI root unificat | ✅ închis — ADR-0003, registry, mecanism de delegare, comenzile `doctor`/`plan`/`run`/`resume`/`review`/`docs`, `infoapex-ai help` și testele lor sunt gata; fiecare modul rămâne complet utilizabil de sine stătător (niciun modul nu a fost modificat pentru delegare) |
-| **P5** | SDK-uri și operare avansată (9 subproiecte independente, fiecare cu ADR + threat model propriu — nu un singur milestone) | 🟡 început — subproiectul 1 (OpenTelemetry redactat pentru `ai-code-worker`, ADR-0012) e complet și pinned; niciun consumator real încă (gate-ul din roadmap "P5 începe numai după feedback real" e explicit neîndeplinit — pornit oricum, scoped la elementele cu risc scăzut din ordinea recomandată) |
+| **P4.5 / BENCH** | [`ai-code-benchmark`](docs/plans/AI-CODE-BENCHMARK-IMPLEMENTATION-PLAN.md): direct vs. orchestration-only vs. full ICM | 🟡 baseline live complet — modul integrat, root `benchmark`, CI și ZIP smoke cu BENCH-D, plus BENCH-09 R5 30/30 valid; publicarea și pin-ul standalone rămân gate-ul extern |
+| **P5** | SDK-uri și operare avansată (9 subproiecte independente, fiecare cu ADR + threat model propriu — nu un singur milestone) | ▶️ pregătit pentru evaluare — OpenTelemetry redactat este primul candidat retrospectiv și trebuie rulat cu ipoteză, experiment și autorizare noi |
 
 De ce `0.1.0` este pre-release și nu producție:
 
@@ -472,7 +479,7 @@ handoff între agenți, cerințe de audit sau nevoia de a reproduce procesul în
 - backend real de izolare la nivel de sistem/VM/container, cu capabilități probate;
 - validarea strictă a fiecărui mesaj la toate granițele dintre procese;
 - teste Windows și Linux, smoke test automat al bundle-ului ZIP, artefacte semnate;
-- benchmark A/B pe aceleași task-uri: direct Codex/Claude versus flux orchestrat;
+- publicarea standalone și pin-ul public pentru `ai-code-benchmark`, plus evaluarea fiecărui candidat P5 față de baseline-ul A/B/C;
 - adaptoare pentru motoare suplimentare fără a cupla contractele de un provider;
 - UI local pentru DAG, bugete, evenimente, dovezi și aprobări umane;
 - politici de echipă și aprobări explicite înaintea execuțiilor cu privilegii ridicate.

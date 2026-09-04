@@ -1,0 +1,26 @@
+{
+  "adapter": {
+    "executable": "node",
+    "id": "fake-subprocess.v1",
+    "parser": "bench-d-fake.v1"
+  },
+  "armId": "B",
+  "changedPaths": [
+    "src/result.txt"
+  ],
+  "classification": "DONE",
+  "evaluatorVerdict": "PASS",
+  "expected": "DONE",
+  "order": 34,
+  "outputSha256": "2bf056fb5712d892ce7a29b1e9103e58ffcd1d151869fef84bbecde2f4c9c169",
+  "passed": true,
+  "recovery": null,
+  "scenario": "success",
+  "seed": 1568886225,
+  "taskId": "serialization-roundtrip",
+  "termination": {
+    "exitCode": 0,
+    "outputTruncated": false,
+    "timedOut": false
+  }
+}

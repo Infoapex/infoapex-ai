@@ -6,6 +6,7 @@ dist-release/
 **/db/
 .logs/
 .env
+validation/benchmark/pilot/.local/
 
 # Generated Obsidian code-map projection; source code and SQLite remain canonical.
 docs/code-map/generated/

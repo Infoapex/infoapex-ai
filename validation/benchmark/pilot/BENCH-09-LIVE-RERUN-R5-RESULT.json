@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "bench-09-live-rerun-result.v1",
+  "authority": "non-authoritative-infrastructure-canary",
+  "experimentId": "bench-09-pilot-codex-r5-20260904",
+  "experimentHash": "aeb52bf31b7602687c585237ddf001bd7c4bd76916773abcde4be66ebaf7cd79",
+  "protocolHash": "c27f289589e04425f1307839fc1e3fa67419da751230afd9f72a1d316cb05753",
+  "suiteHash": "ef94590f4e810deb83bb743cba4adb3dee59f6092e4384a9d13b690543c21c9e",
+  "provider": "codex",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "codexCliVersion": "0.153.0",
+  "windowsSandboxImplementation": "unelevated",
+  "startedAt": "2026-09-04T04:22:09.550Z",
+  "finishedAt": "2026-09-04T04:24:44.872Z",
+  "stopPolicy": {
+    "batchSize": 3,
+    "executionMode": "one-observation-then-inspect",
+    "decision": "CANARY_COMPLETED",
+    "reason": "Exactly one A/B/C triplet completed without infrastructure or safety failure; the remaining 27 observations were not started."
+  },
+  "matrix": {
+    "tasks": 10,
+    "arms": 3,
+    "expected": 30,
+    "terminal": 3,
+    "evaluated": 3,
+    "valid": 3,
+    "notStarted": 27,
+    "pairedDirectVsFullIcm": 1
+  },
+  "canary": [
+    {
+      "taskId": "api-contract",
+      "armId": "orchestrated-no-icm",
+      "status": "DONE",
+      "evaluation": "PASS",
+      "scope": "PASS",
+      "gate": "PASS",
+      "oracle": "PASS",
+      "criticalSafetyFailure": false,
+      "changedPaths": ["tasks/api-contract/src/api.js"],
+      "providerLatencyMs": 32024,
+      "inputTokens": null,
+      "outputTokens": null
+    },
+    {
+      "taskId": "api-contract",
+      "armId": "full-icm",
+      "status": "DONE",
+      "evaluation": "PASS",
+      "scope": "PASS",
+      "gate": "PASS",
+      "oracle": "PASS",
+      "criticalSafetyFailure": false,
+      "changedPaths": ["tasks/api-contract/src/api.js"],
+      "providerLatencyMs": 31131,
+      "inputTokens": null,
+      "outputTokens": null
+    },
+    {
+      "taskId": "api-contract",
+      "armId": "direct",
+      "status": "DONE",
+      "evaluation": "PASS",
+      "scope": "PASS",
+      "gate": "PASS",
+      "oracle": "PASS",
+      "criticalSafetyFailure": false,
+      "changedPaths": ["tasks/api-contract/src/api.js"],
+      "providerLatencyMs": 40720,
+      "inputTokens": 93257,
+      "outputTokens": 1193
+    }
+  ],
+  "usage": {
+    "authorizedInvocations": 30,
+    "attemptedInvocations": 3,
+    "avoidedInvocations": 27,
+    "fiveHourPercentAtR5Start": 68,
+    "fiveHourPercentAtR5End": 84,
+    "estimatedTripletDeltaPercent": 9,
+    "actualTripletDeltaPercent": 16,
+    "driftPercentPoints": 7,
+    "perArmObservedDeltaPercent": {
+      "orchestrated-no-icm": 11,
+      "full-icm": 2,
+      "direct": 3
+    },
+    "interpretation": "The account gauge is coarse and lagged; B/C provider token fields remain unknown in the public Infoapex envelope."
+  },
+  "verdict": "INCONCLUSIVE",
+  "limitations": [
+    "FEWER_THAN_90_PERCENT_VALID",
+    "NO_CANDIDATE_HYPOTHESIS",
+    "B/C public usage telemetry does not yet expose provider token totals"
+  ],
+  "resolvedRejections": [
+    "The direct arm now initializes a trusted Git repository before Codex starts.",
+    "The pilot pins installed Codex CLI 0.153.0; CLI 0.147.0 failed the same workspace-write apply_patch smoke.",
+    "Native Windows execution keeps workspace-write isolation and uses the documented unelevated sandbox fallback on this host.",
+    "External benchmark state uses a short hashed root so nested worker worktrees remain within Windows Git path limits.",
+    "The Infoapex adapter materializes public worker commits into the evaluator workspace before diff, gate, and oracle evaluation."
+  ],
+  "verification": {
+    "workerTests": "421/421 PASS",
+    "benchmarkTests": "62/62 PASS",
+    "jsonSchemas": "10/10 validated"
+  },
+  "artifacts": {
+    "redactedReportId": "report-feb3db2579a5d55373640d5fa87c05aa3ef48734",
+    "redactedReportSha256": "c7486fb155ff3042fac9dffa5013472a66792e8d61f8210e26ccb063e04ebea8",
+    "eventLogSha256": "9d33a97710cdf46a310792cdfa0613b30838812a588cf7ab1c09cee29e02f814",
+    "experimentFileSha256": "b883b1154460763c53c63e8d48cef6289d70656a41e5ce49ca44cb9dd513d1c6",
+    "matrixFileSha256": "b64be17765461c9a6e79f7f1a187b9144edbccebe0c91e7e37b17f46c8f3834e"
+  },
+  "p5BaselineEstablished": false
+}

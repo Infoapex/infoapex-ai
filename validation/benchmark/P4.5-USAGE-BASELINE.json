@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "1.0",
+  "planId": "P4.5-BENCH",
+  "frozenAt": "2026-09-03T07:03:09.753Z",
+  "measurement": {
+    "provider": "codex-subscription",
+    "windowMinutes": 300,
+    "windowUsedPercent": 20,
+    "windowRemainingPercent": 80,
+    "windowResetsAtUnixSeconds": 1788433802,
+    "profile": "codex:gpt-5.6-sol:high",
+    "sessionId": "01a0645f-e61b-7c42-93f2-b6601ff1714e",
+    "reportedTokensAtFreeze": 8671608,
+    "preFreezeAudit": {
+      "startingUsedPercent": 14,
+      "endingUsedPercent": 20,
+      "usedPercentagePoints": 6,
+      "reportedTokenDelta": 612263
+    }
+  },
+  "calibration": {
+    "reportedTokensPerFiveHourPercentagePoint": {
+      "low": 120000,
+      "central": 135000,
+      "high": 170000
+    },
+    "confidence": "low",
+    "notes": [
+      "The subscription percentage is account-level, rounded, and may include coordinator overhead.",
+      "Reported tokens include cached input and are not billing-equivalent tokens.",
+      "A rate-limit reset starts a new measurement window; percentages are never added across windows."
+    ]
+  },
+  "totals": {
+    "implementationTokens": { "low": 3710000, "median": 4990000, "high": 6250000 },
+    "livePilotTokens": { "low": 1800000, "median": 2400000, "high": 3000000 },
+    "overallTokens": { "low": 5510000, "median": 7390000, "high": 9250000 },
+    "fiveHourPercentagePoints": { "low": 32, "median": 55, "high": 77 }
+  },
+  "tasks": [
+    { "id": "BENCH-PLAN", "model": "gpt-5.6-sol", "effort": "high", "lowTokens": 120000, "medianTokens": 170000, "highTokens": 220000 },
+    { "id": "BENCH-00", "model": "gpt-5.6-sol", "effort": "high", "lowTokens": 220000, "medianTokens": 290000, "highTokens": 360000 },
+    { "id": "BENCH-01", "model": "gpt-5.6-terra", "effort": "medium", "lowTokens": 180000, "medianTokens": 240000, "highTokens": 300000 },
+    { "id": "BENCH-02", "model": "gpt-5.6-terra", "effort": "high", "lowTokens": 350000, "medianTokens": 475000, "highTokens": 600000 },
+    { "id": "BENCH-03", "model": "gpt-5.6-terra", "effort": "high", "lowTokens": 480000, "medianTokens": 630000, "highTokens": 780000 },
+    { "id": "BENCH-04", "model": "gpt-5.6-sol", "effort": "high", "lowTokens": 450000, "medianTokens": 600000, "highTokens": 750000 },
+    { "id": "BENCH-05", "model": "gpt-5.6-terra", "effort": "high", "lowTokens": 320000, "medianTokens": 420000, "highTokens": 520000 },
+    { "id": "BENCH-06", "model": "gpt-5.6-sol", "effort": "high", "lowTokens": 380000, "medianTokens": 515000, "highTokens": 650000 },
+    { "id": "BENCH-07", "model": "gpt-5.6-sol", "effort": "high", "lowTokens": 330000, "medianTokens": 445000, "highTokens": 560000 },
+    { "id": "BENCH-08", "model": "gpt-5.6-terra", "effort": "high", "lowTokens": 400000, "medianTokens": 550000, "highTokens": 700000 },
+    { "id": "BENCH-09-CODE", "model": "gpt-5.6-terra", "effort": "medium", "lowTokens": 220000, "medianTokens": 290000, "highTokens": 360000 },
+    { "id": "BENCH-09-LIVE", "model": "provider-under-test", "effort": "fixed-by-experiment", "lowTokens": 1800000, "medianTokens": 2400000, "highTokens": 3000000 },
+    { "id": "BENCH-10", "model": "gpt-5.6-terra", "effort": "high", "lowTokens": 260000, "medianTokens": 355000, "highTokens": 450000 }
+  ],
+  "recalibrationPolicy": {
+    "greenAbsoluteDriftPercent": 20,
+    "amberAbsoluteDriftPercent": 40,
+    "redAboveAbsoluteDriftPercent": 40,
+    "futureEstimatesOnly": true,
+    "minimumCompletedTasksBeforeMultiplierUpdate": 2
+  }
+}

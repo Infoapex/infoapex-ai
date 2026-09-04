@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "id": "replace-candidate-id",
+  "candidateChange": "REPLACE: one bounded P5 capability change",
+  "suiteId": "replace-frozen-suite-id",
+  "improves": [
+    "REPLACE: named primary metric"
+  ],
+  "nonRegression": [
+    "REPLACE: named quality or safety metric"
+  ],
+  "thresholds": {
+    "REPLACE_metric_threshold": 0
+  },
+  "maximumCostUsd": null,
+  "possibleVerdicts": [
+    "ACCEPT",
+    "REJECT",
+    "INCONCLUSIVE",
+    "ACCEPT_WITH_LIMITS"
+  ]
+}

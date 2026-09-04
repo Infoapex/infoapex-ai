@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/preserve-refactor: Extract duplicated parsing logic without changing observable behavior.\nProtocol: no network, no provider credentials, report only deterministic changes."

@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/error-classification: Classify malformed input as a validation error without masking internal failures.\nProtocol: no network, no provider credentials, report only deterministic changes."

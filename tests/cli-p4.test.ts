@@ -15,6 +15,7 @@ import { test } from "node:test";
 
 const rootCliPath = resolve("dist/src/cli.js");
 const workerCliPath = resolve("modules/ai-code-worker/dist/src/cli.js");
+const benchmarkSuitePath = resolve("modules/ai-code-benchmark/datasets/generic-v1/suite.json");
 
 function runRootCli(repositoryPath: string, args: readonly string[]): { status: number; stdout: string; stderr: string } {
   try {
@@ -137,6 +138,23 @@ test("run delegates to ai-code-worker and returns its full report as the envelop
   }
 });
 
+test("benchmark forwards its module subcommand without reimplementing benchmark semantics", () => {
+  const repository = createWorkerFixtureRepo();
+  try {
+    const result = runRootCli(repository, ["benchmark", "validate", "--suite", benchmarkSuitePath]);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const envelope = JSON.parse(result.stdout) as { command: string; module: string; status: string; body: { command: string; details: { suiteId: string; taskCount: number } } };
+    assert.equal(envelope.command, "benchmark");
+    assert.equal(envelope.module, "ai-code-benchmark");
+    assert.equal(envelope.status, "PASS");
+    assert.equal(envelope.body.command, "validate");
+    assert.equal(envelope.body.details.suiteId, "generic-v1");
+    assert.equal(envelope.body.details.taskCount, 12);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("resume rejects a run-id that was never started, without ever starting one under that id", () => {
   const repository = createWorkerFixtureRepo();
   try {
@@ -190,7 +208,7 @@ test("help, --help, and -h all print the full command reference and exit 0", () 
   for (const flag of ["help", "--help", "-h"]) {
     const result = runRootCli(process.cwd(), [flag]);
     assert.equal(result.status, 0, result.stderr);
-    for (const command of ["doctor", "plan", "run", "resume", "review", "docs", "init", "status", "handoff"]) {
+    for (const command of ["doctor", "plan", "run", "resume", "review", "docs", "benchmark", "init", "status", "handoff"]) {
       assert.match(result.stdout, new RegExp(`  ${command}\\b`), `help output is missing '${command}'`);
     }
   }

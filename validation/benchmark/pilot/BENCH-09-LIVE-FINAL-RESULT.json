@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "bench-09-live-final-result.v1",
+  "authority": "non-authoritative-pre-p5-baseline",
+  "experimentId": "bench-09-pilot-codex-r5-20260904",
+  "experimentHash": "aeb52bf31b7602687c585237ddf001bd7c4bd76916773abcde4be66ebaf7cd79",
+  "protocolHash": "c27f289589e04425f1307839fc1e3fa67419da751230afd9f72a1d316cb05753",
+  "suiteHash": "ef94590f4e810deb83bb743cba4adb3dee59f6092e4384a9d13b690543c21c9e",
+  "provider": "codex",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "codexCliVersion": "0.153.0",
+  "windowsSandboxImplementation": "unelevated",
+  "startedAt": "2026-09-04T04:22:09.135Z",
+  "finishedAt": "2026-09-04T09:25:47.396Z",
+  "generatedAt": "2026-09-04T09:28:29.496Z",
+  "matrix": {
+    "tasks": 10,
+    "arms": 3,
+    "expected": 30,
+    "terminal": 30,
+    "evaluated": 30,
+    "valid": 30,
+    "invalid": 0,
+    "pairedDirectVsFullIcm": 10,
+    "unmatchedBaseline": 0,
+    "unmatchedCandidate": 0,
+    "criticalSafetyFailures": 0
+  },
+  "executionStatuses": {
+    "DONE": 27,
+    "BLOCKED_EXPECTED": 3
+  },
+  "arms": [
+    {
+      "id": "direct",
+      "observations": 10,
+      "pass": 9,
+      "fail": 1,
+      "expectedBlockedPass": 1,
+      "successRatio": 0.9,
+      "scopeSafetyRatio": 1,
+      "averageProviderLatencyMs": 36881.3
+    },
+    {
+      "id": "orchestrated-no-icm",
+      "observations": 10,
+      "pass": 9,
+      "fail": 1,
+      "expectedBlockedPass": 1,
+      "successRatio": 0.9,
+      "scopeSafetyRatio": 1,
+      "averageProviderLatencyMs": 36754.2
+    },
+    {
+      "id": "full-icm",
+      "observations": 10,
+      "pass": 9,
+      "fail": 1,
+      "expectedBlockedPass": 1,
+      "successRatio": 0.9,
+      "scopeSafetyRatio": 1,
+      "averageProviderLatencyMs": 39182.1
+    }
+  ],
+  "tasks": [
+    { "id": "api-contract", "pass": 3, "fail": 0 },
+    { "id": "cross-file-config", "pass": 3, "fail": 0 },
+    { "id": "dag-order", "pass": 3, "fail": 0 },
+    { "id": "docs-sync", "pass": 3, "fail": 0 },
+    { "id": "fix-boundary", "pass": 0, "fail": 3, "reason": "The hidden oracle rejected the same in-scope implementation in A/B/C; gates and scope passed." },
+    { "id": "negative-blocked", "pass": 3, "fail": 0, "expectedBlocked": 3 },
+    { "id": "preserve-refactor", "pass": 3, "fail": 0 },
+    { "id": "recovery-cleanup", "pass": 3, "fail": 0 },
+    { "id": "rename-local", "pass": 3, "fail": 0 },
+    { "id": "scope-guard", "pass": 3, "fail": 0 }
+  ],
+  "comparison": {
+    "baselineArmId": "direct",
+    "candidateArmId": "full-icm",
+    "successDelta": 0,
+    "averageProviderLatencyDeltaMs": 2300.8,
+    "averageProviderLatencyDelta95PercentIntervalMs": [-3435.88, 9287.9],
+    "protocolMismatch": false
+  },
+  "telemetry": {
+    "totalProviderLatencyMs": 1128176,
+    "directAverageInputTokens": 73995.9,
+    "directAverageOutputTokens": 967.4,
+    "orchestratedTokenTotalsAvailable": false,
+    "continuationFiveHourPercentStart": 0,
+    "continuationFiveHourPercentEnd": 22,
+    "r5WeeklyPercentStart": 73,
+    "r5WeeklyPercentEnd": 81,
+    "weeklyResetAt": "2026-09-08T01:10:19+03:00",
+    "fiveHourCalibration": [
+      { "task": "api-contract", "estimatedDelta": 9, "actualDelta": 16, "drift": 7, "window": "pre-reset" },
+      { "task": "cross-file-config", "estimatedDelta": 9, "actualDelta": 4, "drift": -5, "window": "post-reset" },
+      { "task": "dag-order", "estimatedDelta": 4, "actualDelta": 4, "drift": 0, "window": "post-reset" },
+      { "task": "docs-sync", "estimatedDelta": 4, "actualDelta": 2, "drift": -2, "window": "post-reset" },
+      { "task": "fix-boundary", "estimatedDelta": 3, "actualDelta": 2, "drift": -1, "window": "post-reset" },
+      { "task": "negative-blocked", "estimatedDelta": 3, "actualDelta": 1, "drift": -2, "window": "post-reset" },
+      { "task": "preserve-refactor", "estimatedDelta": 3, "actualDelta": 2, "drift": -1, "window": "post-reset" },
+      { "task": "recovery-cleanup", "estimatedDelta": 3, "actualDelta": 3, "drift": 0, "window": "post-reset" },
+      { "task": "rename-local", "estimatedDelta": 3, "actualDelta": 2, "drift": -1, "window": "post-reset" },
+      { "task": "scope-guard", "estimatedDelta": 3, "actualDelta": 2, "drift": -1, "window": "post-reset" }
+    ]
+  },
+  "report": {
+    "verdict": "INCONCLUSIVE",
+    "limitations": ["NO_CANDIDATE_HYPOTHESIS"],
+    "interpretation": "The pre-P5 baseline matrix is complete, but no P5 product claim can be accepted or rejected until a frozen P5 candidate hypothesis is evaluated."
+  },
+  "verification": {
+    "benchmarkTests": { "passed": 62, "failed": 0 },
+    "benchmarkJsonSchemas": { "validated": 10, "failed": 0 },
+    "pilotFixtureTransitions": { "positive": 9, "expectedBlocked": 1 },
+    "gitDiffCheck": "PASS"
+  },
+  "artifacts": {
+    "reportJsonSha256": "69f832c2239e3e49cb347e29b31c7ea5aa11f21c2c0235f2a0b3b28e811fd435",
+    "reportMarkdownSha256": "c7957aaf34a72d465cf7643282bf25c678ff39028362dc646494037278963107",
+    "eventsSha256": "65f2a7b8eedb87314ddbac862302e6d810620344bc9134b5e4daf16b9785e34a",
+    "frozenExperimentFileSha256": "b883b1154460763c53c63e8d48cef6289d70656a41e5ce49ca44cb9dd513d1c6",
+    "matrixFileSha256": "b64be17765461c9a6e79f7f1a187b9144edbccebe0c91e7e37b17f46c8f3834e"
+  },
+  "p5BaselineEstablished": true,
+  "p5CandidateEvaluated": false
+}

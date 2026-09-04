@@ -5,7 +5,7 @@
  * see ADR-0003's "Consequences" for why that is deliberate.
  */
 
-export type RootCommand = "doctor" | "plan" | "run" | "resume" | "review" | "docs";
+export type RootCommand = "doctor" | "plan" | "run" | "resume" | "review" | "docs" | "benchmark";
 
 export interface ModuleDescriptor {
   readonly name: string;
@@ -39,6 +39,11 @@ export const MODULE_REGISTRY: readonly ModuleDescriptor[] = [
     name: "ai-code-docs",
     cliRelativePath: "modules/ai-code-docs/dist/src/cli.js",
     commandMap: { doctor: "doctor", docs: "generate" }
+  },
+  {
+    name: "ai-code-benchmark",
+    cliRelativePath: "modules/ai-code-benchmark/dist/src/cli.js",
+    commandMap: { benchmark: "help" }
   }
 ];
 
@@ -50,7 +55,7 @@ export function modulesForCommand(command: RootCommand): readonly ModuleDescript
 
 export function moduleSubcommand(module: ModuleDescriptor, command: RootCommand): string {
   const subcommand = module.commandMap[command];
-  if (!subcommand) {
+  if (subcommand === undefined) {
     throw new Error(`Module '${module.name}' does not back root command '${command}'.`);
   }
   return subcommand;

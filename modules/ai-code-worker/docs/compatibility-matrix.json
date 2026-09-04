@@ -6,10 +6,11 @@
       "requiredCapabilities": ["--json", "--cd", "--sandbox"],
       "usageFields": ["inputUncachedTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "costUsd"],
       "streaming": true,
-      "lastVerified": "2026-08-10",
+      "lastVerified": "2026-09-04",
       "notes": [
-        "0.136.0-alpha.2 verified live 2026-08-10 against a real ChatGPT-subscription (auth_mode: chatgpt) install: --ignore-user-config/--ignore-rules do not break subscription auth, --output-schema is honored correctly.",
-        "--sandbox workspace-write reports read-only on Windows for both tested versions (pre-existing upstream issue, see docs/PHASE-1.md) - danger-full-access is the correct default until that is fixed upstream.",
+        "0.153.0 verified live 2026-09-04 against a real ChatGPT-subscription install: workspace-write completed one direct and two orchestrated BENCH-09 tasks, each with passing scope, gate, and hidden oracle evaluation.",
+        "The verified Windows host uses the documented windows.sandbox=unelevated fallback because its elevated sandbox setup fails to launch child commands; danger-full-access is not used.",
+        "The adapter intentionally keeps user config/rules loading. On CLI 0.147.0, --ignore-user-config caused the generated managed permission profile to become read-only despite a later --sandbox workspace-write flag.",
         "The codex binary is not always a global PATH install - on at least one verified machine it ships bundled inside the VS Code openai.chatgpt extension.",
         "Usage is read from the token_count event's total_token_usage in the --json JSONL stream (cumulative, not per-turn) - see src/engines/codex-cli.ts parseCodexUsage()."
       ]

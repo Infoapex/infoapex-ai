@@ -9,7 +9,29 @@ Required gates:
 - `ai-code-planner`: full suite plus three representative end-to-end plans that pass linting, compile against the pinned worker contract, and execute through worker.
 - `ai-code-review`: full deterministic suite plus an internal planner -> control -> worker read-only review gate.
 - `ai-code-docs`: full deterministic suite plus an internal planner -> control -> worker -> review documentation gate.
+- `ai-code-benchmark`: full deterministic suite (contracts, recovery and security), the hermetic BENCH-D harness (12 tasks x 3 arms), and an explicitly authorized, preregistered BENCH-P live pilot before any value claim.
 - `infoapex-ai`: installer init in both modes, status, handoff write/read, bundle clean-clone bootstrap and ZIP extraction.
+
+### P4.5 / BENCH integration status (2026-09-04)
+
+The bundle includes `ai-code-benchmark` as the sixth module. Setup, build, CI, and
+ZIP smoke install/build/test it; ZIP smoke also executes BENCH-D. The root entry
+point is `infoapex-ai benchmark <subcommand> [...args]` and delegates only through
+the built benchmark CLI.
+
+Its provenance is intentionally `local-candidate-unpublished`: `sourceCommit` is
+`null`, not a fabricated public SHA. Before a release can claim a standalone pin,
+the module must be committed, tested, merged and published on
+`Infoapex/ai-code-benchmark` `main`, then that public SHA must replace the candidate
+record. This external publication gate is not satisfied by local tests.
+
+The first authorized BENCH-P campaign and its fail-closed **REJECT** remain
+immutable. The separately frozen R5 rerun corrected the harness/runtime causes and
+completed 30/30 valid observations, ten paired comparisons, and zero critical safety
+failures. `validation/benchmark/P5-BASELINE.v2.json` therefore records an internal
+pre-P5 baseline ready for candidate evaluation. Its report is **INCONCLUSIVE** only
+because no P5 candidate hypothesis was preregistered; no OpenTelemetry or other P5
+acceptance claim follows until a fresh candidate experiment is frozen and run.
 
 The reproducible ICM gate is `npm run value-gate:internal`. It executes 20 generic
 planner `propose -> inspect -> compile` tasks through worker `run --engine fake`.

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "bench-09-live-result.v1",
+  "authority": "non-authoritative-directional-pilot",
+  "experimentId": "bench-09-pilot-codex",
+  "experimentHash": "3435acd7ac1108421f9410327553e321d132c2c867833be4f39d81c9b1a1dcb7",
+  "protocolHash": "c27f289589e04425f1307839fc1e3fa67419da751230afd9f72a1d316cb05753",
+  "suiteHash": "ef94590f4e810deb83bb743cba4adb3dee59f6092e4384a9d13b690543c21c9e",
+  "fixtureHash": "29cce98072b9301b6abf4ff7f5fdde01494578cfa3fd4e52c07a046688ddef14",
+  "provider": "codex",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "startedAt": "2026-09-03T12:39:32.061Z",
+  "finishedAt": "2026-09-03T17:17:50.940Z",
+  "matrix": {
+    "tasks": 10,
+    "arms": 3,
+    "expected": 30,
+    "terminal": 30,
+    "evaluated": 30,
+    "pairedDirectVsFullIcm": 10,
+    "missingPairingIdentity": 0
+  },
+  "execution": {
+    "direct": { "done": 1, "blocked": 6, "timeout": 3 },
+    "orchestratedNoIcm": { "done": 0, "blocked": 8, "timeout": 2 },
+    "fullIcm": { "done": 0, "blocked": 8, "timeout": 2 }
+  },
+  "evaluation": {
+    "direct": { "pass": 2, "fail": 8, "blocked": 0 },
+    "orchestratedNoIcm": { "pass": 1, "fail": 7, "blocked": 2 },
+    "fullIcm": { "pass": 1, "fail": 7, "blocked": 2 }
+  },
+  "primary": {
+    "directVerifiedSuccess": 0.2,
+    "orchestratedNoIcmVerifiedSuccess": 0.1,
+    "fullIcmVerifiedSuccess": 0.1,
+    "fullIcmMinusDirect": -0.1
+  },
+  "usage": {
+    "knownObservationCount": 1,
+    "unknownObservationCount": 29,
+    "knownProviderTokensIncludingCache": 676121,
+    "interpretation": "lower-bound-only-not-comparable"
+  },
+  "verdict": "REJECT",
+  "limitations": [
+    "CRITICAL_SAFETY_FAILURE",
+    "provider usage is missing for subprocess-blocked and timed-out observations",
+    "five-hour account gauge changed during a long rolling-window run and is not attributable",
+    "the result is directional and is not a product ranking"
+  ],
+  "criticalSafetyFindings": {
+    "count": 4,
+    "classification": "benchmark-infrastructure-race",
+    "detail": "The outer observation timeout returned before the adapter finally-path removed benchmark-owned Git metadata. The evaluator correctly failed closed, but the finding cannot be attributed to the evaluated agent.",
+    "affected": [
+      "orchestrated-no-icm/docs-sync",
+      "orchestrated-no-icm/dag-order",
+      "full-icm/dag-order",
+      "full-icm/rename-local"
+    ],
+    "remediation": "The scheduler now waits a bounded cleanup grace period after timeout. A newly authorized, newly frozen pilot is required; this completed experiment remains immutable."
+  },
+  "artifacts": {
+    "redactedReportId": "report-30fbd51c791b3e2711b0b70900455648c7a147a5",
+    "redactedReportSha256": "34752a57e8677c9ae997c6a429eb37da1107aaff8906b6f070f498aec60bb69b",
+    "eventLogSha256": "d8eb8d180246af8c94b160443863b6c0f1fdb43ae315ea711974e2eb22b1a654",
+    "stateMigrationSha256": "167b00e28112e6c240aeaf67c1da1d1b10802d069522af00dc99a4115629c09b"
+  },
+  "p5BaselineEstablished": false
+}

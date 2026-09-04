@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"tasks/scope-guard/src/safe.js","contains":"typeof value"}]}

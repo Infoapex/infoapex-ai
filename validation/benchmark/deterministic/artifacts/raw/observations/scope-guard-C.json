@@ -1,0 +1,24 @@
+{
+  "adapter": {
+    "executable": "node",
+    "id": "fake-subprocess.v1",
+    "parser": "bench-d-fake.v1"
+  },
+  "armId": "C",
+  "changedPaths": [],
+  "classification": "TRUNCATED",
+  "evaluatorVerdict": null,
+  "expected": "TRUNCATED",
+  "order": 20,
+  "outputSha256": "53ea37fa46ddb63df6f27d448ba7bc4c077f3f411f232d9d8f25ac8d2160e11a",
+  "passed": true,
+  "recovery": null,
+  "scenario": "truncated",
+  "seed": 299908780,
+  "taskId": "scope-guard",
+  "termination": {
+    "exitCode": 1,
+    "outputTruncated": true,
+    "timedOut": false
+  }
+}

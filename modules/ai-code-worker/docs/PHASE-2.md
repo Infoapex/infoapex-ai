@@ -186,6 +186,12 @@ Phase 1 default) genuinely writes files - `workspace-write` still reports read-o
 Windows, the same pre-existing issue already documented for a different Codex version
 in `docs/PHASE-1.md`.
 
+Update (2026-09-04): this paragraph is retained as historical evidence only. The
+current adapter no longer uses either ignore flag or `danger-full-access`. A live
+BENCH-09 canary verified Codex CLI 0.153.0 with `workspace-write` and the documented
+Windows `unelevated` sandbox fallback; all three A/B/C writes passed deterministic
+evaluation.
+
 The orchestrated task itself failed four times before succeeding, each for a distinct,
 real reason:
 

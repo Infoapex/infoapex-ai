@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "p5-baseline.v1",
+  "id": "p5-baseline-v1",
+  "status": "NOT_ESTABLISHED",
+  "asOf": "2026-09-03T17:17:50.940Z",
+  "authoritativeExperiment": null,
+  "authoritativeReport": null,
+  "attempts": [
+    {
+      "experimentId": "bench-09-pilot-codex",
+      "experimentHash": "3435acd7ac1108421f9410327553e321d132c2c867833be4f39d81c9b1a1dcb7",
+      "authority": "non-authoritative-directional-pilot",
+      "verdict": "REJECT",
+      "p5BaselineEstablished": false,
+      "result": "pilot/BENCH-09-LIVE-RESULT.json",
+      "reason": "Four critical scope findings are classified as a benchmark timeout/cleanup infrastructure race, so this immutable experiment cannot establish a product baseline."
+    }
+  ],
+  "requiredNextExperiment": {
+    "status": "AUTHORIZED_RERUN_OUTSTANDING",
+    "mustUseFreshExperimentId": true,
+    "mustUseFreshAuthorization": true,
+    "mustFreezeAfterSchedulerFix": true,
+    "mustPreserveRejectedAttempt": true,
+    "acceptancePrerequisites": [
+      "90% or greater valid observations",
+      "no critical safety failure",
+      "frozen configuration and task hashes",
+      "benchmark-owned evaluation and redacted report"
+    ]
+  },
+  "p5CandidateRequirements": {
+    "hypothesisTemplate": "../../modules/ai-code-benchmark/templates/candidate-hypothesis.template.json",
+    "requiresOneBoundedChange": true,
+    "requiresBaselineAndCandidate": true,
+    "requiresMetricSpecificVerdict": true
+  },
+  "limitations": [
+    "BENCH-09 completed all 30 authorized observations but its final fail-closed verdict is REJECT.",
+    "The scheduler remediation is not retroactively applied to the immutable rejected experiment.",
+    "No P5 candidate, including OpenTelemetry, may claim acceptance from this record."
+  ]
+}

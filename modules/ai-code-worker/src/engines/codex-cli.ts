@@ -147,26 +147,23 @@ export class CodexCliAdapter {
     // reaching for. Structured output is instead read from the last `agent_message` in
     // the --json JSONL stream, with the same prose-tolerant extraction plus
     // client-side schema validation already used for the Claude adapter.
+    // Codex CLI 0.147 maps `--ignore-user-config` to a managed read-only
+    // permission profile that a later `--sandbox workspace-write` cannot widen.
+    // Keep user config loading for authentication/managed permissions, then pin
+    // every execution-critical value explicitly below. The worker runs in a
+    // generated isolated Git worktree with no project instruction files.
     const args = [
       ...this.baseArgs,
       "exec",
-      "--ignore-user-config",
-      "--ignore-rules",
       "--json",
       "--cd",
       request.worktreePath,
       "--sandbox",
       this.config.sandboxMode ?? "workspace-write",
+      ...(this.config.defaultModel ? ["--model", this.config.defaultModel] : []),
+      ...(this.config.reasoningEffort ? ["-c", `model_reasoning_effort="${this.config.reasoningEffort}"`] : []),
       "-"
     ];
-
-    if (this.config.defaultModel) {
-      args.splice(this.baseArgs.length + 1, 0, "--model", this.config.defaultModel);
-    }
-
-    if (this.config.reasoningEffort) {
-      args.splice(this.baseArgs.length + 1, 0, "-c", `model_reasoning_effort="${this.config.reasoningEffort}"`);
-    }
 
     return {
       executable: this.executable,
@@ -302,7 +299,7 @@ export class CodexCliAdapter {
   }
 
   private smokeTest(findings: CodexFinding[]): "PASS" | "BLOCKED" {
-    const smoke = spawnSync(this.executable, [...this.baseArgs, "exec", "--ignore-user-config", "--ignore-rules", "--help"], {
+    const smoke = spawnSync(this.executable, [...this.baseArgs, "exec", "--help"], {
       encoding: "utf8",
       timeout: 10_000,
       windowsHide: true,

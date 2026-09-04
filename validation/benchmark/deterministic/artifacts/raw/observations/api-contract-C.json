@@ -1,0 +1,26 @@
+{
+  "adapter": {
+    "executable": "node",
+    "id": "fake-subprocess.v1",
+    "parser": "bench-d-fake.v1"
+  },
+  "armId": "C",
+  "changedPaths": [
+    "src/result.txt"
+  ],
+  "classification": "DONE",
+  "evaluatorVerdict": "PASS",
+  "expected": "DONE",
+  "order": 11,
+  "outputSha256": "3cf0291d141307f0edd1760fcef09ca5235cc7d5ad48fcb252babff7d44a1453",
+  "passed": true,
+  "recovery": null,
+  "scenario": "success",
+  "seed": 1651045361,
+  "taskId": "api-contract",
+  "termination": {
+    "exitCode": 0,
+    "outputTruncated": false,
+    "timedOut": false
+  }
+}

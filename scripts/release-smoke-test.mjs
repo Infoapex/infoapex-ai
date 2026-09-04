@@ -10,7 +10,8 @@ import { fileURLToPath } from "node:url";
 // archive (build-release-zip.mjs) already guarantees the ZIP itself has no such files, and
 // this script extracts into a fresh mkdtemp directory, so nothing from the developer machine
 // (PATH entries aside) can leak into the "clean install" being verified. Then setup/build/test
-// from scratch, and a smoke chain covering all five modules: value-gate (planner+worker),
+// from scratch, and a smoke chain covering all six modules: BENCH-D plus
+// value-gate (planner+worker),
 // pilot:icm-graph (planner+worker+control), review-gate (planner+worker+review), docs-gate
 // (planner+worker+review+docs), plus the root installer's own init/status/handoff in both
 // independent and integrated mode against a disposable target directory.
@@ -41,16 +42,24 @@ try {
     }
   });
 
-  step("npm run setup (npm ci across root + all 5 modules, no dev cache)", () => {
+  step("npm run setup (npm ci across root + all 6 modules, no dev cache)", () => {
     run(npm, ["run", "setup"], extractedRoot);
   });
 
-  step("npm run build (root + all 5 modules)", () => {
+  step("npm run build (root + all 6 modules)", () => {
     run(npm, ["run", "build"], extractedRoot);
   });
 
   step("npm test (root installer's own tests, from the clean build)", () => {
     run(npm, ["test"], extractedRoot);
+  });
+
+  step("ai-code-benchmark deterministic suite, contracts, recovery, and security", () => {
+    run(npm, ["test", "--prefix", "modules/ai-code-benchmark"], extractedRoot);
+  });
+
+  step("BENCH-D hermetic deterministic harness", () => {
+    run(npm, ["run", "benchmark:deterministic", "--prefix", "modules/ai-code-benchmark"], extractedRoot);
   });
 
   step("value-gate:internal (planner + worker, 20 generic tasks, engine fake)", () => {

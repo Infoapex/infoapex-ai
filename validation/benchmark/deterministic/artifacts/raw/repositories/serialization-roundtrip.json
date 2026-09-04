@@ -1,0 +1,16 @@
+{
+  "files": {
+    "oracles/serialization-roundtrip.json": {
+      "assertions": [
+        {
+          "contains": "PASS",
+          "path": "src/result.txt",
+          "type": "file-contains"
+        }
+      ],
+      "schemaVersion": "bench-d-oracle.v1"
+    },
+    "src/result.txt": "BASELINE\n"
+  },
+  "id": "serialization-roundtrip"
+}

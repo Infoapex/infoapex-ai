@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "p5-otel-redacted-v1",
+  "candidateChange": "Opt-in local redacted OpenTelemetry spans exported from ai-code-worker EventLog lifecycle events.",
+  "suiteId": "p5-otel-retrospective-v1",
+  "improves": [
+    "telemetrySafety",
+    "eligibleTraceCoverage"
+  ],
+  "nonRegression": [
+    "verifiedTaskSuccess",
+    "harnessOverheadPercent"
+  ],
+  "thresholds": {
+    "telemetryLeakageCount": 0,
+    "harnessOverheadPercentMaximum": 5,
+    "eligibleTraceCoverageMinimum": 0.95,
+    "verifiedTaskSuccessMaximumRegression": 0
+  },
+  "maximumCostUsd": null,
+  "possibleVerdicts": [
+    "ACCEPT",
+    "REJECT",
+    "INCONCLUSIVE",
+    "ACCEPT_WITH_LIMITS"
+  ]
+}

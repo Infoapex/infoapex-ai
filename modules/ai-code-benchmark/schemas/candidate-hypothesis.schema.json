@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://infoapex.dev/schemas/ai-code-benchmark/candidate-hypothesis-1.0.json", "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "id", "candidateChange", "suiteId", "improves", "nonRegression", "thresholds", "maximumCostUsd", "possibleVerdicts"],
+  "properties": {"schemaVersion": {"const": "1.0"}, "id": {"$ref": "#/$defs/id"}, "candidateChange": {"type": "string", "minLength": 1}, "suiteId": {"$ref": "#/$defs/id"}, "improves": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}, "nonRegression": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}, "thresholds": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "number"}}, "maximumCostUsd": {"type": ["number", "null"], "minimum": 0}, "possibleVerdicts": {"type": "array", "uniqueItems": true, "items": {"enum": ["ACCEPT", "REJECT", "INCONCLUSIVE", "ACCEPT_WITH_LIMITS"]}}},
+  "$defs": {"id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$"}}
+}

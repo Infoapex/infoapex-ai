@@ -118,14 +118,17 @@ describe("codex cli adapter", () => {
 
     assert.equal(invocation.executable, process.execPath);
     assert.ok(invocation.args.includes("exec"));
-    assert.ok(invocation.args.includes("--ignore-user-config"));
-    assert.ok(invocation.args.includes("--ignore-rules"));
+    assert.ok(!invocation.args.includes("--ignore-user-config"));
+    assert.ok(!invocation.args.includes("--ignore-rules"));
     assert.ok(invocation.args.includes("--json"));
     assert.ok(invocation.args.includes("--cd"));
     assert.ok(invocation.args.includes("--sandbox"));
     assert.ok(invocation.args.includes("workspace-write"));
     assert.ok(invocation.args.includes("--model"));
     assert.ok(invocation.args.includes('model_reasoning_effort="high"'));
+    assert.ok(invocation.args.indexOf("--model") > invocation.args.indexOf("exec"));
+    assert.ok(invocation.args.indexOf("--sandbox") > invocation.args.indexOf("exec"));
+    assert.ok(invocation.args.indexOf("-c") > invocation.args.indexOf("exec"));
     assert.equal(invocation.stdin, "Implement task.");
 
     // --output-schema/--output-last-message are deliberately not used - a live run

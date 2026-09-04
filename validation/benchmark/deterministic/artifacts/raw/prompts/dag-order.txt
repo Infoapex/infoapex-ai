@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/dag-order: Add a derived field whose validation depends on the prior parser update.\nProtocol: no network, no provider credentials, report only deterministic changes."

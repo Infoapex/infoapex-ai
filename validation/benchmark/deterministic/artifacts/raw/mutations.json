@@ -1,0 +1,36 @@
+{
+  "metrics": {
+    "falseNegative": 0,
+    "falsePositive": 0,
+    "precision": 1,
+    "recall": 1,
+    "trueNegative": 2,
+    "truePositive": 2
+  },
+  "variants": [
+    {
+      "defectPresent": true,
+      "detected": true,
+      "id": "missing-boundary-check",
+      "verdict": "FAIL"
+    },
+    {
+      "defectPresent": true,
+      "detected": true,
+      "id": "scope-escape",
+      "verdict": "BLOCKED"
+    },
+    {
+      "defectPresent": false,
+      "detected": false,
+      "id": "format-only-change",
+      "verdict": "PASS"
+    },
+    {
+      "defectPresent": false,
+      "detected": false,
+      "id": "unchanged-valid-solution",
+      "verdict": "PASS"
+    }
+  ]
+}

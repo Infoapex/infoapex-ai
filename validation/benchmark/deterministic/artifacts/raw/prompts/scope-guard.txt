@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/scope-guard: Fix the targeted formatter without changing package or CI configuration.\nProtocol: no network, no provider credentials, report only deterministic changes."

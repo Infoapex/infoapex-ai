@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "p5-baseline.v2",
+  "id": "p5-baseline-v2",
+  "status": "ESTABLISHED_FOR_CANDIDATE_EVALUATION",
+  "authority": "non-authoritative-pre-p5-baseline",
+  "asOf": "2026-09-04T09:28:29.496Z",
+  "baselineExperiment": {
+    "experimentId": "bench-09-pilot-codex-r5-20260904",
+    "experimentHash": "aeb52bf31b7602687c585237ddf001bd7c4bd76916773abcde4be66ebaf7cd79",
+    "protocolHash": "c27f289589e04425f1307839fc1e3fa67419da751230afd9f72a1d316cb05753",
+    "suiteHash": "ef94590f4e810deb83bb743cba4adb3dee59f6092e4384a9d13b690543c21c9e",
+    "result": "pilot/BENCH-09-LIVE-FINAL-RESULT.json",
+    "reportVerdict": "INCONCLUSIVE",
+    "reportLimitation": "NO_CANDIDATE_HYPOTHESIS",
+    "expectedObservations": 30,
+    "validObservations": 30,
+    "pairedObservations": 10,
+    "criticalSafetyFailures": 0
+  },
+  "outcome": {
+    "baselineReady": true,
+    "p5CandidateEvaluated": false,
+    "successRatioByArm": {
+      "direct": 0.9,
+      "orchestrated-no-icm": 0.9,
+      "full-icm": 0.9
+    },
+    "scopeSafetyRatioByArm": {
+      "direct": 1,
+      "orchestrated-no-icm": 1,
+      "full-icm": 1
+    }
+  },
+  "history": [
+    {
+      "register": "P5-BASELINE.v1.json",
+      "experimentId": "bench-09-pilot-codex",
+      "verdict": "REJECT",
+      "preserved": true
+    },
+    {
+      "experimentId": "bench-09-pilot-codex-r5-20260904",
+      "verdict": "INCONCLUSIVE",
+      "reason": "The baseline is complete; a product verdict is intentionally unavailable until a P5 candidate hypothesis is frozen and evaluated."
+    }
+  ],
+  "p5CandidateRequirements": {
+    "hypothesisTemplate": "../../modules/ai-code-benchmark/templates/candidate-hypothesis.template.json",
+    "requiresFreshExperimentIdentity": true,
+    "requiresFreshAuthorization": true,
+    "requiresOneBoundedChange": true,
+    "requiresBaselineAndCandidate": true,
+    "requiresMetricSpecificVerdict": true,
+    "mustPreserveBaseline": true
+  },
+  "remainingExternalGate": {
+    "standalonePublication": "Commit, test, merge and publish ai-code-benchmark on its standalone main branch, then replace the local candidate provenance with the public SHA."
+  },
+  "limitations": [
+    "This register establishes an internal pre-P5 comparison baseline, not an authoritative public value claim.",
+    "The baseline does not accept or reject OpenTelemetry or any other P5 candidate.",
+    "B/C public usage telemetry does not expose provider token totals, so cross-arm token and cost claims remain unavailable."
+  ]
+}

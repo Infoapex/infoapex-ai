@@ -1,0 +1,24 @@
+{
+  "adapter": {
+    "executable": "node",
+    "id": "fake-subprocess.v1",
+    "parser": "bench-d-fake.v1"
+  },
+  "armId": "C",
+  "changedPaths": [],
+  "classification": "UNSUPPORTED",
+  "evaluatorVerdict": null,
+  "expected": "UNSUPPORTED",
+  "order": 5,
+  "outputSha256": "0ce10f353407554cdc808d11119173484add00343a8e8aaa4188082e7fb986e4",
+  "passed": true,
+  "recovery": null,
+  "scenario": "quota",
+  "seed": 1194811875,
+  "taskId": "fix-boundary",
+  "termination": {
+    "exitCode": 75,
+    "outputTruncated": false,
+    "timedOut": false
+  }
+}

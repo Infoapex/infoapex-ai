@@ -12,11 +12,12 @@ const requiredModules = new Map([
   ["ai-code-worker", "modules/ai-code-worker"],
   ["ai-code-planner", "modules/ai-code-planner"],
   ["ai-code-review", "modules/ai-code-review"],
-  ["ai-code-docs", "modules/ai-code-docs"]
+  ["ai-code-docs", "modules/ai-code-docs"],
+  ["ai-code-benchmark", "modules/ai-code-benchmark"]
 ]);
 
-if (manifest.schemaVersion !== "1.0" || !Array.isArray(manifest.modules)) {
-  failures.push("modules/provenance.json must use schemaVersion 1.0 and declare a modules array");
+if (manifest.schemaVersion !== "1.1" || !Array.isArray(manifest.modules)) {
+  failures.push("modules/provenance.json must use schemaVersion 1.1 and declare a modules array");
 } else {
   for (const module of manifest.modules) {
     if (!module.name || names.has(module.name)) failures.push(`invalid or duplicate module name: ${module.name ?? "<missing>"}`);
@@ -25,7 +26,14 @@ if (manifest.schemaVersion !== "1.0" || !Array.isArray(manifest.modules)) {
     if (module.sourceRepository !== `https://github.com/Infoapex/${module.name}.git`) {
       failures.push(`${module.name}: invalid canonical sourceRepository`);
     }
-    if (!/^[0-9a-f]{40}$/.test(module.sourceCommit ?? "")) failures.push(`${module.name}: sourceCommit is not a full Git SHA`);
+    if (module.provenanceStatus === "published") {
+      if (!/^[0-9a-f]{40}$/.test(module.sourceCommit ?? "")) failures.push(`${module.name}: published sourceCommit is not a full Git SHA`);
+    } else if (module.provenanceStatus === "local-candidate-unpublished") {
+      if (module.sourceCommit !== null) failures.push(`${module.name}: unpublished local candidate must use sourceCommit: null`);
+      if (typeof module.publicationGate !== "string" || module.publicationGate.trim().length === 0) failures.push(`${module.name}: unpublished local candidate requires a publicationGate`);
+    } else {
+      failures.push(`${module.name}: provenanceStatus must be published or local-candidate-unpublished`);
+    }
     if (module.sourceBranch !== "main") failures.push(`${module.name}: sourceBranch must be main`);
     if (module.bundlePath !== requiredModules.get(module.name) || !existsSync(resolve(root, module.bundlePath ?? ""))) {
       failures.push(`${module.name}: bundlePath does not exist`);

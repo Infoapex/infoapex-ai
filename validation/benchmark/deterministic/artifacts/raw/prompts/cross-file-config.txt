@@ -1,0 +1,1 @@
+"BENCH-D/generic-v1/cross-file-config: Add a bounded retry setting through config, defaults, and consumer.\nProtocol: no network, no provider credentials, report only deterministic changes."

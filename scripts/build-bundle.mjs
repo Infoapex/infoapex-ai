@@ -9,6 +9,7 @@ const packageDirectories = [
   "modules/ai-code-worker",
   "modules/ai-code-review",
   "modules/ai-code-docs",
+  "modules/ai-code-benchmark",
   "modules/ai-code-control/tools/ai-code-control/mcp-server"
 ];
 
