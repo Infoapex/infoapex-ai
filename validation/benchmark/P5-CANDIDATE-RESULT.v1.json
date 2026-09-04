@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "p5-candidate-register.v1",
+  "updatedAt": "2026-09-04T18:11:40.183Z",
+  "baseline": {
+    "register": "P5-BASELINE.v2.json",
+    "experimentId": "bench-09-live-r5-20260904",
+    "experimentHash": "aeb52bf31b7602687c585237ddf001bd7c4bd76916773abcde4be66ebaf7cd79"
+  },
+  "candidate": {
+    "id": "p5-otel-redacted-v2",
+    "change": "INFOAPEX_OTEL_ENABLED=1",
+    "hypothesis": "p5-candidates/opentelemetry-redacted-v2/candidate-hypothesis.json",
+    "preregistration": "p5-candidates/opentelemetry-redacted-v2/PREREGISTRATION.md"
+  },
+  "experiment": {
+    "id": "p5-otel-candidate-r2-20260904",
+    "experimentHash": "d59e69395cfc4763bc62df4c59a5a34978bd5cd415aa838eb8a673ad3cdc3c11",
+    "protocolHash": "dacbfa03655da75485a197008bc93cbfbc9fe25f07d02491fbcfe63ea3815a54",
+    "hypothesisHash": "1ce234bd1f5fdbb08e93a07b4adee8a7bec55774b17aca683382170e0fb06e32",
+    "authorizationScope": "P5-OTEL",
+    "maximumInvocations": 20
+  },
+  "result": {
+    "verdict": "ACCEPT",
+    "authoritativeness": "internal-directional",
+    "validObservations": 20,
+    "pairedComparisons": 10,
+    "criticalSafetyFailures": 0,
+    "allFrozenMetricGatesPassed": true,
+    "artifact": "p5-candidates/opentelemetry-redacted-v2/LIVE-EVALUATION-R2.json"
+  },
+  "historicalCanary": {
+    "experimentId": "p5-otel-candidate-r1-20260904",
+    "experimentHash": "9a0067b7b165180c45e3ef593f4b61822af155ab03e1566fccdf1de5535e806f",
+    "terminalObservations": 2,
+    "verdict": "INCONCLUSIVE",
+    "resumed": false,
+    "artifact": "p5-candidates/opentelemetry-redacted-v2/CANARY-R1-INCIDENT.md"
+  }
+}

@@ -52,10 +52,29 @@ test("a frozen expected protocol or experiment hash mismatch is inconclusive", (
   assert.ok(report.limitations.includes("PROTOCOL_HASH_MISMATCH"));
 });
 
+test("a bounded canary is inconclusive for sample coverage without inventing protocol drift", () => {
+  const rows = [observation("a", "baseline"), observation("b", "candidate")];
+  const report = buildBenchmarkReport(rows, { experimentHash: hash, protocolHash: null, baselineArmId: "baseline", candidateArmId: "candidate", expectedObservationCount: 20, candidateHypothesis: hypothesis({ improves: ["success"], nonRegression: ["costUsd"], thresholds: { success: 0, costUsd: 1 } }) });
+  assert.equal(report.verdict, "INCONCLUSIVE"); assert.ok(report.limitations.includes("FEWER_THAN_90_PERCENT_VALID")); assert.equal(report.limitations.includes("PROTOCOL_HASH_MISMATCH"), false);
+});
+
 test("missing every declared improvement threshold rejects instead of accepting with limits", () => {
   const rows = [observation("a", "baseline"), observation("b", "candidate", "task-one", { evaluation: { verdict: "FAIL", scope: { verdict: "PASS" }, criticalSafetyFailure: false } })];
   const report = buildBenchmarkReport(rows, { experimentHash: hash, baselineArmId: "baseline", candidateArmId: "candidate", expectedObservationCount: 2, candidateHypothesis: hypothesis({ improves: ["success"], nonRegression: ["costUsd"], thresholds: { success: 0, costUsd: 1 } }) });
   assert.equal(report.verdict, "REJECT");
+});
+
+test("the frozen OpenTelemetry metrics accept coverage only when safety and overhead do not regress", () => {
+  const baseline = observation("a", "baseline", "task-one", { verifiedTaskSuccess: 1, eligibleTraceCoverage: 0, telemetryLeakageCount: 0, harnessOverheadPercent: 0 });
+  const candidate = observation("b", "candidate", "task-one", { verifiedTaskSuccess: 1, eligibleTraceCoverage: 1, telemetryLeakageCount: 0, harnessOverheadPercent: 2 });
+  const frozen = hypothesis({ improves: ["eligibleTraceCoverage"], nonRegression: ["verifiedTaskSuccess", "harnessOverheadPercent", "telemetryLeakageCount"], thresholds: { eligibleTraceCoverage: 0.95, verifiedTaskSuccess: 0, harnessOverheadPercent: 5, telemetryLeakageCount: 0 } });
+  const report = buildBenchmarkReport([baseline, candidate], { experimentHash: hash, baselineArmId: "baseline", candidateArmId: "candidate", expectedObservationCount: 2, candidateHypothesis: frozen });
+  assert.equal(report.verdict, "ACCEPT");
+  assert.deepEqual(report.verdicts, { eligibleTraceCoverage: "PASS", verifiedTaskSuccess: "PASS", harnessOverheadPercent: "PASS", telemetryLeakageCount: "PASS" });
+
+  const excessive = buildBenchmarkReport([baseline, { ...candidate, harnessOverheadPercent: 6 }], { experimentHash: hash, baselineArmId: "baseline", candidateArmId: "candidate", expectedObservationCount: 2, candidateHypothesis: frozen });
+  assert.equal(excessive.verdict, "REJECT");
+  assert.equal(excessive.verdicts?.harnessOverheadPercent, "FAIL");
 });
 
 test("Markdown report escapes table delimiters and newlines", () => {

@@ -324,8 +324,10 @@ inclusiv BENCH-D deterministic. Repository-ul standalone
 `899d14894444121f5f7141f6850eb62841b33152`. BENCH-D nu este un baseline live P5. Campania BENCH-09
 R5, înghețată și autorizată separat, a închis 30/30 observații valide, zece perechi
 și zero incidente critice; `P5-BASELINE.v2` poate fi folosit pentru evaluarea
-candidaților. Raportul este `INCONCLUSIVE` numai pentru că nu conține încă o
-ipoteză P5. Primul BENCH-P respins rămâne imuabil și separat.
+candidaților. Raportul baseline este `INCONCLUSIVE` deoarece nu conține o ipoteză
+P5. Primul candidat separat, OpenTelemetry redactat R2, a închis 20/20 observații
+valide cu verdict intern direcțional `ACCEPT`; primul BENCH-P respins și canary-ul
+P5 R1 oprit fail-closed rămân imuabile și separate.
 
 ### Obiectiv
 
@@ -353,7 +355,7 @@ Planul canonic complet este
 7. Harness determinist fără provider.
 8. Pilot live bounded pe 10 taskuri × 3 brațe.
 9. Pin în bundle, comandă root `benchmark` și baseline P5.
-10. Evaluarea retrospectivă a OpenTelemetry, deja implementat.
+10. Evaluarea OpenTelemetry deja implementat — completă, R2 `ACCEPT`.
 
 ### Gate de ieșire
 
@@ -369,10 +371,11 @@ Planul canonic complet este
 ### Obiectiv
 
 Capabilități post-stabilizare. Fiecare subproiect cere justificare și pilot separat; P5 nu este
-un singur milestone monolitic. OpenTelemetry redactat este deja implementat și pinned;
-baseline-ul P4.5 este acum disponibil, iar OpenTelemetry poate fi evaluat
-retrospectiv ca primul candidat P5. Fiecare candidat necesită o ipoteză, un
-experiment și o autorizare noi; acest baseline nu reprezintă acceptarea lui.
+un singur milestone monolitic. OpenTelemetry redactat este implementat, pinned și
+acceptat ca primul candidat intern: R2 a avut 20/20 observații valide, coverage
+`0 → 1`, zero leakage, zero regresie paired de succes și overhead sub pragul
+preregistrat. Verdictul nu se transferă altor candidați. Fiecare subproiect următor
+necesită propria ipoteză, propriul experiment și propria autorizare.
 
 ### Subproiecte și modele
 
@@ -390,7 +393,7 @@ experiment și o autorizare noi; acest baseline nu reprezintă acceptarea lui.
 
 ### Ordine recomandată în P5
 
-1. OpenTelemetry redactat.
+1. OpenTelemetry redactat — complet și acceptat intern prin R2.
 2. UI local read-only pentru run/evidence.
 3. Provider registry, fără provideri noi activați implicit.
 4. SDK adapters prin pilot separat.
@@ -409,7 +412,7 @@ slăbește funcționarea standalone sau guardrail-urile existente.
 1. P0, P1, P2 și P3 se execută strict în această ordine.
 2. P4 începe numai după ce `v0.1.0` poate fi instalat curat.
 3. P4.5 începe după P4 și devine gate obligatoriu înainte de continuarea P5.
-4. OpenTelemetry, deja implementat, se păstrează și se evaluează retrospectiv după P4.5.
+4. OpenTelemetry, deja implementat, este păstrat după evaluarea R2 `ACCEPT`; evidențele R1/R2 nu se rescriu.
 5. Restul P5 începe numai după baseline-ul P4.5, utilizare reală și feedback din minimum un proiect consumator.
 6. Un singur writer per repository până la finalizarea P3.
 7. Review-ul poate folosi alt model, dar rămâne secvențial; `GRAPH-06` nu se activează implicit.

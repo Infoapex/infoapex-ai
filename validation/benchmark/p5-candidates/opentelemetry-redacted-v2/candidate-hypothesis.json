@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "p5-otel-redacted-v2",
+  "candidateChange": "Enable only INFOAPEX_OTEL_ENABLED=1 for local redacted OpenTelemetry span export while holding provider, model, effort, task fixtures, budgets, orchestration, and evaluator constant.",
+  "suiteId": "p5-otel-live-v1",
+  "improves": [
+    "eligibleTraceCoverage"
+  ],
+  "nonRegression": [
+    "verifiedTaskSuccess",
+    "harnessOverheadPercent",
+    "telemetryLeakageCount"
+  ],
+  "thresholds": {
+    "eligibleTraceCoverage": 0.95,
+    "verifiedTaskSuccess": 0,
+    "harnessOverheadPercent": 5,
+    "telemetryLeakageCount": 0
+  },
+  "maximumCostUsd": null,
+  "possibleVerdicts": [
+    "ACCEPT",
+    "REJECT",
+    "INCONCLUSIVE",
+    "ACCEPT_WITH_LIMITS"
+  ]
+}

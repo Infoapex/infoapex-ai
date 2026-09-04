@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "p5-otel-live-result.v1",
+  "candidateId": "p5-otel-redacted-v2",
+  "experimentId": "p5-otel-candidate-r2-20260904",
+  "experimentHash": "d59e69395cfc4763bc62df4c59a5a34978bd5cd415aa838eb8a673ad3cdc3c11",
+  "protocolHash": "dacbfa03655da75485a197008bc93cbfbc9fe25f07d02491fbcfe63ea3815a54",
+  "suiteId": "p5-otel-live-v1",
+  "suiteHash": "4ca5f11ac4162c5f43cad207bccf895d37cd0dd3184e6ebe3c323f960d688da2",
+  "hypothesisHash": "1ce234bd1f5fdbb08e93a07b4adee8a7bec55774b17aca683382170e0fb06e32",
+  "baselineExperimentHash": "aeb52bf31b7602687c585237ddf001bd7c4bd76916773abcde4be66ebaf7cd79",
+  "authorizationFileSha256": "92f55a4867c0d0ed781b0d7dcbc8da8f0ba55982caa603db7de6ab4c51e6d60e",
+  "reportId": "report-555342403c328e6f6ee60a5b48a9c58ec127199f",
+  "reportFileSha256": "6c4b81402965ad57c77c3510e28fb1f511677dad225af472544788817a4590ce",
+  "traceEvidenceFileSha256": "4b8d9574315367a9089d74f9ad589bc62ebae4b5818a7bf316706724a2265054",
+  "generatedAt": "2026-09-04T18:11:40.183Z",
+  "startedAt": "2026-09-04T17:57:58.586Z",
+  "finishedAt": "2026-09-04T18:11:37.044Z",
+  "verdict": "ACCEPT",
+  "authoritativeness": "internal-directional",
+  "counts": {
+    "expected": 20,
+    "valid": 20,
+    "invalid": 0,
+    "paired": 10,
+    "unmatchedBaseline": 0,
+    "unmatchedCandidate": 0,
+    "duplicateKeys": 0,
+    "missingIdentity": 0,
+    "arm.candidate": 10,
+    "arm.full-icm": 10
+  },
+  "verdicts": {
+    "eligibleTraceCoverage": "PASS",
+    "verifiedTaskSuccess": "PASS",
+    "harnessOverheadPercent": "PASS",
+    "telemetryLeakageCount": "PASS"
+  },
+  "metrics": {
+    "eligibleTraceCoverage": {
+      "baseline": 0,
+      "candidate": 1,
+      "delta": 1,
+      "lower": 1,
+      "upper": 1,
+      "eligibleUnitsPerArm": 126,
+      "candidateSpans": 126
+    },
+    "verifiedTaskSuccess": {
+      "baseline": 0.8,
+      "candidate": 0.8,
+      "delta": 0,
+      "lower": 0,
+      "upper": 0
+    },
+    "harnessOverheadPercent": {
+      "delta": -1.7252973562310192,
+      "lower": -6.464467541350826,
+      "upper": 3.0032002659229193
+    },
+    "telemetryLeakageCount": {
+      "baseline": 0,
+      "candidate": 0,
+      "delta": 0
+    }
+  },
+  "taskResults": [
+    { "taskId": "api-contract", "baseline": "PASS", "candidate": "PASS", "scope": "PASS" },
+    { "taskId": "cross-file-config", "baseline": "FAIL", "candidate": "FAIL", "scope": "PASS" },
+    { "taskId": "dag-order", "baseline": "PASS", "candidate": "PASS", "scope": "PASS" },
+    { "taskId": "docs-sync", "baseline": "PASS", "candidate": "PASS", "scope": "PASS" },
+    { "taskId": "fix-boundary", "baseline": "FAIL", "candidate": "FAIL", "scope": "PASS" },
+    { "taskId": "negative-blocked", "baseline": "PASS", "candidate": "PASS", "scope": "PASS", "traceEligibility": "not-applicable" },
+    { "taskId": "preserve-refactor", "baseline": "PASS", "candidate": "PASS", "scope": "PASS" },
+    { "taskId": "recovery-cleanup", "baseline": "PASS", "candidate": "PASS", "scope": "PASS" },
+    { "taskId": "rename-local", "baseline": "PASS", "candidate": "PASS", "scope": "PASS" },
+    { "taskId": "scope-guard", "baseline": "PASS", "candidate": "PASS", "scope": "PASS" }
+  ],
+  "limitations": [
+    "Directional single-provider evaluation; this is not a product ranking.",
+    "The paired elapsed-time overhead metric includes provider variance and is therefore conservative and noisy.",
+    "The expected-BLOCKED negative task produced no eligible worker trace in either arm and is excluded from trace coverage.",
+    "Five-hour and weekly utilization were null in worker run reports, so quota drift could not be measured directly."
+  ],
+  "quotaCalibration": {
+    "plannedProviderInvocations": 20,
+    "actualR2ProviderInvocations": 20,
+    "additionalR1CanaryInvocations": 2,
+    "invocationCountDriftPercent": 10,
+    "preregisteredEstimateFiveHourPercentagePoints": 15,
+    "preregisteredEstimateWeeklyPercentagePoints": 4,
+    "measuredUtilization": null
+  }
+}

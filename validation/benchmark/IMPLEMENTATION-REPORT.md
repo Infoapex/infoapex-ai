@@ -1,14 +1,14 @@
 # P4.5 / BENCH implementation report
 
-Status: integrated and published standalone; R5 pre-P5 baseline established for
-candidate evaluation on 2026-09-04.
+Status: integrated and published standalone; R5 pre-P5 baseline established and
+the first P5 OpenTelemetry candidate accepted internally on 2026-09-04.
 
 Completion update: the separately frozen and authorized BENCH-09 R5 experiment
 completed 30/30 valid observations, ten paired comparisons, and zero critical
 safety failures. `P5-BASELINE.v2.json` records the new baseline without modifying
 the rejected v1 experiment or register. Its report is `INCONCLUSIVE` only because
-no P5 candidate hypothesis was attached; candidate acceptance remains a separate
-future experiment.
+no P5 candidate hypothesis was attached. A separate frozen and authorized R2
+experiment subsequently evaluated OpenTelemetry without rewriting this baseline.
 
 `ai-code-benchmark` is integrated as the sixth bundle module. The root command
 `infoapex-ai benchmark <subcommand> [...args]` delegates to its built CLI without
@@ -38,5 +38,8 @@ The published pin does not by itself make an authoritative live benchmark or P5
 acceptance claim. The mandatory P5 hypothesis template is in
 `modules/ai-code-benchmark/templates/`; OpenTelemetry's retrospective threshold
 assessment is explicitly `INCONCLUSIVE` in `p5-candidates/opentelemetry-redacted-v1/`.
-A preregistered P5 candidate hypothesis plus a fresh, authorized candidate
-experiment remain required for an actual P5 acceptance or rejection verdict.
+The independent `opentelemetry-redacted-v2` hypothesis was frozen before provider
+execution and R2 used a fresh experiment and Ed25519 authorization. It completed
+20/20 valid observations and received `ACCEPT`: coverage `0 → 1`, zero detected
+leakage, zero paired success regression, and a +3.00% upper overhead confidence bound
+against the +5% gate. This is an internal directional result, not a product ranking.

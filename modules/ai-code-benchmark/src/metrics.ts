@@ -289,14 +289,16 @@ export interface ObservationMetricCapture {
   readonly scope: ScopeMetrics;
   readonly evidence: EvidenceMetrics;
   readonly completeness: MetricCompleteness;
+  readonly eligibleTraceCoverage?: number;
+  readonly telemetryLeakageCount?: number;
 }
-export type ObservationMetricInput = { readonly elapsedMs?: number | null; readonly providerLatencyMs?: number | null; readonly harnessLatencyMs?: number | null; readonly usage?: Partial<AdapterUsage> | null; readonly diff?: DiffMetrics | null; readonly scope?: ScopeMetrics | null; readonly evidence?: EvidenceMetrics | null };
+export type ObservationMetricInput = { readonly elapsedMs?: number | null; readonly providerLatencyMs?: number | null; readonly harnessLatencyMs?: number | null; readonly usage?: Partial<AdapterUsage> | null; readonly diff?: DiffMetrics | null; readonly scope?: ScopeMetrics | null; readonly evidence?: EvidenceMetrics | null; readonly eligibleTraceCoverage?: number; readonly telemetryLeakageCount?: number };
 export function captureObservationMetrics(input: ObservationMetricInput): ObservationMetricCapture {
   const latency = splitLatency(input); const usage = { ...unknownUsage(), ...(input.usage ?? {}) };
   const diff = input.diff ?? { changedFiles: null, addedLines: null, deletedLines: null, diffBytes: null, changedPaths: null, reasons: ["DIFF_NOT_CAPTURED"] };
   const scope = input.scope ?? { changedFiles: null, outOfScopeFiles: null, outOfScopePaths: null, status: "UNKNOWN" as const, reasons: ["SCOPE_NOT_CAPTURED"] };
   const evidence = input.evidence ?? assessEvidence({});
-  return { schemaVersion: METRICS_SCHEMA_VERSION, latency, usage, diff, scope, evidence, completeness: metricCompleteness({ usage, latency, diff, scope, evidence }) };
+  return { schemaVersion: METRICS_SCHEMA_VERSION, latency, usage, diff, scope, evidence, completeness: metricCompleteness({ usage, latency, diff, scope, evidence }), ...(input.eligibleTraceCoverage === undefined ? {} : { eligibleTraceCoverage: input.eligibleTraceCoverage }), ...(input.telemetryLeakageCount === undefined ? {} : { telemetryLeakageCount: input.telemetryLeakageCount }) };
 }
 export const captureMetrics = captureObservationMetrics;
 export const computeScopeMetrics = assessScope;

@@ -87,3 +87,11 @@ The current bundle-level register is
 baseline for candidate evaluation. The rejected v1 register is preserved. Every
 candidate still requires a newly frozen hypothesis, experiment, and authorization;
 the baseline alone makes no P5 acceptance claim.
+
+The module also exports the bounded P5 OpenTelemetry candidate driver from
+`src/p5/index.ts`. It freezes a two-arm, 10-task/20-invocation experiment, validates
+an Ed25519 authorization bound to both experiment and hypothesis hashes, toggles only
+`INFOAPEX_OTEL_ENABLED`, and emits aggregate redacted trace evidence. The bundle's
+R2 campaign completed 20/20 valid observations with an internal directional
+`ACCEPT`; the full preregistration and compact evidence remain bundle-level artifacts,
+not a claim that other providers or P5 candidates have passed.

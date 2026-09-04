@@ -73,6 +73,15 @@ export interface AdapterUsage {
   readonly costUsd: number | null;
 }
 
+export interface CandidateTelemetryEvidence {
+  readonly eventCount: number;
+  readonly eligibleTraceUnits: number;
+  readonly exportedSpans: number;
+  readonly eligibleTraceCoverage: number;
+  readonly telemetryLeakageCount: number;
+  readonly evidenceSha256: string;
+}
+
 export interface BoundedProcessResult {
   readonly startedAt: string;
   readonly completedAt: string;
@@ -125,6 +134,9 @@ export interface AdapterResult {
     readonly redacted: true;
   };
   readonly usage: AdapterUsage;
+  /** Safe aggregate evidence for an explicitly declared telemetry candidate.
+   * Raw worker paths, events, and spans never cross the adapter boundary. */
+  readonly candidateTelemetry?: CandidateTelemetryEvidence;
 }
 
 export interface BenchmarkAdapter {

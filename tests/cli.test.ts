@@ -53,9 +53,9 @@ test("installer keeps independent mode isolated and exposes status", () => {
     assert.match(worker!.sourceRepository, /^https:\/\//);
     const benchmark = statusBody.modules.find((entry) => entry.name === "ai-code-benchmark");
     assert.ok(benchmark);
-    assert.equal(benchmark!.sourceCommit, null);
-    assert.equal(benchmark!.provenanceStatus, "local-candidate-unpublished");
-    assert.match(benchmark!.publicationGate ?? "", /public 40-character SHA/);
+    assert.match(benchmark!.sourceCommit ?? "", /^[a-f0-9]{40}$/u);
+    assert.equal(benchmark!.provenanceStatus, "published");
+    assert.equal(benchmark!.publicationGate, undefined);
 
     const payloadPath = join(repository, "payload.json");
     writeFileSync(payloadPath, JSON.stringify({ status: "DONE" }), "utf8");

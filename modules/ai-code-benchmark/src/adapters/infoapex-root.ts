@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import type { AdapterDoctorReport, AdapterRequest, AdapterResult, BenchmarkAdapter } from "../types.js";
+import { homedir } from "node:os";
+import { join, relative, resolve, sep } from "node:path";
+import type { AdapterDoctorReport, AdapterRequest, AdapterResult, BenchmarkAdapter, CandidateTelemetryEvidence } from "../types.js";
 import { ADAPTER_VERSION, normalizedResult, probeCommand, unsupportedResult } from "./common.js";
 import { INFOAPEX_PARSER_VERSION, parseInfoapexOutput } from "./parse.js";
 import { runBoundedProcess } from "./subprocess.js";
@@ -31,13 +34,123 @@ export class InfoapexRootAdapter implements BenchmarkAdapter {
     const normalized = normalizedResult({ id: this.id, parserVersion: INFOAPEX_PARSER_VERSION, request, executable: this.command[0]!, executableVersion: doctor.executableVersion, process, parsed: parseInfoapexOutput(process.stdout) });
     if (normalized.status !== "DONE") return normalized;
 
+    const candidateTelemetry = collectCandidateTelemetry(process.stdout, request);
     const materialization = await materializeWorkerCommits(process.stdout, request);
     if (materialization.error !== null) return { ...normalized, status: "BLOCKED", message: materialization.error };
     return materialization.count === 0
-      ? normalized
-      : { ...normalized, message: `Adapter process completed and materialized ${materialization.count} worker commit(s) into the evaluator workspace.` };
+      ? { ...normalized, ...(candidateTelemetry ? { candidateTelemetry } : {}) }
+      : { ...normalized, message: `Adapter process completed and materialized ${materialization.count} worker commit(s) into the evaluator workspace.`, ...(candidateTelemetry ? { candidateTelemetry } : {}) };
   }
 }
+
+const ALLOWED_SPAN_ATTRIBUTES = new Set([
+  "taskId", "gateId", "runId", "commit", "parent", "exitCode", "failureClass", "outputSha256", "scope", "status", "code",
+  "executionId", "sessionId", "intentId", "baseCommit", "planSha256", "manifestSha256", "authorizationId", "snapshotMetadataSha256",
+  "contextDigest", "packageId", "headCommit", "branch", "maximumParallelWriters", "maximumRepairCycles", "repairTaskId", "cycle", "attempt",
+  "outcome", "sourceMapDigest", "traceCoveragePercent", "complete", "coverageRows", "findings", "stopReason", "taskIds", "tasks", "changedPathCount"
+]);
+const SECRET_SHAPE = /(?:api[_-]?key|token|secret|password|authorization)\s*[=:]|\b(?:sk-|gh[pousr]_)[A-Za-z0-9_-]{8,}|\bbearer\s+[A-Za-z0-9._~-]{8,}/iu;
+const ABSOLUTE_PATH = /(?:[A-Za-z]:\\Users\\|\/(?:home|Users)\/)[^\s"']+/u;
+const PAIRS: Readonly<Record<string, { readonly finish: string; readonly fields: readonly string[] }>> = {
+  "task.started": { finish: "task.finished", fields: ["taskId"] },
+  "gate.started": { finish: "gate.finished", fields: ["taskId", "gateId"] },
+  "repair.attempt-started": { finish: "repair.attempt-finished", fields: ["taskId", "attempt"] }
+};
+
+/** Read only aggregate, redaction-safe evidence from the worker state declared by
+ * the isolated public config. Raw paths, events and spans are never returned. */
+export function collectCandidateTelemetry(output: string, request: AdapterRequest): CandidateTelemetryEvidence | null {
+  if (request.arm !== "full-icm" && request.arm !== "candidate") return null;
+  try {
+    const envelope = JSON.parse(output) as Record<string, unknown>;
+    const body = record(envelope.body) ? envelope.body : envelope;
+    const state = record(body.state) ? body.state : null;
+    if (!state || typeof state.runRoot !== "string") return null;
+    const config = JSON.parse(readFileSync(join(request.repositoryPath, ".ai-code-worker", "config.json"), "utf8")) as { stateRoot?: unknown };
+    if (typeof config.stateRoot !== "string") return null;
+    const configuredStateRoot = resolve(request.repositoryPath, config.stateRoot);
+    const runRoot = trustedWorkerRunRoot(configuredStateRoot, state.runRoot);
+    const eventPath = assertContained(runRoot, typeof state.eventLogPath === "string" ? state.eventLogPath : join(runRoot, "events.jsonl"));
+    const eventText = readFileSync(eventPath, "utf8");
+    const events = jsonLines(eventText);
+    const expected = eligibleTraceUnits(events);
+    const spanPath = join(runRoot, "otel-spans.jsonl");
+    const spanText = existsSync(spanPath) ? readFileSync(assertContained(runRoot, spanPath), "utf8") : "";
+    const spans = spanText ? jsonLines(spanText) : [];
+    const leakageCount = spans.reduce((count, span) => count + spanLeakageCount(span), 0);
+    return {
+      eventCount: events.length,
+      eligibleTraceUnits: expected,
+      exportedSpans: spans.length,
+      eligibleTraceCoverage: expected === 0 ? 1 : Math.min(1, spans.length / expected),
+      telemetryLeakageCount: leakageCount,
+      evidenceSha256: createHash("sha256").update(JSON.stringify({ eventSha256: hash(eventText), spanSha256: hash(spanText), expected, exported: spans.length, leakageCount })).digest("hex")
+    };
+  } catch {
+    return null;
+  }
+}
+
+function trustedWorkerRunRoot(configuredStateRoot: string, candidate: string): string {
+  try { return assertContained(configuredStateRoot, candidate); } catch { /* worker compile currently uses its platform state root */ }
+  const defaultBase = process.platform === "win32"
+    ? process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local")
+    : process.platform === "darwin"
+      ? join(homedir(), "Library", "Application Support")
+      : process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state");
+  const repositoriesRoot = join(defaultBase, "ai-code-worker", "repos");
+  const runRoot = assertContained(repositoriesRoot, candidate);
+  const parts = relative(repositoriesRoot, runRoot).split(sep);
+  if (parts.length !== 3 || !/^[a-f0-9]{16}$/u.test(parts[0] ?? "") || parts[1] !== "runs" || !/^[a-z][a-z0-9-]{2,63}$/u.test(parts[2] ?? "")) {
+    throw new Error("Worker telemetry run root does not match the public state layout.");
+  }
+  return runRoot;
+}
+
+function jsonLines(value: string): Record<string, unknown>[] {
+  return value.split(/\r?\n/u).filter(Boolean).map((line) => {
+    const item: unknown = JSON.parse(line);
+    if (!record(item)) throw new Error("Telemetry evidence contains a non-object JSON line.");
+    return item;
+  });
+}
+
+function eligibleTraceUnits(events: readonly Record<string, unknown>[]): number {
+  const open = new Set<string>(); let units = 0;
+  const finishes = new Map(Object.entries(PAIRS).map(([start, spec]) => [spec.finish, { start, fields: spec.fields }]));
+  for (const event of events) {
+    const type = typeof event.type === "string" ? event.type : ""; const payload = record(event.payload) ? event.payload : {};
+    const start = PAIRS[type];
+    if (start) { open.add(`${type}:${start.fields.map((field) => String(payload[field])).join(":")}`); continue; }
+    const finish = finishes.get(type);
+    if (finish) {
+      const key = `${finish.start}:${finish.fields.map((field) => String(payload[field])).join(":")}`;
+      if (open.delete(key)) units += 1; else units += 1;
+      continue;
+    }
+    units += 1;
+  }
+  return units + open.size;
+}
+
+function spanLeakageCount(span: Record<string, unknown>): number {
+  let count = 0; const attributes = record(span.attributes) ? span.attributes : {};
+  for (const [key, value] of Object.entries(attributes)) {
+    if (!ALLOWED_SPAN_ATTRIBUTES.has(key)) count += 1;
+    const rendered = typeof value === "string" ? value : JSON.stringify(value);
+    if (SECRET_SHAPE.test(rendered) || ABSOLUTE_PATH.test(rendered)) count += 1;
+  }
+  if (Array.isArray(span.events)) for (const event of span.events) if (record(event) && record(event.attributes)) {
+    for (const [key, value] of Object.entries(event.attributes)) {
+      if (!ALLOWED_SPAN_ATTRIBUTES.has(key)) count += 1;
+      const rendered = typeof value === "string" ? value : JSON.stringify(value);
+      if (SECRET_SHAPE.test(rendered) || ABSOLUTE_PATH.test(rendered)) count += 1;
+    }
+  }
+  return count;
+}
+
+function hash(value: string): string { return createHash("sha256").update(value, "utf8").digest("hex"); }
 
 async function materializeWorkerCommits(output: string, request: AdapterRequest): Promise<{ readonly count: number; readonly error: string | null }> {
   let value: unknown;

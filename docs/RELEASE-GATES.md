@@ -29,8 +29,12 @@ immutable. The separately frozen R5 rerun corrected the harness/runtime causes a
 completed 30/30 valid observations, ten paired comparisons, and zero critical safety
 failures. `validation/benchmark/P5-BASELINE.v2.json` therefore records an internal
 pre-P5 baseline ready for candidate evaluation. Its report is **INCONCLUSIVE** only
-because no P5 candidate hypothesis was preregistered; no OpenTelemetry or other P5
-acceptance claim follows until a fresh candidate experiment is frozen and run.
+because no P5 candidate hypothesis was preregistered. The separately frozen and
+authorized OpenTelemetry R2 candidate then completed 20/20 valid observations and
+received the internal directional verdict **ACCEPT**, with every preregistered metric
+gate passing. Its compact evidence is under
+`validation/benchmark/p5-candidates/opentelemetry-redacted-v2/`; this does not imply
+acceptance of any other P5 subproject or a universal product ranking.
 
 The reproducible ICM gate is `npm run value-gate:internal`. It executes 20 generic
 planner `propose -> inspect -> compile` tasks through worker `run --engine fake`.

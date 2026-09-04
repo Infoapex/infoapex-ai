@@ -7,7 +7,7 @@ import { containedPath } from "./security/paths.js";
 import { assertObservationMatrix, type ObservationMatrix } from "./runtime/matrix.js";
 
 export type CandidateVerdict = "ACCEPT" | "REJECT" | "INCONCLUSIVE" | "ACCEPT_WITH_LIMITS";
-export type MetricName = "success" | "firstPassSuccess" | "scopeSafety" | "totalLatencyMs" | "providerLatencyMs" | "harnessLatencyMs" | "inputTokens" | "outputTokens" | "costUsd" | "humanActiveMinutes" | "retries" | "repairCycles";
+export type MetricName = "success" | "firstPassSuccess" | "scopeSafety" | "totalLatencyMs" | "providerLatencyMs" | "harnessLatencyMs" | "inputTokens" | "outputTokens" | "costUsd" | "humanActiveMinutes" | "retries" | "repairCycles" | "eligibleTraceCoverage" | "telemetryLeakageCount" | "harnessOverheadPercent";
 
 export interface Aggregate {
   readonly value: number | null;
@@ -80,15 +80,17 @@ const METRICS: readonly { readonly name: MetricName; readonly unit: string }[] =
   { name: "success", unit: "ratio" }, { name: "firstPassSuccess", unit: "ratio" }, { name: "scopeSafety", unit: "ratio" },
   { name: "totalLatencyMs", unit: "milliseconds" }, { name: "providerLatencyMs", unit: "milliseconds" }, { name: "harnessLatencyMs", unit: "milliseconds" },
   { name: "inputTokens", unit: "tokens" }, { name: "outputTokens", unit: "tokens" }, { name: "costUsd", unit: "USD" },
-  { name: "humanActiveMinutes", unit: "minutes" }, { name: "retries", unit: "count" }, { name: "repairCycles", unit: "count" }
+  { name: "humanActiveMinutes", unit: "minutes" }, { name: "retries", unit: "count" }, { name: "repairCycles", unit: "count" },
+  { name: "eligibleTraceCoverage", unit: "ratio" }, { name: "telemetryLeakageCount", unit: "count" }, { name: "harnessOverheadPercent", unit: "percent" }
 ];
-const LOWER_IS_BETTER = /latency|tokens|cost|minutes|retries|repair|failure|error|violation/u;
+const LOWER_IS_BETTER = /latency|tokens|cost|minutes|retries|repair|failure|error|violation|leakage|overhead/iu;
 const METRIC_ALIASES: Readonly<Record<string, MetricName>> = {
   "verified-task-success": "success", "verifiedTaskSuccess": "success", "task-success": "success", quality: "success",
   "first-pass-success": "firstPassSuccess", "firstPass": "firstPassSuccess", "scope-safety": "scopeSafety", safety: "scopeSafety",
   latency: "totalLatencyMs", "total-latency": "totalLatencyMs", "provider-latency": "providerLatencyMs", "harness-latency": "harnessLatencyMs",
   "input-tokens": "inputTokens", "output-tokens": "outputTokens", cost: "costUsd", "cost-usd": "costUsd", "human-active-minutes": "humanActiveMinutes",
-  "repair-cycles": "repairCycles"
+  "repair-cycles": "repairCycles", "eligible-trace-coverage": "eligibleTraceCoverage", "telemetry-safety": "telemetryLeakageCount",
+  "telemetry-leakage-count": "telemetryLeakageCount", "harness-overhead-percent": "harnessOverheadPercent"
 };
 function metricName(value: string): string { return METRIC_ALIASES[value] ?? value; }
 
@@ -98,7 +100,7 @@ function text(value: unknown): string | null { return typeof value === "string" 
 function compareText(left: string, right: string): number { return left < right ? -1 : left > right ? 1 : 0; }
 function nested(item: Record<string, unknown>, name: string): number | null {
   const metrics = object(item.metrics); const telemetry = object(item.telemetry); const usage = object(metrics?.usage); const latency = object(metrics?.latency);
-  const direct = number(item[name]) ?? number(item[Object.entries(METRIC_ALIASES).find(([, canonical]) => canonical === name)?.[0] ?? ""]); if (direct !== null) return direct;
+  const direct = number(item[name]) ?? number(metrics?.[name]) ?? number(item[Object.entries(METRIC_ALIASES).find(([, canonical]) => canonical === name)?.[0] ?? ""]); if (direct !== null) return direct;
   if (name === "totalLatencyMs") return number(latency?.totalLatencyMs) ?? number(telemetry?.totalLatencyMs) ?? number(telemetry?.elapsedMs) ?? number(item.elapsedMs);
   if (name === "providerLatencyMs") return number(latency?.providerLatencyMs) ?? number(telemetry?.providerLatencyMs);
   if (name === "harnessLatencyMs") return number(latency?.harnessLatencyMs) ?? number(telemetry?.harnessLatencyMs);
@@ -225,7 +227,11 @@ export function buildBenchmarkReport(observations: readonly Record<string, unkno
   if (protocolMismatch) limitations.push("PROTOCOL_HASH_MISMATCH"); if (observations.some(safetyFailure)) limitations.push("CRITICAL_SAFETY_FAILURE");
   let verdict: CandidateVerdict = "INCONCLUSIVE"; let verdicts: Record<string, unknown> = {};
   if (observations.some(safetyFailure)) verdict = "REJECT";
-  else if (options.candidateHypothesis && baselineArmId && candidateArmId) { const assessed = assessCandidate(options.candidateHypothesis, deltas, pairing, options, protocolMismatch || limitations.includes("FEWER_THAN_90_PERCENT_VALID")); verdict = assessed.verdict; verdicts = assessed.verdicts; limitations.push(...assessed.limitations); }
+  else if (options.candidateHypothesis && baselineArmId && candidateArmId) {
+    if (!limitations.includes("FEWER_THAN_90_PERCENT_VALID")) {
+      const assessed = assessCandidate(options.candidateHypothesis, deltas, pairing, options, protocolMismatch); verdict = assessed.verdict; verdicts = assessed.verdicts; limitations.push(...assessed.limitations);
+    }
+  }
   else limitations.push("NO_CANDIDATE_HYPOTHESIS");
   const counts = { expected, valid, invalid: Math.max(0, expected - valid), paired: pairing.pairs.length, unmatchedBaseline: pairing.unmatchedBaseline, unmatchedCandidate: pairing.unmatchedCandidate, duplicateKeys: pairing.duplicateKeys, missingIdentity: pairing.missingIdentity, ...Object.fromEntries(Object.entries(armCounts).map(([arm, count]) => [`arm.${arm}`, count])) };
   const experimentHash = options.experimentHash ?? sha256CanonicalJson({ observations, seed }); const stable = { experimentHash, aggregates, counts, categories, verdict, verdicts, limitations: [...new Set(limitations)].sort() }; const id = `report-${sha256CanonicalJson(stable).slice(0, 40)}`;

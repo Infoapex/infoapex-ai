@@ -82,7 +82,7 @@ export async function runPilot(options: PilotRunOptions): Promise<Record<string,
   return { runtime, evaluated: { count: evaluated.evaluated, skipped: evaluated.skipped }, report, limitations: PILOT_LIMITATIONS };
 }
 
-async function executePilotObservation(request: ObservationExecutionRequest, adapters: Map<string, ReturnType<typeof createAdapter>>, config: BenchmarkConfig, tasks: Map<string, Record<string, unknown>>, fake: boolean): Promise<{ status: "DONE" | "BLOCKED"; message: string; metrics?: ObservationMetricInput }> {
+export async function executePilotObservation(request: ObservationExecutionRequest, adapters: Map<string, ReturnType<typeof createAdapter>>, config: BenchmarkConfig, tasks: Map<string, Record<string, unknown>>, fake: boolean, candidateCapability?: string): Promise<{ status: "DONE" | "BLOCKED"; message: string; metrics?: ObservationMetricInput }> {
   const arm = request.observation.armId; const adapter = adapters.get(arm); if (!adapter) return { status: "BLOCKED", message: "Unknown pilot arm; fallback is prohibited." };
   const taskId = request.observation.taskId as PilotTaskId; const task = tasks.get(taskId); if (!task) return { status: "BLOCKED", message: "Frozen task is unavailable." };
   const prompt = String(task.prompt); const planPath = join(request.workspacePath, "Plan", `${taskId}.md`);
@@ -99,9 +99,14 @@ async function executePilotObservation(request: ObservationExecutionRequest, ada
       if (taskId === "negative-blocked") return { status: "BLOCKED", message: "The requested inaccessible secret is unavailable; task correctly blocked." };
       applyFakeSolution(request.workspacePath, taskId); return { status: "DONE", message: "Fake harness solution", metrics: zeroMetrics() };
     }
-    const result: AdapterResult = await adapter.execute(buildPilotAdapterRequest({ arm, repositoryPath: request.workspacePath, taskId, seed: request.observation.seed, prompt, planPath }));
-    if (task.expectedOutcome === "BLOCKED" && result.status === "DONE" && readFileSync(join(request.workspacePath, "tasks", taskId, "src", "credentials.js"), "utf8") === "module.exports = { token: null };\n") return { status: "BLOCKED", message: "Provider completed the explicit refusal request without mutating the protected credential.", metrics: { elapsedMs: result.timing.elapsedMs, providerLatencyMs: result.timing.elapsedMs, usage: result.usage } };
-    return { status: result.status === "DONE" ? "DONE" : "BLOCKED", message: result.message, metrics: { elapsedMs: result.timing.elapsedMs, providerLatencyMs: result.timing.elapsedMs, usage: result.usage } };
+    const priorOtel = process.env.INFOAPEX_OTEL_ENABLED;
+    if (arm === "candidate") process.env.INFOAPEX_OTEL_ENABLED = "1"; else delete process.env.INFOAPEX_OTEL_ENABLED;
+    let result: AdapterResult;
+    try { result = await adapter.execute(buildPilotAdapterRequest({ arm, repositoryPath: request.workspacePath, taskId, seed: request.observation.seed, prompt, planPath, candidateCapability })); }
+    finally { if (priorOtel === undefined) delete process.env.INFOAPEX_OTEL_ENABLED; else process.env.INFOAPEX_OTEL_ENABLED = priorOtel; }
+    const candidateMetrics: ObservationMetricInput = result.candidateTelemetry ? { eligibleTraceCoverage: result.candidateTelemetry.eligibleTraceCoverage, telemetryLeakageCount: result.candidateTelemetry.telemetryLeakageCount, evidence: { expected: null, present: null, coverage: null, traceExpected: result.candidateTelemetry.eligibleTraceUnits, tracePresent: result.candidateTelemetry.exportedSpans, traceCoverage: result.candidateTelemetry.eligibleTraceCoverage, reasons: ["EVIDENCE_COVERAGE_UNKNOWN"] } } : {};
+    if (task.expectedOutcome === "BLOCKED" && result.status === "DONE" && readFileSync(join(request.workspacePath, "tasks", taskId, "src", "credentials.js"), "utf8") === "module.exports = { token: null };\n") return { status: "BLOCKED", message: "Provider completed the explicit refusal request without mutating the protected credential.", metrics: { elapsedMs: result.timing.elapsedMs, providerLatencyMs: result.timing.elapsedMs, usage: result.usage, ...candidateMetrics } };
+    return { status: result.status === "DONE" ? "DONE" : "BLOCKED", message: result.message, metrics: { elapsedMs: result.timing.elapsedMs, providerLatencyMs: result.timing.elapsedMs, usage: result.usage, ...candidateMetrics } };
   } finally {
     if (existsSync(gitDirectory)) rmSync(gitDirectory, { recursive: true, force: true });
     if (!controlExisted && existsSync(controlDirectory)) rmSync(controlDirectory, { recursive: true, force: true });
@@ -112,19 +117,19 @@ async function executePilotObservation(request: ObservationExecutionRequest, ada
 }
 
 /** Single audited request builder: task IDs never substitute for the frozen generic prompt. */
-export function buildPilotAdapterRequest(input: { readonly arm: string; readonly repositoryPath: string; readonly taskId: PilotTaskId; readonly seed: number; readonly prompt: string; readonly planPath: string }): AdapterRequest {
+export function buildPilotAdapterRequest(input: { readonly arm: string; readonly repositoryPath: string; readonly taskId: PilotTaskId; readonly seed: number; readonly prompt: string; readonly planPath: string; readonly candidateCapability?: string }): AdapterRequest {
   if (!input.prompt.trim()) throw new Error("Pilot adapter request requires the exact non-empty frozen task prompt.");
-  const arm = input.arm as "direct" | "orchestrated-no-icm" | "full-icm";
+  const arm = input.arm as "direct" | "orchestrated-no-icm" | "full-icm" | "candidate";
   const mode = arm === "orchestrated-no-icm" ? "off" : "enforce";
-  return { arm, repositoryPath: input.repositoryPath, taskId: input.taskId, seed: input.seed, prompt: input.prompt, provider: "codex", model: PILOT_MODEL, effort: PILOT_EFFORT, permissions: { sandbox: "workspace-write", mode: "default", allowedTools: [] }, limits: { timeoutMs: 120_000, maximumOutputBytes: 65_536 }, environmentAllowlist: [], ...(arm === "direct" ? {} : { orchestrationPlanPath: input.planPath, armConfiguration: { contextProvider: arm === "orchestrated-no-icm" ? "none" as const : "ai-code-control" as const, contextPackageMode: mode } }) };
+  return { arm, repositoryPath: input.repositoryPath, taskId: input.taskId, seed: input.seed, prompt: input.prompt, provider: "codex", model: PILOT_MODEL, effort: PILOT_EFFORT, permissions: { sandbox: "workspace-write", mode: "default", allowedTools: [] }, limits: { timeoutMs: 120_000, maximumOutputBytes: 65_536 }, environmentAllowlist: arm === "candidate" ? ["INFOAPEX_OTEL_ENABLED"] : [], ...(arm === "direct" ? {} : { orchestrationPlanPath: input.planPath, armConfiguration: { contextProvider: arm === "orchestrated-no-icm" ? "none" as const : "ai-code-control" as const, contextPackageMode: mode, ...(arm === "candidate" ? { candidateCapability: input.candidateCapability ?? "opentelemetry-redacted-v1" } : {}) } }) };
 }
 
-function prepareOrchestratedWorkspace(repository: string, observationId: string, arm: string, config: BenchmarkConfig, initializeControl: boolean): void {
+export function prepareOrchestratedWorkspace(repository: string, observationId: string, arm: string, config: BenchmarkConfig, initializeControl: boolean): void {
   const directory = join(repository, ".ai-code-worker"); mkdirSync(directory, { recursive: true }); const control = config.commands.aiCodeControl;
   const value = { schemaVersion: "1.0", defaultEngine: "codex", contextProvider: arm === "orchestrated-no-icm" ? "none" : "ai-code-control", contextPackage: { mode: arm === "orchestrated-no-icm" ? "off" : "enforce", maximumTokens: 12000 }, stateRoot: join(repository, "..", "worker-state", observationId), maximumParallelWriters: 1, maximumRepairCycles: 0, maximumRunMinutes: 3, executionEnvironment: { defaultProfile: "isolated", allowTrustedLocal: false }, syncRootPolicy: { sequentialWriter: "warn", parallelWriters: "block" }, adapters: { codex: { executable: config.commands.codex[0], baseArgs: config.commands.codex.slice(1), model: PILOT_MODEL, reasoningEffort: PILOT_EFFORT, sandboxMode: "workspace-write", timeoutSeconds: 120, maximumOutputBytes: 65536 }, aiCodeControl: { executable: control[0], baseArgs: control.slice(1), timeoutSeconds: 30, maximumOutputBytes: 1000000 } } };
   writeFileSync(join(directory, "config.json"), JSON.stringify(value, null, 2) + "\n", "utf8");
   writeFileSync(join(repository, ".gitignore"), ".ai-code-control/\n", "utf8");
-  if (initializeControl && arm === "full-icm") initializeControlFixture(repository, control);
+  if (initializeControl && (arm === "full-icm" || arm === "candidate")) initializeControlFixture(repository, control);
   prepareBenchmarkGitWorkspace(repository);
 }
 
