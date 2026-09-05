@@ -97,6 +97,12 @@ registru; nu se mareste timeout-ul si nu se porneste automat un alt provider.
   canary de readiness separat pentru provider si un buget P5 C# care include
   restore-ul in worktree, inghetat printr-un nou experiment; nu se mareste
   automat limita experimentului actual.
+- **INT-18 Task C# deja rezolvat in baseline:** canary-ul a aratat ca
+  `api-not-found` exista deja in commitul inghetat `d8aaa37` (fallback 404 si
+  testul aferent). Un benchmark de modificare nu poate masura corect un task
+  care are oracle-ul satisfacut inainte de agent. Rezolvare necesara: fiecare
+  task nou trebuie sa demonstreze tranzitia evaluator-owned `baseline FAIL ->
+  solution PASS`; se ingheata suite, hash si autorizare noi inainte de P5.
 
 ## Regula de inchidere pentru onboarding
 

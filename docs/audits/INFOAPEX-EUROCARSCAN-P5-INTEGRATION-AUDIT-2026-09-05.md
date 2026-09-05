@@ -75,6 +75,11 @@ Defectul rămas este diagnosticarea și stabilizarea contractului root → worke
   bugetul inghetat de 120 s. Nu s-a produs commit. Finding-ul a expus initial
   JSONL provider brut; aceasta regresie de confidentialitate este tratata prin
   INT-16, care pastreaza numai o clasificare publica a erorii.
+- Acelasi canary a descoperit `INT-18`: `api-not-found` era deja implementat in
+  baseline-ul inghetat `d8aaa37` (fallback JSON 404 si testul aferent). Matricea
+  C# nu poate continua pana cand fiecare task demonstreaza independent tranzitia
+  `baseline FAIL -> known solution PASS`; un task deja satisfacut nu poate evalua
+  diferenta produsa de provider.
 
 ## Politica de interpretare
 
