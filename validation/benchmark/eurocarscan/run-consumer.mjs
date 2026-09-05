@@ -98,7 +98,10 @@ function prepareWorkspace(workspace, observation, task, arm) {
     const armSpec = experiment.arms.find((item) => String(item.id) === arm);
     if (!armSpec) throw new Error(`Consumer experiment does not define arm ${arm}.`);
     const worker = join(workspace, ".ai-code-worker"); mkdirSync(worker, { recursive: true });
-    writeFileSync(join(worker, "config.json"), JSON.stringify({ schemaVersion: "1.0", defaultEngine: "codex", contextProvider: "ai-code-control", contextPackage: { mode: "enforce", maximumTokens: 12000 }, stateRoot: join(workspace, "..", "worker-state", String(observation.id)), maximumParallelWriters: 1, maximumRepairCycles: 0, maximumRunMinutes: 3, executionEnvironment: { defaultProfile: "isolated", allowTrustedLocal: false }, syncRootPolicy: { sequentialWriter: "warn", parallelWriters: "block" }, adapters: { codex: { executable: codexCommand[0], baseArgs: codexCommand.slice(1), model: String(armSpec.model ?? ""), reasoningEffort: String(armSpec.effort ?? ""), sandboxMode: codexSandbox, timeoutSeconds: 120, maximumOutputBytes: 65536 }, aiCodeControl: { executable: controlCommand[0], baseArgs: controlCommand.slice(1), timeoutSeconds: 30, maximumOutputBytes: 1000000 } } }, null, 2) + "\n", "utf8");
+    // Keep worker state outside the generated workspace but under the bounded
+    // benchmark root. Nesting it below evidence/workspaces makes Git worktree
+    // administrative paths exceed Windows limits (fatal: '$GIT_DIR' too big).
+    writeFileSync(join(worker, "config.json"), JSON.stringify({ schemaVersion: "1.0", defaultEngine: "codex", contextProvider: "ai-code-control", contextPackage: { mode: "enforce", maximumTokens: 12000 }, stateRoot: join(stateRoot, "worker-state", String(observation.id)), maximumParallelWriters: 1, maximumRepairCycles: 0, maximumRunMinutes: 3, executionEnvironment: { defaultProfile: "isolated", allowTrustedLocal: false }, syncRootPolicy: { sequentialWriter: "warn", parallelWriters: "block" }, adapters: { codex: { executable: codexCommand[0], baseArgs: codexCommand.slice(1), model: String(armSpec.model ?? ""), reasoningEffort: String(armSpec.effort ?? ""), sandboxMode: codexSandbox, timeoutSeconds: 120, maximumOutputBytes: 65536 }, aiCodeControl: { executable: controlCommand[0], baseArgs: controlCommand.slice(1), timeoutSeconds: 30, maximumOutputBytes: 1000000 } } }, null, 2) + "\n", "utf8");
     writeFileSync(join(workspace, ".gitignore"), ".ai-code-control/\n", "utf8");
     if (arm === "full-icm" || arm === "candidate") execFileSync(controlCommand[0], [...controlCommand.slice(1), "init", "--repo", workspace], { cwd: workspace, stdio: "ignore", windowsHide: true });
   }
@@ -112,7 +115,25 @@ function scaffoldingPlan(workspace, task) {
   const gateCommand = verification && Array.isArray(verification.command) && verification.command.every((part) => typeof part === "string" && part.length > 0) ? verification.command : null;
   if (!gateCommand) throw new Error(`Consumer task ${String(task.id)} has no valid verification command.`);
   const gateText = gateCommand.join(" ");
-  const body = { workerContractVersion: "1.1", goal: prompt, tasks: [{ id: `CONSUMER-${String(task.id).toUpperCase()}`, kind: "backend", role: prompt, dependsOn: [], requiredInputs: [], allowedPaths: Array.isArray(task.scope?.allow) ? task.scope.allow : [], forbiddenPaths: [".git/**", ".infoapex-ai/**", "mockup/**", "*.env", "*.log"], expectedArtifacts: Array.isArray(task.scope?.allow) ? task.scope.allow : [], acceptanceCriteria: [prompt], verify: [gateText], traceability: { acceptanceCriteria: [{ criterionId: "AC-CONSUMER-01", text: prompt }], gates: [{ gateId: "G-CONSUMER-01", command: gateText, evidenceContract: "Consumer verification command passes.", criterionIds: ["AC-CONSUMER-01"] }] }, concurrencyKeys: [String(task.id)], risk: String(task.risk) }] };
+  const body = {
+    workerContractVersion: "1.1",
+    goal: prompt,
+    tasks: [{ id: `CONSUMER-${String(task.id).toUpperCase()}`, kind: "backend", role: prompt, dependsOn: [], requiredInputs: [], allowedPaths: Array.isArray(task.scope?.allow) ? task.scope.allow : [], forbiddenPaths: [".git/**", ".infoapex-ai/**", "mockup/**", "*.env", "*.log"], expectedArtifacts: Array.isArray(task.scope?.allow) ? task.scope.allow : [], acceptanceCriteria: [prompt], verify: [gateText], traceability: { acceptanceCriteria: [{ criterionId: "AC-CONSUMER-01", text: prompt }], gates: [{ gateId: "G-CONSUMER-01", command: gateText, evidenceContract: "Consumer verification command passes.", criterionIds: ["AC-CONSUMER-01"] }] }, concurrencyKeys: [String(task.id)], risk: String(task.risk) }],
+    globalGates: [],
+    budgets: {
+      maximumParallelWriters: 1,
+      maximumRepairCycles: 0,
+      maximumTaskMinutes: 2,
+      maximumRunMinutes: 3,
+      maximumAgentInvocations: 1,
+      maximumRunInputUncachedTokens: 100000,
+      maximumRunCacheReadTokens: 100000,
+      maximumRunCacheWriteTokens: 100000,
+      maximumRunOutputTokens: 50000,
+      maximumRunCostUsd: null,
+      onUnknownUsage: "warn"
+    }
+  };
   writeFileSync(plan, `---\nstatus: accepted\n---\n\n# EuroCarScan consumer task\n\n\`\`\`json ai-code-worker-plan\n${JSON.stringify(body, null, 2)}\n\`\`\`\n`, "utf8"); return plan;
 }
 function cleanupWorkspaceScaffolding(workspace, scaffolding) { removeTransientCaches(workspace); if (existsSync(join(workspace, ".git"))) rmSync(join(workspace, ".git"), { recursive: true, force: true }); if (existsSync(join(workspace, ".ai-code-worker"))) rmSync(join(workspace, ".ai-code-worker"), { recursive: true, force: true }); if (existsSync(join(workspace, ".ai-code-control"))) rmSync(join(workspace, ".ai-code-control"), { recursive: true, force: true }); if (scaffolding.plan && existsSync(scaffolding.plan)) rmSync(scaffolding.plan, { force: true }); if (scaffolding.oldGitignore === null) { if (existsSync(join(workspace, ".gitignore"))) rmSync(join(workspace, ".gitignore"), { force: true }); } else writeFileSync(join(workspace, ".gitignore"), scaffolding.oldGitignore, "utf8"); }

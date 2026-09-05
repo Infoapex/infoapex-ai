@@ -22,6 +22,14 @@ Preflight-ul deterministic este sănătos, iar aplicația consumator C# compilea
 | INT-09 | Baseline-ul consumator devenea stale după commituri de documentație | Suitele cereau potrivire exactă de HEAD, chiar când fișierele taskului nu se schimbaseră | Verificarea permite descendent Git doar dacă baseline-ul este ancestor și căile taskului sunt byte-unchanged; modificările relevante cer experiment nou; rezolvat |
 | INT-10 | Rularea completă ar fi consumat provider quota înainte de validarea workerului | Canary-ul nu era o poartă suficient de strictă pentru integrarea reală | Runnerul este folosit cu `--maximum-new-observations 1`; la prima anomalie se oprește; procedura este acum obligatorie |
 
+### Incidente adaugate la reluarea P5
+
+| ID | Simptom | CauzÄƒ | Stare |
+|---|---|---|---|
+| INT-11 | Planul sintetic consumer a fost respins cu `MANIFEST_INVALID` | Lipseau campurile obligatorii `globalGates` si `budgets` | Runner corectat cu manifest v1.1 complet si bugete bounded |
+| INT-12 | Git a esuat cu `WORKTREE_CREATE_FAILED` / `fatal: '$GIT_DIR' too big` | `stateRoot` era sub `evidence/workspaces`, generand cai administrative prea lungi pe Windows | Runnerul foloseste state root bounded sub radacina benchmarkului |
+| INT-13 | Full-ICM a ajuns la gate, dar `dotnet test` a iesit cu exit 1; candidate a depasit timeout-ul de 120 s | Gate-ul C# nu este inca preflight-uit intr-un workspace curat; executia candidate nu a produs rezultat bounded | P5 oprit dupa doua observatii; este necesar experiment nou dupa stabilizare |
+
 ## Dovezi reproducibile
 
 - Infoapex root tests: **26/26 PASS**.
@@ -43,6 +51,13 @@ Defectul rămas este diagnosticarea și stabilizarea contractului root → worke
 3. Test fake end-to-end pentru: plan acceptat → root `--json` → worker blocked/done → evidence.
 4. Verificarea că `stateRoot` configurat este folosit de compile, status, checkpoint, worktree și telemetry.
 5. Un singur canary nou; numai dacă trece se autorizează Claude și matricea P5.
+
+## Rezultatul reluarii P5 (canary bounded)
+
+- Observatia 1 (`full-icm`, `api-not-found`) a trecut de compilare si worktree, apoi a fost blocata la gate-ul `dotnet test` cu exit 1 (`TASK_GATE_FAILED`). Testul a trecut manual ulterior in acelasi worktree, deci trebuie izolata diferenta de restore/executie a gate-ului.
+- Observatia 2 (`candidate`, `api-not-found`) a depasit timeout-ul providerului de 120 s; nu s-a obtinut envelope, diff sau usage comparabil.
+- Rularea a fost oprita dupa doua observatii. Claude si restul matricei nu au fost lansate.
+- Verdictul ramane `REJECT`; rezultatul nu autorizeaza comparatia P5 si cere experiment/autorizare noi dupa stabilizare.
 
 ## Politica de interpretare
 
