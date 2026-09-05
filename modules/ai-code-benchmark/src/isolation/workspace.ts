@@ -5,6 +5,11 @@ import { canonicalJson } from "../canonical-json.js";
 import { atomicWriteJson, readJson } from "../persistence/store.js";
 import { assertContained, assertPlainPath, canonicalPath, containedPath } from "../security/paths.js";
 
+// Dependencies and build outputs are reproducible workspace inputs, not source
+// artifacts. Excluding them keeps isolated benchmark copies bounded and prevents
+// a local install (for example frontend/node_modules) from dominating evaluation.
+const EXCLUDED_GENERATED_DIRECTORIES = new Set([".git", "node_modules", ".next", "bin", "obj", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+
 export interface WorkspaceRecord {
   readonly schemaVersion: "1.0";
   readonly observationId: string;
@@ -25,6 +30,7 @@ export function assertSafeWorkspaceTree(directory: string, allowExcludedGitMetad
       if (allowExcludedGitMetadata) continue;
       throw new Error(`Evaluation workspace contains forbidden Git metadata: ${path}`);
     }
+    if (entry.isDirectory() && EXCLUDED_GENERATED_DIRECTORIES.has(entry.name)) continue;
     if (entry.isDirectory()) assertSafeWorkspaceTree(path, allowExcludedGitMetadata);
     else if (!entry.isFile()) throw new Error(`Workspace contains an unsupported filesystem entry: ${path}`);
   }
@@ -43,7 +49,7 @@ export function prepareWorkspace(sourceRepository: string, workspacesRoot: strin
     errorOnExist: true,
     force: false,
     verbatimSymlinks: true,
-    filter: (path) => basename(path) !== ".git"
+    filter: (path) => !EXCLUDED_GENERATED_DIRECTORIES.has(basename(path))
   });
   return record;
 }
@@ -73,6 +79,7 @@ export function captureWorkspaceDiff(sourceRepository: string, workspacePath: st
           const stat = lstatSync(path);
           if (entry.isSymbolicLink() || stat.isSymbolicLink()) throw new Error(`Workspace contains a symlink or junction: ${relativePath}`);
           if (entry.name === ".git") continue;
+          if (entry.isDirectory() && EXCLUDED_GENERATED_DIRECTORIES.has(entry.name)) continue;
           if (entry.isDirectory()) walk(path, relativePath);
           else if (entry.isFile()) {
             bytes += stat.size;
@@ -128,6 +135,7 @@ function rawWorkspaceDigest(root: string): string {
       const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
       const stat = lstatSync(path);
       if (entry.isSymbolicLink() || stat.isSymbolicLink()) throw new Error(`Evidence copy contains a symlink or junction: ${relative}`);
+      if (entry.isDirectory() && EXCLUDED_GENERATED_DIRECTORIES.has(entry.name)) continue;
       if (entry.isDirectory()) walk(path, relative);
       else if (entry.isFile()) entries.push({ path: relative, sha256: createHash("sha256").update(readFileSync(path)).digest("hex") });
       else throw new Error(`Evidence copy contains an unsupported entry: ${relative}`);
