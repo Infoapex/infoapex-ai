@@ -80,6 +80,11 @@ registru; nu se mareste timeout-ul si nu se porneste automat un alt provider.
   chiar daca testul trecea manual. Rezolvare: allowlist explicit pentru HOME,
   USERPROFILE, LOCALAPPDATA, APPDATA, TEMP/TMP, DOTNET_ROOT si NUGET_PACKAGES;
   secretele si variabilele arbitrare raman eliminate, cu test de regresie.
+- **INT-15 Deadlines imbricate la provider:** timeout-ul root, worker task si
+  procesul Codex puteau expira simultan, omorand wrapper-ul inainte ca workerul
+  sa scrie finding-ul JSON (`TIMEOUT`). Rezolvare: adapterul public root aplica
+  o marja fixa de teardown de 15 secunde peste limita providerului; verdictul
+  ramane `BLOCKED/TIMEOUT`, dar cauza este observabila si recuperabila.
 
 ## Regula de inchidere pentru onboarding
 

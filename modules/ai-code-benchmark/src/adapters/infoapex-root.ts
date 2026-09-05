@@ -10,6 +10,12 @@ import { runBoundedProcess } from "./subprocess.js";
 import { assertContained, canonicalPath, containedPath } from "../security/paths.js";
 
 const REQUIRED = ["run", "--repo", "--plan", "--engine"] as const;
+// The worker enforces the provider/task deadline itself.  The public root
+// process needs a short additional window to terminate the provider tree,
+// write its structured timeout finding and restore the isolated workspace.
+// Without this margin both deadlines fire together and the benchmark sees an
+// opaque adapter timeout instead of the actionable worker result.
+export const INFOAPEX_ROOT_TEARDOWN_GRACE_MS = 15_000;
 
 /** Invokes the bundle root CLI only. It reads public JSON configuration; it never imports worker/control code. */
 export class InfoapexRootAdapter implements BenchmarkAdapter {
@@ -33,7 +39,7 @@ export class InfoapexRootAdapter implements BenchmarkAdapter {
       // message. Keep the root→worker contract explicit and deterministic.
       command: [...this.command, "run", "--repo", request.repositoryPath, "--plan", request.orchestrationPlanPath, "--engine", request.provider, "--json"],
       cwd: request.repositoryPath,
-      timeoutMs: request.limits.timeoutMs,
+      timeoutMs: request.limits.timeoutMs + INFOAPEX_ROOT_TEARDOWN_GRACE_MS,
       maximumOutputBytes: request.limits.maximumOutputBytes,
       environmentNames: request.environmentAllowlist
     });

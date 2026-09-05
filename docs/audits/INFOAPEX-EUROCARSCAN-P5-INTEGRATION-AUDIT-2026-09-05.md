@@ -63,6 +63,11 @@ Defectul rămas este diagnosticarea și stabilizarea contractului root → worke
   permite acum doar caile standard de profil/cache (HOME, USERPROFILE,
   LOCALAPPDATA, APPDATA, TEMP/TMP, DOTNET_ROOT, NUGET_PACKAGES), fara variabile
   arbitrare sau secrete; testul de regresie este verde.
+- Timeout-ul candidatului a fost separat de `REJECT`: procesul root, task-ul worker
+  si Codex aveau aceeasi limita de 120 s, astfel wrapper-ul putea fi terminat exact
+  cand workerul incerca sa emita finding-ul structurat. `InfoapexRootAdapter` are acum
+  o marja de teardown de 15 s; un timeout real va fi raportat ca `TIMEOUT/BLOCKED`,
+  nu ca un timeout opac al wrapper-ului.
 
 ## Politica de interpretare
 
