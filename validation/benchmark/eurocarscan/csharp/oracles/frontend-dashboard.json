@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"frontend/app/page.tsx","contains":"EuroCarScan"},{"type":"file-contains","path":"frontend/app/page.tsx","contains":"health"}]}

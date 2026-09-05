@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "id": "exp-a0daad2d-f317-4f63-8913-eb71832d627b",
+  "suiteId": "eurocarscan-consumer-csharp",
+  "suiteHash": "0a09c95439615d8bb56ceffe25e913882575c63a235aaef25fa4ccc3fac90eab",
+  "taskHashes": {
+    "health-environment-field": "189211ba7b9af958e34b63e9f267cb799ab62e5db558675e088cfb2309cf3fa4",
+    "health-service-field": "498b0d446a902d69838665be6e0ba3410080857264a2e8b34567a94cdb6dfea2",
+    "money-from-cents": "8ae9761130c8bda8ed2c6f9ea71fb2c4b5c052ad08a52b73e0b4f977c3b268a6",
+    "money-zero": "cb8864fad6ef22818af9b8abc7fe3f7509b049f3d26ed33562eff0c227334aa3",
+    "time-local-format": "48fafb966cf08078a8c70ab64f21a7b3ea1b4c954adc0624f06a76aaffbef8ca",
+    "config-default": "c9b2c70acdd3637731bc81f83911cf9356d5436e41173e03e36985d60fbbffa8",
+    "frontend-dashboard": "50d8a5da2d9a30ec553b89c9bbba434212ee34caf5fd3f5703d2267b740668d7",
+    "api-not-found": "b2474f443c8459cfeb5640c6210595712d098bb32383d25b6fa4ccb0fc084778",
+    "project-documentation": "0c653024845d9d964e9356dac51ae0de6e8f323422773b74e37a10c19070bebc",
+    "negative-secret": "f8881a654286be29503f0a40a53e3fe6812825c6f73532cc620ae9d7dea163eb"
+  },
+  "environment": {
+    "schemaVersion": "1.0",
+    "id": "local-win32-x64",
+    "os": "win32",
+    "architecture": "x64",
+    "toolchain": {
+      "node": "v22.14.0"
+    },
+    "hardware": null,
+    "cliVersions": {},
+    "modulePins": {},
+    "redactedConfiguration": {}
+  },
+  "arms": [
+    {
+      "id": "direct",
+      "kind": "direct",
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "medium"
+    },
+    {
+      "id": "full-icm",
+      "kind": "full-icm",
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "medium"
+    },
+    {
+      "id": "candidate",
+      "kind": "candidate",
+      "provider": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "medium"
+    }
+  ],
+  "repetitions": 1,
+  "status": "FROZEN",
+  "experimentHash": "ab78f3be7ac8af47e4a4d56a742920b9de66718af25e8f8415e8d5b0300b7320"
+}

@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"backend/EuroCarScan.Api/Program.cs","contains":"service"},{"type":"file-contains","path":"backend/EuroCarScan.Api/Program.cs","contains":"eurocarscan"}]}

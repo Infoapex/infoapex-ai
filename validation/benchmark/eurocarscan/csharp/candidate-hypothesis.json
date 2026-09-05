@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "id": "eurocarscan-otel-redacted-csharp-v1",
+  "candidateChange": "Enable only INFOAPEX_OTEL_ENABLED=1 for redacted local OpenTelemetry evidence while holding the C# suite, provider, model, effort, budgets and evaluator constant.",
+  "suiteId": "eurocarscan-consumer-csharp",
+  "improves": ["eligibleTraceCoverage"],
+  "nonRegression": ["verifiedTaskSuccess", "harnessOverheadPercent", "telemetryLeakageCount"],
+  "thresholds": { "eligibleTraceCoverage": 0.95, "verifiedTaskSuccess": 0, "harnessOverheadPercent": 5, "telemetryLeakageCount": 0 },
+  "maximumCostUsd": null,
+  "possibleVerdicts": ["ACCEPT", "REJECT", "INCONCLUSIVE", "ACCEPT_WITH_LIMITS"]
+}

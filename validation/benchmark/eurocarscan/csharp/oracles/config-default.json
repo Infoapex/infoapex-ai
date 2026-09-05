@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"backend/EuroCarScan.Api/appsettings.json","contains":"EuroCarScan"}]}

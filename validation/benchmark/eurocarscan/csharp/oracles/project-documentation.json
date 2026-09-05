@@ -1,0 +1,1 @@
+{"assertions":[{"type":"file-contains","path":"README.md","contains":"ASP.NET Core"},{"type":"file-contains","path":"README.md","contains":"Python"},{"type":"file-contains","path":"README.md","contains":"Next.js"}]}
