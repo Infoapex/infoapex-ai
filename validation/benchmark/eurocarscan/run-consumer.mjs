@@ -6,7 +6,7 @@
  */
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = resolve(fileURLToPath(new URL(".", import.meta.url)));
@@ -15,6 +15,7 @@ const moduleRoot = join(bundleRoot, "modules", "ai-code-benchmark", "dist", "src
 const { loadSuite } = await import(pathToFileURL(join(moduleRoot, "dataset.js")).href);
 const { runExperiment } = await import(pathToFileURL(join(moduleRoot, "runtime", "index.js")).href);
 const { evaluateExperiment } = await import(pathToFileURL(join(moduleRoot, "evaluation", "index.js")).href);
+const { evaluateOracle } = await import(pathToFileURL(join(moduleRoot, "evaluation", "index.js")).href);
 const { buildBenchmarkReport, renderMarkdownReport } = await import(pathToFileURL(join(moduleRoot, "report.js")).href);
 const { DirectCodexAdapter } = await import(pathToFileURL(join(moduleRoot, "adapters", "direct-codex.js")).href);
 const { DirectClaudeAdapter } = await import(pathToFileURL(join(moduleRoot, "adapters", "direct-claude.js")).href);
@@ -22,6 +23,7 @@ const { InfoapexRootAdapter } = await import(pathToFileURL(join(moduleRoot, "ada
 
 const repo = resolve(option("--repo") ?? "C:/__infoapex/eurocarscan");
 const suitePath = resolve(option("--suite") ?? join(here, "suite.json"));
+const suiteRoot = dirname(suitePath);
 const experimentPath = resolve(option("--experiment") ?? join(here, ".local", "experiment.json"));
 const stateRoot = resolve(option("--state-root") ?? join(repo, "..", `eurocarscan-benchmark-state-${provider()}`));
 const suite = loadSuite(suitePath);
@@ -35,6 +37,12 @@ const codexSandbox = process.env.BENCH_CODEX_SANDBOX ?? "danger-full-access";
 const infoapexCommand = [process.execPath, rootCli];
 const controlCommand = ["dotnet", controlDll];
 const preflightedGates = new Set();
+// P5 provider execution is governed by a progress watchdog, not the old 120 s
+// wall-clock cap. The runner retains a separate outer ceiling so a failed child
+// can be collected and reported, but never runs indefinitely.
+const workerIdleTimeoutSeconds = positive("--worker-idle-timeout-seconds") ?? 180;
+const workerMaximumRuntimeSeconds = positive("--worker-maximum-runtime-seconds") ?? 600;
+const experimentTimeoutMs = (positive("--experiment-timeout-seconds") ?? workerMaximumRuntimeSeconds + 30) * 1000;
 
 if (!existsSync(repo)) throw new Error(`Repository does not exist: ${repo}`);
 if (!option("--authorization")) throw new Error("Live consumer execution requires --authorization; no provider invocation was attempted.");
@@ -73,11 +81,11 @@ class ConsumerExecutor {
   }
 }
 
-const runtime = await runExperiment({ experiment: experimentPath, repositoryPath: repo, stateRoot, executor: new ConsumerExecutor(), concurrency: 1, timeoutMs: 135000, maximumNewObservations: positive("--maximum-new-observations") });
+const runtime = await runExperiment({ experiment: experimentPath, repositoryPath: repo, stateRoot, executor: new ConsumerExecutor(), concurrency: 1, timeoutMs: experimentTimeoutMs, maximumNewObservations: positive("--maximum-new-observations") });
 const evaluated = await evaluateExperiment({ stateRoot, experimentId: String(experiment.id), suite });
 const observations = evaluated.results.map((evaluation) => {
   const terminal = runtime.observations.find((item) => item.id === evaluation.observationId);
-  return { taskId: evaluation.taskId, armId: String(terminal?.armId ?? "unknown"), repetition: Number(terminal?.repetition ?? 1), provider: armProviders.get(String(terminal?.armId)) ?? "unknown", environmentId: String(experiment.environment?.id ?? "unknown"), verdict: evaluation.verdict, evaluation, criticalSafetyFailure: evaluation.criticalSafetyFailure, scopeSafety: evaluation.scope.verdict === "PASS" ? 1 : 0, verifiedTaskSuccess: evaluation.verdict === "PASS" ? 1 : 0, firstPassSuccess: evaluation.verdict === "PASS" ? 1 : 0, humanActiveMinutes: 0, telemetry: terminal?.telemetry ?? null, experimentHash: experiment.experimentHash, protocolHash: experiment.protocolHash ?? suite.hash };
+  return { taskId: evaluation.taskId, armId: String(terminal?.armId ?? "unknown"), repetition: Number(terminal?.repetition ?? 1), provider: armProviders.get(String(terminal?.armId)) ?? "unknown", environmentId: String(experiment.environment?.id ?? "unknown"), verdict: evaluation.verdict, evaluation, criticalSafetyFailure: evaluation.criticalSafetyFailure, scopeSafety: evaluation.scope.verdict === "PASS" ? 1 : 0, verifiedTaskSuccess: evaluation.verdict === "PASS" ? 1 : 0, firstPassSuccess: evaluation.verdict === "PASS" ? 1 : 0, humanActiveMinutes: 0, metrics: executionMetrics(evaluation.observationId), telemetry: terminal?.telemetry ?? null, experimentHash: experiment.experimentHash, protocolHash: experiment.protocolHash ?? suite.hash };
 });
 const candidateArm = experiment.arms.find((arm) => arm.kind === "candidate");
 const report = buildBenchmarkReport(observations, { experimentId: String(experiment.id), experimentHash: experiment.experimentHash, protocolHash: experiment.protocolHash ?? suite.hash, providerByArm: Object.fromEntries(armProviders), environmentId: String(experiment.environment?.id ?? "unknown"), categories: Object.fromEntries(suite.tasks.map((task) => [String(task.value.id), String(task.value.kind)])), expectedObservationCount: experiment.arms.length * suite.tasks.length * Number(experiment.repetitions), baselineArmId: "full-icm", candidateArmId: String(candidateArm?.id ?? "candidate"), generatedAt: new Date().toISOString() });
@@ -91,7 +99,7 @@ function requestFor({ observation, workspacePath, task, arm, provider }) {
   if (!armSpec) throw new Error(`Consumer experiment does not define arm ${arm}.`);
   const base = { arm, repositoryPath: workspacePath, taskId: String(task.id), seed: Number(observation.seed), prompt, provider, model: String(armSpec.model ?? ""), effort: String(armSpec.effort ?? ""), permissions: { sandbox: codexSandbox, mode: "dontAsk", allowedTools: [] }, limits: { timeoutMs: Number(task.limits.timeoutSeconds) * 1000, maximumOutputBytes: Number(task.limits.maximumOutputBytes) }, environmentAllowlist: arm === "candidate" ? ["INFOAPEX_OTEL_ENABLED"] : [] };
   if (arm === "direct") return base;
-  return { ...base, provider: "codex", orchestrationPlanPath: scaffoldingPlan(workspacePath, task), armConfiguration: { contextProvider: "ai-code-control", contextPackageMode: "enforce", ...(arm === "candidate" ? { candidateCapability: "opentelemetry-redacted-v1" } : {}) } };
+  return { ...base, provider: "codex", orchestrationPlanPath: scaffoldingPlan(workspacePath, task), armConfiguration: { contextProvider: "ai-code-control", contextPackageMode: "enforce", ...(arm === "candidate" ? { candidateCapability: "opentelemetry-redacted-v2" } : {}) } };
 }
 function prepareWorkspace(workspace, observation, task, arm) {
   const oldGitignore = existsSync(join(workspace, ".gitignore")) ? readFileSync(join(workspace, ".gitignore"), "utf8") : null;
@@ -103,13 +111,31 @@ function prepareWorkspace(workspace, observation, task, arm) {
     // Keep worker state outside the generated workspace but under the bounded
     // benchmark root. Nesting it below evidence/workspaces makes Git worktree
     // administrative paths exceed Windows limits (fatal: '$GIT_DIR' too big).
-    writeFileSync(join(worker, "config.json"), JSON.stringify({ schemaVersion: "1.0", defaultEngine: "codex", contextProvider: "ai-code-control", contextPackage: { mode: "enforce", maximumTokens: 12000 }, stateRoot: join(stateRoot, "worker-state", String(observation.id)), maximumParallelWriters: 1, maximumRepairCycles: 0, maximumRunMinutes: 3, executionEnvironment: { defaultProfile: "isolated", allowTrustedLocal: false }, syncRootPolicy: { sequentialWriter: "warn", parallelWriters: "block" }, adapters: { codex: { executable: codexCommand[0], baseArgs: codexCommand.slice(1), model: String(armSpec.model ?? ""), reasoningEffort: String(armSpec.effort ?? ""), sandboxMode: codexSandbox, timeoutSeconds: 120, maximumOutputBytes: 65536 }, aiCodeControl: { executable: controlCommand[0], baseArgs: controlCommand.slice(1), timeoutSeconds: 30, maximumOutputBytes: 1000000 } } }, null, 2) + "\n", "utf8");
+    writeFileSync(join(worker, "config.json"), JSON.stringify({ schemaVersion: "1.0", defaultEngine: "codex", contextProvider: "ai-code-control", contextPackage: { mode: "enforce", maximumTokens: 12000 }, stateRoot: join(stateRoot, "worker-state", String(observation.id)), maximumParallelWriters: 1, maximumRepairCycles: 0, maximumRunMinutes: Math.ceil(workerMaximumRuntimeSeconds / 60) + 2, executionEnvironment: { defaultProfile: "isolated", allowTrustedLocal: false }, syncRootPolicy: { sequentialWriter: "warn", parallelWriters: "block" }, adapters: { codex: { executable: codexCommand[0], baseArgs: codexCommand.slice(1), model: String(armSpec.model ?? ""), reasoningEffort: String(armSpec.effort ?? ""), sandboxMode: codexSandbox, idleTimeoutSeconds: workerIdleTimeoutSeconds, maximumRuntimeSeconds: workerMaximumRuntimeSeconds, maximumRepeatedProgressEvents: 4, maximumOutputBytes: 65536 }, aiCodeControl: { executable: controlCommand[0], baseArgs: controlCommand.slice(1), timeoutSeconds: 30, maximumOutputBytes: 1000000 } } }, null, 2) + "\n", "utf8");
     writeFileSync(join(workspace, ".gitignore"), ".ai-code-control/\nbin/\nobj/\nnode_modules/\n.next/\n__pycache__/\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\n", "utf8");
     if (arm === "full-icm" || arm === "candidate") execFileSync(controlCommand[0], [...controlCommand.slice(1), "init", "--repo", workspace], { cwd: workspace, stdio: "ignore", windowsHide: true });
   }
   execFileSync("git", ["init", "--quiet"], { cwd: workspace, stdio: "ignore" }); execFileSync("git", ["-c", "user.name=benchmark", "-c", "user.email=benchmark@localhost", "add", "."], { cwd: workspace, stdio: "ignore" }); execFileSync("git", ["-c", "user.name=benchmark", "-c", "user.email=benchmark@localhost", "commit", "--quiet", "-m", "benchmark baseline"], { cwd: workspace, stdio: "ignore" });
-  const preflightError = arm === "direct" ? null : preflightGate(workspace, task);
+  // A consumer benchmark task must start unsolved. This evaluator-only check is
+  // performed before any provider is invoked and never crosses into the prompt
+  // or workspace. It prevents spending quota on an already-satisfied task.
+  const baselineError = baselineOracleError(workspace, task);
+  const preflightError = baselineError ?? (arm === "direct" ? null : preflightGate(workspace, task));
   return { plan, oldGitignore, preflightError };
+}
+function baselineOracleError(workspace, task) {
+  if (task.expectedOutcome === "BLOCKED") return null;
+  const oracleRef = task.oracle?.oracleRef;
+  if (typeof oracleRef !== "string" || oracleRef.length === 0 || oracleRef.includes("\\") || oracleRef.startsWith("/") || oracleRef.split("/").includes("..")) return "Consumer task has no safe evaluator-owned oracle reference.";
+  try {
+    const oracle = JSON.parse(readFileSync(join(suiteRoot, oracleRef), "utf8"));
+    const result = evaluateOracle({ workspacePath: workspace, oracle, expectedOutcome: "PASS", executionStatus: "DONE" });
+    return result.verdict === "PASS"
+      ? "Consumer task baseline already satisfies its evaluator-owned oracle. Replace the task with a proven baseline FAIL -> known solution PASS transition before authorizing a provider."
+      : null;
+  } catch {
+    return "Consumer task baseline oracle preflight could not be evaluated safely.";
+  }
 }
 function preflightGate(workspace, task) {
   const verification = Array.isArray(task.verification) ? task.verification[0] : null;
@@ -141,8 +167,8 @@ function scaffoldingPlan(workspace, task) {
     budgets: {
       maximumParallelWriters: 1,
       maximumRepairCycles: 0,
-      maximumTaskMinutes: 2,
-      maximumRunMinutes: 3,
+      maximumTaskMinutes: Math.ceil(workerMaximumRuntimeSeconds / 60),
+      maximumRunMinutes: Math.ceil(workerMaximumRuntimeSeconds / 60) + 2,
       maximumAgentInvocations: 1,
       maximumRunInputUncachedTokens: 100000,
       maximumRunCacheReadTokens: 100000,
@@ -155,6 +181,12 @@ function scaffoldingPlan(workspace, task) {
   writeFileSync(plan, `---\nstatus: accepted\n---\n\n# EuroCarScan consumer task\n\n\`\`\`json ai-code-worker-plan\n${JSON.stringify(body, null, 2)}\n\`\`\`\n`, "utf8"); return plan;
 }
 function cleanupWorkspaceScaffolding(workspace, scaffolding) { removeTransientCaches(workspace); if (existsSync(join(workspace, ".git"))) rmSync(join(workspace, ".git"), { recursive: true, force: true }); if (existsSync(join(workspace, ".ai-code-worker"))) rmSync(join(workspace, ".ai-code-worker"), { recursive: true, force: true }); if (existsSync(join(workspace, ".ai-code-control"))) rmSync(join(workspace, ".ai-code-control"), { recursive: true, force: true }); if (scaffolding.plan && existsSync(scaffolding.plan)) rmSync(scaffolding.plan, { force: true }); if (scaffolding.oldGitignore === null) { if (existsSync(join(workspace, ".gitignore"))) rmSync(join(workspace, ".gitignore"), { force: true }); } else writeFileSync(join(workspace, ".gitignore"), scaffolding.oldGitignore, "utf8"); }
+function executionMetrics(observationId) {
+  try {
+    const execution = JSON.parse(readFileSync(join(stateRoot, "benchmarks", String(experiment.id), "steps", String(observationId), "execution.json"), "utf8"));
+    return execution && typeof execution === "object" && execution.metrics && typeof execution.metrics === "object" ? execution.metrics : null;
+  } catch { return null; }
+}
 function removeTransientCaches(root) { for (const entry of readdirSync(root, { withFileTypes: true })) { const path = join(root, entry.name); if (entry.isDirectory() && ["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "bin", "obj", "node_modules", ".next"].includes(entry.name)) { rmSync(path, { recursive: true, force: true }); continue; } if (entry.isDirectory() && entry.name !== ".git") removeTransientCaches(path); } }
 function zeroMetrics() { return { elapsedMs: 0, providerLatencyMs: 0, usage: { inputUncachedTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: null } }; }
 function assertFrozenRepositoryRevision(repository, loadedSuite) {

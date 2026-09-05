@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import type { AgentExecutionResult } from "./fake-engine.js";
 import { createEngineEvent, validateEngineEventStream, type EngineEvent, type EngineUsage } from "./engine-event.js";
@@ -23,6 +24,12 @@ export interface CodexCliAdapterConfig {
   readonly defaultModel?: string | null;
   readonly reasoningEffort?: "none" | "low" | "medium" | "high" | "xhigh" | "max";
   readonly timeoutMs?: number;
+  /** Maximum silence without semantic output/worktree activity (default 3 minutes). */
+  readonly idleTimeoutMs?: number;
+  /** High safety circuit breaker (default 20 minutes), not a task-performance limit. */
+  readonly maximumRuntimeMs?: number;
+  /** Consecutive identical semantic actions allowed before loop protection stops the CLI. */
+  readonly maximumRepeatedProgressEvents?: number;
   readonly maximumOutputBytes?: number;
 }
 
@@ -72,6 +79,9 @@ export class CodexCliAdapter {
   private readonly baseArgs: readonly string[];
   private readonly adapterVersion: string;
   private readonly timeoutMs: number;
+  private readonly idleTimeoutMs: number;
+  private readonly maximumRuntimeMs: number;
+  private readonly maximumRepeatedProgressEvents: number;
   private readonly maximumOutputBytes: number;
 
   constructor(
@@ -81,7 +91,12 @@ export class CodexCliAdapter {
     this.executable = config.executable ?? discoverEngineExecutable("codex");
     this.baseArgs = config.baseArgs ?? [];
     this.adapterVersion = config.adapterVersion ?? "0.1.0";
-    this.timeoutMs = config.timeoutMs ?? 60_000;
+    // timeoutMs remains for synchronous legacy callers. Async P5 execution uses the
+    // watchdog below: legacy timeoutMs becomes an idle limit, never a hard 120 s cap.
+    this.timeoutMs = config.timeoutMs ?? 20 * 60_000;
+    this.idleTimeoutMs = config.idleTimeoutMs ?? config.timeoutMs ?? 3 * 60_000;
+    this.maximumRuntimeMs = config.maximumRuntimeMs ?? 20 * 60_000;
+    this.maximumRepeatedProgressEvents = config.maximumRepeatedProgressEvents ?? 4;
     // 1 MiB was too small for real exploratory tasks: codex exec --json echoes each
     // command's full output (including whole file contents from Read-equivalent
     // commands) back inside "aggregated_output" fields, and a task reading several
@@ -273,6 +288,13 @@ export class CodexCliAdapter {
       input: invocation.stdin,
       maximumOutputBytes: this.maximumOutputBytes,
       timeoutMs: this.timeoutMs,
+      watchdog: {
+        idleTimeoutMs: this.idleTimeoutMs,
+        maximumRuntimeMs: this.maximumRuntimeMs,
+        maximumRepeatedProgressEvents: this.maximumRepeatedProgressEvents,
+        progressDirectory: request.worktreePath,
+        classifyProgressLine: classifyCodexProgressLine
+      },
       shell: needsShellWrapper(invocation.executable)
     });
     const result = readAgentResult(child, request, this.registry) ?? failedResult(request, childOutputMessage(child));
@@ -441,11 +463,46 @@ function childOutputMessage(child: ReturnType<typeof spawnSync> | BufferedProces
   // Provider output is private evidence. It can contain source paths, prompt
   // fragments, tool arguments, or a secret echoed by a failed command. Never
   // propagate it through the public worker/root/benchmark finding chain.
+  if ("stopReason" in child && child.stopReason === "idle-timeout") return "Codex CLI made no observable progress before the idle watchdog expired.";
+  if ("stopReason" in child && child.stopReason === "loop-detected") return "Codex CLI repeated the same semantic action until the loop guard stopped it.";
+  if ("stopReason" in child && child.stopReason === "hard-timeout") return "Codex CLI exceeded the configured safety circuit breaker before producing a valid agent result.";
   if (childTimedOut(child)) return "Codex CLI timed out before producing a valid agent result.";
   if ("outputTruncated" in child && child.outputTruncated) return "Codex CLI output exceeded the configured maximum before producing a valid agent result.";
   if (child.error) return "Codex CLI process failed before producing a valid agent result.";
   if (child.status !== 0) return "Codex CLI exited unsuccessfully before producing a valid agent result.";
   return "Codex did not produce a valid agent result.";
+}
+
+/**
+ * Produces only a tiny, non-sensitive action identity. Raw provider output is never
+ * persisted in the watchdog or public findings. Token counters do not count as
+ * progress; a repeated command/tool action does.
+ */
+export function classifyCodexProgressLine(stream: "stdout" | "stderr", line: string): string | null {
+  if (stream !== "stdout") return null;
+  try {
+    const event = JSON.parse(line) as {
+      readonly type?: unknown;
+      readonly item?: { readonly type?: unknown; readonly command?: unknown; readonly path?: unknown };
+    };
+    const type = typeof event.type === "string" ? event.type : null;
+    const itemType = typeof event.item?.type === "string" ? event.item.type : null;
+    if (!type) return null;
+    // Codex emits an item.started and an item.completed for one command. Only
+    // completed commands are semantic loop events; otherwise ordinary lifecycle
+    // pairs can be counted twice and stop a healthy run.
+    if (itemType === "command_execution" && type === "item.completed") {
+      const command = typeof event.item?.command === "string" ? event.item.command.replace(/\s+/g, " ") : "unknown";
+      // Command text may contain a path, argument or a secret-like value. The
+      // watchdog needs equality only, so retain a short hash rather than the text.
+      return `command:${createHash("sha256").update(command).digest("hex").slice(0, 16)}`;
+    }
+    if (itemType === "file_change") return `file-change:${type}`;
+    if (type === "thread.started" || type === "turn.started" || type === "turn.completed") return type;
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function childTimedOut(child: ReturnType<typeof spawnSync> | BufferedProcessResult): boolean {

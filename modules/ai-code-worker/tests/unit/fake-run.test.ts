@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, describe, it } from "node:test";
 import { runFake } from "../../src/run/fake-run.js";
+import { taskWorktreePath } from "../../src/git/worktree.js";
 import { SchemaRegistry } from "../../src/schema/json-schema.js";
 import { runStatus } from "../../src/status/status.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
@@ -243,7 +244,7 @@ describe("fake run coordinator", () => {
         .join("\n")}\n`,
       "utf8"
     );
-    execFileSync("git", ["worktree", "remove", "--force", join(dirname(dirname(first.state.runRoot!)), "worktrees", "run-crash-after-commit", "BACKEND-01", "attempt-1")], {
+    execFileSync("git", ["worktree", "remove", "--force", taskWorktreePath({ stateRoot: dirname(dirname(first.state.runRoot!)), runId: "run-crash-after-commit", taskId: "BACKEND-01", attempt: 1 })], {
       cwd: repo,
       stdio: "ignore"
     });

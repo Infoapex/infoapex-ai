@@ -162,7 +162,11 @@ function runtimeEnvironment(explicit: Readonly<Record<string, string>> | undefin
   for (const name of [
     "PATH", "Path", "PATHEXT", "SystemRoot", "ComSpec",
     "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA",
-    "TEMP", "TMP", "DOTNET_ROOT", "NUGET_PACKAGES"
+    "TEMP", "TMP", "DOTNET_ROOT", "NUGET_PACKAGES",
+    // NuGet resolves machine package/config locations through these standard
+    // Windows runtime directories. They contain paths only, never credentials.
+    "ProgramData", "PROGRAMDATA", "ALLUSERSPROFILE", "PUBLIC",
+    "ProgramFiles", "ProgramFiles(x86)", "CommonProgramFiles", "CommonProgramFiles(x86)"
   ]) {
     const value = host[name];
     if (value !== undefined) {

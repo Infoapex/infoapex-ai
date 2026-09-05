@@ -6,6 +6,12 @@ export interface AdapterProjectConfig {
   readonly baseArgs?: readonly string[];
   readonly model?: string | null;
   readonly timeoutSeconds?: number;
+  /** Maximum silence without semantic provider output or a worktree mutation. */
+  readonly idleTimeoutSeconds?: number;
+  /** High circuit breaker for an invocation. Never use this as a performance target. */
+  readonly maximumRuntimeSeconds?: number;
+  /** Consecutive identical semantic provider actions tolerated before fail-closed stop. */
+  readonly maximumRepeatedProgressEvents?: number;
   readonly maximumOutputBytes?: number;
   readonly testedVersionRanges?: readonly string[];
 }

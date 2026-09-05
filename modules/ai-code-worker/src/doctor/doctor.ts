@@ -173,7 +173,10 @@ function codexAdapterConfigFromProject(config: ProjectConfig | null): Partial<Co
     ...(source?.model !== undefined ? { defaultModel: source.model } : {}),
     ...(source?.reasoningEffort !== undefined ? { reasoningEffort: source.reasoningEffort } : {}),
     ...(source?.sandboxMode !== undefined ? { sandboxMode: source.sandboxMode } : {}),
-    ...(source?.timeoutSeconds !== undefined ? { timeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.timeoutSeconds !== undefined ? { idleTimeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.idleTimeoutSeconds !== undefined ? { idleTimeoutMs: source.idleTimeoutSeconds * 1000 } : {}),
+    ...(source?.maximumRuntimeSeconds !== undefined ? { maximumRuntimeMs: source.maximumRuntimeSeconds * 1000 } : {}),
+    ...(source?.maximumRepeatedProgressEvents !== undefined ? { maximumRepeatedProgressEvents: source.maximumRepeatedProgressEvents } : {}),
     ...(source?.maximumOutputBytes !== undefined ? { maximumOutputBytes: source.maximumOutputBytes } : {}),
     ...(source?.testedVersionRanges !== undefined ? { testedVersionRanges: source.testedVersionRanges } : {})
   };
@@ -189,7 +192,10 @@ function claudeAdapterConfigFromProject(config: ProjectConfig | null): Partial<C
     ...(source?.allowedTools !== undefined ? { allowedTools: source.allowedTools } : {}),
     ...(source?.bareMode !== undefined ? { bareMode: source.bareMode } : {}),
     ...(source?.dangerouslySkipPermissions !== undefined ? { dangerouslySkipPermissions: source.dangerouslySkipPermissions } : {}),
-    ...(source?.timeoutSeconds !== undefined ? { timeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.timeoutSeconds !== undefined ? { idleTimeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.idleTimeoutSeconds !== undefined ? { idleTimeoutMs: source.idleTimeoutSeconds * 1000 } : {}),
+    ...(source?.maximumRuntimeSeconds !== undefined ? { maximumRuntimeMs: source.maximumRuntimeSeconds * 1000 } : {}),
+    ...(source?.maximumRepeatedProgressEvents !== undefined ? { maximumRepeatedProgressEvents: source.maximumRepeatedProgressEvents } : {}),
     ...(source?.maximumOutputBytes !== undefined ? { maximumOutputBytes: source.maximumOutputBytes } : {}),
     ...(source?.testedVersionRanges !== undefined ? { testedVersionRanges: source.testedVersionRanges } : {})
   };

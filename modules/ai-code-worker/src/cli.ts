@@ -652,7 +652,7 @@ if (command === "benchmark") {
           ]
         }
       : engine === "codex"
-      ? runCodex({
+      ? await runCodex({
           repositoryPath,
           planPath,
           runId,
@@ -670,7 +670,7 @@ if (command === "benchmark") {
             : {})
         })
       : engine === "claude"
-      ? runClaude({
+      ? await runClaude({
           repositoryPath,
           planPath,
           runId,

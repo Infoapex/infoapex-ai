@@ -146,7 +146,7 @@ ${JSON.stringify(
 }
 
 describe("claude run coordinator - real engine repair (todo.md #13, real-engine slice)", () => {
-  it("dispatches a real (fake-CLI) Claude repair attempt that writes the missing file, and verify decides DONE for real", () => {
+  it("dispatches a real (fake-CLI) Claude repair attempt that writes the missing file, and verify decides DONE for real", async () => {
     const repo = createReviewFailingRepository();
     const stateRoot = resolveStateRoot({ repoRoot: repo }).path;
     const runId = "run-claude-real-repair-pass";
@@ -160,7 +160,7 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
     const taskCli = fakeCli("2.1.177", "src/original-output.txt");
     const repairCli = fakeCli("2.1.177", "target.txt");
 
-    const report = runClaude({
+    const report = await runClaude({
       repositoryPath: repo,
       planPath: "Plan/RUN.md",
       runId,
@@ -202,7 +202,7 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
     assert.match(committedContent, /claude fake output/);
   });
 
-  it("does not falsely report DONE when the repair engine runs but the file still fails real verify", () => {
+  it("does not falsely report DONE when the repair engine runs but the file still fails real verify", async () => {
     const repo = createReviewFailingRepository();
     const stateRoot = resolveStateRoot({ repoRoot: repo }).path;
     const runId = "run-claude-real-repair-fail";
@@ -218,7 +218,7 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
     // keep failing for real against content that doesn't satisfy it.
     const repairCli = fakeCli("2.1.177", "target.txt");
 
-    const report = runClaude({
+    const report = await runClaude({
       repositoryPath: repo,
       planPath: "Plan/RUN.md",
       runId,

@@ -12,7 +12,7 @@ import { CodexCliAdapter, type CodexCliAdapterConfig } from "../engines/codex-cl
 import type { EngineUsage } from "../engines/engine-event.js";
 import { createWorkerCommit } from "../git/commit.js";
 import { currentHead, git } from "../git/diff.js";
-import { createTaskWorktree } from "../git/worktree.js";
+import { createTaskWorktree, taskWorktreePath } from "../git/worktree.js";
 import { buildTaskGraph, getTask, type ManifestTask, type TaskRuntimeState } from "../graph/task-graph.js";
 import { EventLog } from "../persistence/event-log.js";
 import { recoverRunCheckpoints, type RunCheckpoints } from "../persistence/recovery.js";
@@ -97,7 +97,7 @@ export interface CodexRunFinding {
   readonly message: string;
 }
 
-export function runCodex(options: CodexRunOptions): CodexRunReport {
+export async function runCodex(options: CodexRunOptions): Promise<CodexRunReport> {
   const registry = SchemaRegistry.load();
   const compile = runCompile(options);
 
@@ -113,7 +113,6 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
   const adapter = new CodexCliAdapter(
     codexConfig({
       ...codexAdapterConfigFromProject(projectConfig),
-      timeoutMs: Number(manifest.budgets.maximumTaskMinutes) * 60_000,
       ...options.adapterConfig
     }),
     registry
@@ -274,7 +273,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
     }
 
     const candidates = task.routing?.candidates ?? [{ engine: "codex" as const, model: options.adapterConfig?.defaultModel ?? null }];
-    const taskExecution = executeTaskWithFallback({
+    const taskExecution = await executeTaskWithFallback({
       candidates,
       projectConfig,
       request: {
@@ -518,7 +517,7 @@ export function runCodex(options: CodexRunOptions): CodexRunReport {
 
   const runEvidencePath = join(compile.state.runRoot, "run-evidence.json");
   const lastTaskId = graph.topologicalOrder.at(-1);
-  const lastTaskRoot = lastTaskId ? join(stateRootFromRunRoot(compile.state.runRoot), "worktrees", compile.runId, lastTaskId, "attempt-1") : compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath;
+  const lastTaskRoot = lastTaskId ? taskWorktreePath({ stateRoot: stateRootFromRunRoot(compile.state.runRoot), runId: compile.runId, taskId: lastTaskId, attempt: 1 }) : compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath;
   const globalGateReport = runGates({
     compile,
     eventLog,
@@ -817,7 +816,12 @@ export function codexAdapterConfigFromProject(config: ProjectConfig | null): Par
     ...(source?.model !== undefined ? { defaultModel: source.model } : {}),
     ...(source?.reasoningEffort !== undefined ? { reasoningEffort: source.reasoningEffort } : {}),
     ...(source?.sandboxMode !== undefined ? { sandboxMode: source.sandboxMode } : {}),
-    ...(source?.timeoutSeconds !== undefined ? { timeoutMs: source.timeoutSeconds * 1000 } : {}),
+    // Legacy timeoutSeconds is deliberately an *idle* watchdog, not an absolute
+    // provider deadline. P5 needs fresh .NET worktrees to be able to restore/build.
+    ...(source?.timeoutSeconds !== undefined ? { idleTimeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.idleTimeoutSeconds !== undefined ? { idleTimeoutMs: source.idleTimeoutSeconds * 1000 } : {}),
+    ...(source?.maximumRuntimeSeconds !== undefined ? { maximumRuntimeMs: source.maximumRuntimeSeconds * 1000 } : {}),
+    ...(source?.maximumRepeatedProgressEvents !== undefined ? { maximumRepeatedProgressEvents: source.maximumRepeatedProgressEvents } : {}),
     ...(source?.maximumOutputBytes !== undefined ? { maximumOutputBytes: source.maximumOutputBytes } : {}),
     ...(source?.testedVersionRanges !== undefined ? { testedVersionRanges: source.testedVersionRanges } : {})
   };

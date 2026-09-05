@@ -59,9 +59,9 @@ test("does not fail over for deterministic implementation failures", () => {
   assert.equal(isAvailabilityFailure(execution), false);
 });
 
-test("fails over mid-task from a quota failure to the next routed candidate", () => {
+test("fails over mid-task from a quota failure to the next routed candidate", async () => {
   const attempts: string[] = [];
-  const result = executeTaskWithFallback({
+  const result = await executeTaskWithFallback({
     candidates: [
       { engine: "codex", model: "primary-model" },
       { engine: "claude", model: "fallback-model" }
@@ -107,9 +107,9 @@ test("fails over mid-task from a quota failure to the next routed candidate", ()
   assert.equal(result.execution.result.status, "DONE");
 });
 
-test("does not fail over when the task itself fails deterministically", () => {
+test("does not fail over when the task itself fails deterministically", async () => {
   const attempts: string[] = [];
-  const result = executeTaskWithFallback({
+  const result = await executeTaskWithFallback({
     candidates: [
       { engine: "codex", model: "primary-model" },
       { engine: "claude", model: "fallback-model" }

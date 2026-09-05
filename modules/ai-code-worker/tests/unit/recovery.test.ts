@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, describe, it } from "node:test";
 import { runFake } from "../../src/run/fake-run.js";
+import { taskWorktreePath } from "../../src/git/worktree.js";
 import { EventLog, type RunEvent } from "../../src/persistence/event-log.js";
 import { SchemaRegistry } from "../../src/schema/json-schema.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
@@ -72,13 +73,12 @@ describe("recovery: process kill at specific pipeline points", () => {
     // 2026-09-02: a second, independently-recomputed hash pointed at a directory
     // whose "worktrees" subdirectory did not even exist.
     const stateRoot = dirname(dirname(first.state.runRoot!));
-    const integrationWorktreePath = join(
+    const integrationWorktreePath = taskWorktreePath({
       stateRoot,
-      "worktrees",
-      "run-kill-during-integration",
-      "__integration__",
-      "attempt-1"
-    );
+      runId: "run-kill-during-integration",
+      taskId: "__integration__",
+      attempt: 1
+    });
     assert.equal(
       existsSync(integrationWorktreePath),
       true,

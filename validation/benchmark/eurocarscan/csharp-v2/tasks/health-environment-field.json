@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0",
+  "id": "health-environment-field",
+  "version": "v2",
+  "kind": "contract-api",
+  "risk": "low",
+  "languages": ["csharp"],
+  "difficulty": "easy",
+  "inclusionReason": "A minimal, deterministic ASP.NET Core task that starts unsolved at the frozen EuroCarScan baseline and exercises the real worker worktree.",
+  "prompt": "Extend the ASP.NET Core GET /health response with a deterministic environment field set to local. Preserve the existing fields, make no network calls, and add or update a focused FoundationTests assertion.",
+  "initialState": { "repository": "backend/EuroCarScan.Api/Program.cs", "revision": "916e7b5" },
+  "setup": [],
+  "scope": { "allow": ["backend/EuroCarScan.Api/Program.cs", "backend/EuroCarScan.Api.Tests/FoundationTests.cs"], "deny": [".env", "secrets"] },
+  "verification": [{ "command": ["dotnet", "test", "backend/EuroCarScan.Api.Tests/EuroCarScan.Api.Tests.csproj", "--nologo"], "timeoutSeconds": 600 }],
+  "oracle": { "access": "evaluator-only", "oracleRef": "oracles/health-environment-field.json" },
+  "limits": { "timeoutSeconds": 600, "maximumOutputBytes": 65536 },
+  "expectedOutcome": "PASS",
+  "dataClassification": "private-redacted"
+}

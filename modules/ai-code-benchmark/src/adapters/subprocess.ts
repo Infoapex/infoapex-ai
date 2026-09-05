@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
 import type { AdapterCommand, BoundedProcessResult } from "../types.js";
 
-const DEFAULT_ENVIRONMENT = ["PATH", "PATHEXT", "SystemRoot", "SystemDrive", "WINDIR", "ComSpec", "TEMP", "TMP", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA"] as const;
+// Runtime directories required by Windows toolchains (especially NuGet) cross
+// the root -> worker boundary. These are paths, not provider configuration;
+// secret-looking names remain rejected below.
+const DEFAULT_ENVIRONMENT = ["PATH", "PATHEXT", "SystemRoot", "SystemDrive", "WINDIR", "ComSpec", "TEMP", "TMP", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "ProgramData", "PROGRAMDATA", "ALLUSERSPROFILE", "PUBLIC", "ProgramFiles", "ProgramFiles(x86)", "CommonProgramFiles", "CommonProgramFiles(x86)"] as const;
 const SENSITIVE_ENVIRONMENT = /(?:token|secret|password|passwd|api[_-]?key|authorization|cookie|credential)/i;
 
 /** Commands are always passed to spawn with shell:false. A command is an executable plus fixed argument tokens. */

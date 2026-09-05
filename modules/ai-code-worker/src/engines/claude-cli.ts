@@ -44,6 +44,12 @@ export interface ClaudeCliAdapterConfig {
   readonly adapterVersion?: string;
   readonly defaultModel?: string | null;
   readonly timeoutMs?: number;
+  /** Maximum silence without semantic output/worktree activity (default 3 minutes). */
+  readonly idleTimeoutMs?: number;
+  /** High safety circuit breaker (default 20 minutes), not a task-performance limit. */
+  readonly maximumRuntimeMs?: number;
+  /** Consecutive identical semantic actions allowed before loop protection stops the CLI. */
+  readonly maximumRepeatedProgressEvents?: number;
   readonly maximumOutputBytes?: number;
   /**
    * Opt-in `--bare` mode: skips OAuth/keychain auth and requires ANTHROPIC_API_KEY.
@@ -105,6 +111,9 @@ export class ClaudeCliAdapter {
   private readonly allowedTools: readonly string[];
   private readonly adapterVersion: string;
   private readonly timeoutMs: number;
+  private readonly idleTimeoutMs: number;
+  private readonly maximumRuntimeMs: number;
+  private readonly maximumRepeatedProgressEvents: number;
   private readonly maximumOutputBytes: number;
 
   constructor(
@@ -116,7 +125,12 @@ export class ClaudeCliAdapter {
     this.permissionMode = config.permissionMode ?? "dontAsk";
     this.allowedTools = config.allowedTools ?? DEFAULT_ALLOWED_TOOLS;
     this.adapterVersion = config.adapterVersion ?? "0.1.0";
-    this.timeoutMs = config.timeoutMs ?? 60_000;
+    // Async P5 execution is watchdog-controlled. timeoutMs is retained for old
+    // synchronous callers and, when supplied by legacy config, means idle time.
+    this.timeoutMs = config.timeoutMs ?? 20 * 60_000;
+    this.idleTimeoutMs = config.idleTimeoutMs ?? config.timeoutMs ?? 3 * 60_000;
+    this.maximumRuntimeMs = config.maximumRuntimeMs ?? 20 * 60_000;
+    this.maximumRepeatedProgressEvents = config.maximumRepeatedProgressEvents ?? 4;
     this.maximumOutputBytes = config.maximumOutputBytes ?? 1024 * 1024;
   }
 
@@ -320,6 +334,13 @@ export class ClaudeCliAdapter {
       input: invocation.stdin,
       maximumOutputBytes: this.maximumOutputBytes,
       timeoutMs: this.timeoutMs,
+      watchdog: {
+        idleTimeoutMs: this.idleTimeoutMs,
+        maximumRuntimeMs: this.maximumRuntimeMs,
+        maximumRepeatedProgressEvents: this.maximumRepeatedProgressEvents,
+        progressDirectory: request.worktreePath,
+        classifyProgressLine: classifyClaudeProgressLine
+      },
       shell: needsShellWrapper(invocation.executable)
     });
     const result = readAgentResult(child, request, this.registry) ?? failedResult(request, childOutputMessage(child));
@@ -532,11 +553,31 @@ function childOutputMessage(child: ReturnType<typeof spawnSync> | BufferedProces
   // Provider output remains private evidence: it must not become a public
   // worker finding, where it could expose prompt/source/secret fragments.
   const error = child.error as (Error & { readonly code?: string }) | undefined;
+  if ("stopReason" in child && child.stopReason === "idle-timeout") return "Claude Code CLI made no observable progress before the idle watchdog expired.";
+  if ("stopReason" in child && child.stopReason === "loop-detected") return "Claude Code CLI repeated the same semantic action until the loop guard stopped it.";
+  if ("stopReason" in child && child.stopReason === "hard-timeout") return "Claude Code CLI exceeded the configured safety circuit breaker before producing a valid agent result.";
   if (("timedOut" in child && child.timedOut === true) || error?.code === "ETIMEDOUT") return "Claude Code CLI timed out before producing a valid agent result.";
   if ("outputTruncated" in child && child.outputTruncated) return "Claude Code CLI output exceeded the configured maximum before producing a valid agent result.";
   if (child.error) return "Claude Code CLI process failed before producing a valid agent result.";
   if (child.status !== 0) return "Claude Code CLI exited unsuccessfully before producing a valid agent result.";
   return "Claude did not produce a valid agent result.";
+}
+
+/** Claude's default JSON result is often terminal-only; workspace mutations provide
+ * the primary progress signal. This recognises stream-json tool records as well for
+ * compatible CLI versions, without retaining their raw content. */
+export function classifyClaudeProgressLine(stream: "stdout" | "stderr", line: string): string | null {
+  if (stream !== "stdout") return null;
+  try {
+    const event = JSON.parse(line) as { readonly type?: unknown; readonly subtype?: unknown };
+    const type = typeof event.type === "string" ? event.type : null;
+    if (type === "assistant" || type === "tool_use" || type === "tool_result" || type === "result") {
+      return `${type}:${typeof event.subtype === "string" ? event.subtype : ""}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function terminalEvents(

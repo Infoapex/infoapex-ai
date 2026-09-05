@@ -8,7 +8,12 @@ import { assertContained, assertPlainPath, canonicalPath, containedPath } from "
 // Dependencies and build outputs are reproducible workspace inputs, not source
 // artifacts. Excluding them keeps isolated benchmark copies bounded and prevents
 // a local install (for example frontend/node_modules) from dominating evaluation.
-const EXCLUDED_GENERATED_DIRECTORIES = new Set([".git", "node_modules", ".next", "bin", "obj", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+// These directories are created by the harness or by local tooling, rather
+// than by the task under evaluation.  They must neither lengthen a safe copy
+// nor become a product-scope violation when an evaluator compares it with the
+// pristine consumer repository.  In particular, ai-code-control persists
+// SQLite indexes under .ai-code-control during context compilation.
+const EXCLUDED_GENERATED_DIRECTORIES = new Set([".git", ".infoapex-ai", ".ai-code-control", "node_modules", ".next", "bin", "obj", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
 
 export interface WorkspaceRecord {
   readonly schemaVersion: "1.0";

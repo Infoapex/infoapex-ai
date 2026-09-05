@@ -179,10 +179,11 @@ test("environment forwarding is allowlisted and secret-looking names are always 
   process.env.BENCH_PUBLIC_VALUE = "visible-to-child";
   process.env.BENCH_API_KEY = "must-not-forward";
   try {
-    const environment = safeEnvironment(["BENCH_PUBLIC_VALUE", "BENCH_API_KEY", "BAD-NAME"]);
+  const environment = safeEnvironment(["BENCH_PUBLIC_VALUE", "BENCH_API_KEY", "BAD-NAME"]);
     assert.equal(environment.environment.BENCH_PUBLIC_VALUE, "visible-to-child");
     assert.equal(environment.environment.BENCH_API_KEY, undefined);
-    assert.equal(environment.forwarded.includes("BENCH_API_KEY"), false);
+  assert.equal(environment.forwarded.includes("BENCH_API_KEY"), false);
+  if (process.platform === "win32" && process.env.ProgramData) assert.equal(environment.environment.ProgramData, process.env.ProgramData);
   } finally {
     if (priorPublic === undefined) delete process.env.BENCH_PUBLIC_VALUE; else process.env.BENCH_PUBLIC_VALUE = priorPublic;
     if (priorSecret === undefined) delete process.env.BENCH_API_KEY; else process.env.BENCH_API_KEY = priorSecret;

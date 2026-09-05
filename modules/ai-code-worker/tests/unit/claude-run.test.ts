@@ -29,11 +29,11 @@ after(() => {
 });
 
 describe("claude run coordinator", () => {
-  it("executes a single-writer claude run through worktree, commit, gates, review, and report", () => {
+  it("executes a single-writer claude run through worktree, commit, gates, review, and report", async () => {
     const repo = createGitRepository();
     const beforeFiles = listRepositoryFiles(repo);
     const cli = fakeCli("2.1.177", "src/claude-output.txt");
-    const report = runClaude({
+    const report = await runClaude({
       repositoryPath: repo,
       planPath: "Plan/RUN.md",
       runId: "run-claude",
@@ -77,10 +77,10 @@ describe("claude run coordinator", () => {
     }
   });
 
-  it("fails closed and never commits when the Claude CLI is unavailable", () => {
+  it("fails closed and never commits when the Claude CLI is unavailable", async () => {
     const repo = createGitRepository();
     const beforeHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
-    const report = runClaude({
+    const report = await runClaude({
       repositoryPath: repo,
       planPath: "Plan/RUN.md",
       runId: "run-claude-missing",

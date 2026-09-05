@@ -1,0 +1,7 @@
+{
+  "assertions": [
+    { "type": "file-contains", "path": "backend/EuroCarScan.Api/Program.cs", "contains": "environment" },
+    { "type": "file-contains", "path": "backend/EuroCarScan.Api/Program.cs", "contains": "local" },
+    { "type": "file-contains", "path": "backend/EuroCarScan.Api.Tests/FoundationTests.cs", "contains": "environment" }
+  ]
+}

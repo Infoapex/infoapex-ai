@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { createWorkerCommit } from "../../src/git/commit.js";
 import { currentHead, listChangedPaths, parsePorcelainStatusZ } from "../../src/git/diff.js";
-import { createTaskWorktree } from "../../src/git/worktree.js";
+import { createTaskWorktree, taskWorktreeBranch, taskWorktreePath } from "../../src/git/worktree.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
 
 const tempRoots: string[] = [];
@@ -18,6 +18,19 @@ after(() => {
 });
 
 describe("git task worktree and worker commit", () => {
+  it("uses bounded hashed branch segments for deeply nested Windows worktrees", () => {
+    const branch = taskWorktreeBranch({
+      runId: "run-".repeat(30),
+      taskId: "CONSUMER-HEALTH-ENVIRONMENT-FIELD-".repeat(12),
+      attempt: 1
+    });
+
+    assert.match(branch, /^aiw\/t\/[a-f0-9]{16}\/[a-f0-9]{16}\/a1$/);
+    assert.ok(branch.length < 50);
+    const path = taskWorktreePath({ stateRoot: "C:/very/deep/state/root", runId: "run-".repeat(30), taskId: "TASK-".repeat(30), attempt: 1 });
+    assert.match(path.replaceAll("\\", "/"), /worktrees\/[a-f0-9]{16}\/[a-f0-9]{16}\/a1$/);
+  });
+
   it("creates a task worktree outside the repository and commits scoped changes with audit trailers", () => {
     const repo = createGitRepository();
     const baseCommit = currentHead(repo);
@@ -37,6 +50,9 @@ describe("git task worktree and worker commit", () => {
     assert.ok(worktree.worktree);
     assert.equal(worktree.worktree.path.startsWith(repo), false);
     assert.equal(worktree.worktree.headCommit, baseCommit);
+    if (process.platform === "win32") {
+      assert.equal(execFileSync("git", ["config", "--get", "core.longpaths"], { cwd: repo, encoding: "utf8" }).trim(), "true");
+    }
 
     mkdirSync(join(worktree.worktree.path, "src"), { recursive: true });
     writeFileSync(join(worktree.worktree.path, "src", "feature.ts"), "export const value = 1;\n", "utf8");

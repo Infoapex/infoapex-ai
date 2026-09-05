@@ -11,7 +11,7 @@ import { FakeEngineAdapter } from "../engines/fake-engine.js";
 import type { EngineUsage } from "../engines/engine-event.js";
 import { currentHead, git } from "../git/diff.js";
 import { createWorkerCommit } from "../git/commit.js";
-import { createTaskWorktree } from "../git/worktree.js";
+import { createTaskWorktree, taskWorktreePath } from "../git/worktree.js";
 import { buildTaskGraph, getTask, type ManifestTask, type TaskRuntimeState } from "../graph/task-graph.js";
 import { EventLog } from "../persistence/event-log.js";
 import { recoverRunCheckpoints, type RunCheckpoints } from "../persistence/recovery.js";
@@ -518,7 +518,7 @@ export function runFake(options: FakeRunOptions): FakeRunReport {
 
   const runEvidencePath = join(compile.state.runRoot, "run-evidence.json");
   const lastTaskId = graph.topologicalOrder.at(-1);
-  const lastTaskRoot = lastTaskId ? join(stateRootFromRunRoot(compile.state.runRoot), "worktrees", compile.runId, lastTaskId, "attempt-1") : compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath;
+  const lastTaskRoot = lastTaskId ? taskWorktreePath({ stateRoot: stateRootFromRunRoot(compile.state.runRoot), runId: compile.runId, taskId: lastTaskId, attempt: 1 }) : compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath;
   const globalGateReport = runGates({
     compile,
     eventLog,

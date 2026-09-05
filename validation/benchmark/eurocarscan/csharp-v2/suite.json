@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "id": "eurocarscan-csharp-watchdog-canary",
+  "version": "v2",
+  "kind": "private-manifest",
+  "taskFiles": ["tasks/health-environment-field.json"],
+  "arms": [
+    { "id": "full-icm", "kind": "full-icm", "provider": "codex", "model": "gpt-5.6-luna", "effort": "medium" },
+    { "id": "candidate", "kind": "candidate", "provider": "codex", "model": "gpt-5.6-luna", "effort": "medium" }
+  ],
+  "repetitions": 1,
+  "metrics": ["verified-task-success", "first-pass-success", "scope-safety", "latency", "tokens", "cost-usd"],
+  "thresholds": { "minimumValidObservations": 1 },
+  "budgets": { "maximumInvocations": 2, "maximumMinutes": 25, "maximumCostUsd": null },
+  "oracleAccess": "evaluator-only",
+  "labels": { "cohort": "eurocarscan-csharp-foundation", "purpose": "p5-watchdog-consumer-canary" }
+}

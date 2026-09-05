@@ -393,12 +393,60 @@ if (args[0] === "exec" && args.includes("--help")) { console.log("--json\\n--cd\
 if (args[0] === "exec") { console.log("PRIVATE_PROVIDER_OUTPUT=must-not-escape"); await new Promise((resolve) => setTimeout(resolve, 1000)); }
 `, "utf8");
     chmodSync(cli, 0o755);
-    const adapter = new CodexCliAdapter({ executable: process.execPath, baseArgs: [cli], testedVersionRanges: ["0.146.0-alpha.3.1"], requiresCapabilitySmokeTest: false, timeoutMs: 20 });
+    const adapter = new CodexCliAdapter({ executable: process.execPath, baseArgs: [cli], testedVersionRanges: ["0.146.0-alpha.3.1"], requiresCapabilitySmokeTest: false, idleTimeoutMs: 20, maximumRuntimeMs: 100 });
     const execution = await adapter.startAsync(startRequest("exec-timeout", "TASK-TIMEOUT"));
 
     assert.equal(execution.result.status, "FAILED");
-    assert.match(execution.result.failures[0]?.message ?? "", /timed out/i);
+    assert.match(execution.result.failures[0]?.message ?? "", /(idle watchdog|circuit breaker)/i);
     assert.doesNotMatch(execution.result.failures[0]?.message ?? "", /PRIVATE_PROVIDER_OUTPUT/);
+  });
+
+  it("allows a long-running provider while its task worktree keeps changing", async () => {
+    const root = mkdtempSync(join(tmpdir(), "aicw-fake-codex-worktree-progress-"));
+    tempRoots.push(root);
+    const cli = join(root, "codex-progress.mjs");
+    writeFileSync(cli, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.includes("--version")) { console.log("codex-cli 0.146.0-alpha.3.1"); process.exit(0); }
+if (args[0] === "exec" && args.includes("--help")) { console.log("--json\\n--cd\\n--sandbox"); process.exit(0); }
+if (args[0] === "exec") {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const worktree = args[args.indexOf("--cd") + 1];
+  console.log(JSON.stringify({ type: "item.started", item: { type: "command_execution", command: "dotnet restore" } }));
+  for (let i = 0; i < 5; i += 1) { await new Promise((r) => setTimeout(r, 35)); fs.writeFileSync(path.join(worktree, "progress.txt"), String(i)); }
+  const request = JSON.parse(fs.readFileSync(0, "utf8"));
+  console.log(JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: JSON.stringify({ schemaVersion: "1.0", runId: request.runId, taskId: request.taskId, status: "DONE", summary: "done", touchedFiles: [], failures: [] }) } }));
+  process.exit(0);
+}
+`, "utf8");
+    chmodSync(cli, 0o755);
+    const adapter = new CodexCliAdapter({
+      executable: process.execPath, baseArgs: [cli], testedVersionRanges: ["0.146.0-alpha.3.1"], requiresCapabilitySmokeTest: false,
+      idleTimeoutMs: 80, maximumRuntimeMs: 2_000, maximumRepeatedProgressEvents: 4
+    });
+    const execution = await adapter.startAsync({ ...startRequest("exec-worktree-progress", "TASK-PROGRESS"), worktreePath: root });
+    assert.equal(execution.result.status, "DONE");
+  });
+
+  it("stops a provider which repeats the same semantic command", async () => {
+    const root = mkdtempSync(join(tmpdir(), "aicw-fake-codex-loop-"));
+    tempRoots.push(root);
+    const cli = join(root, "codex-loop.mjs");
+    writeFileSync(cli, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.includes("--version")) { console.log("codex-cli 0.146.0-alpha.3.1"); process.exit(0); }
+if (args[0] === "exec" && args.includes("--help")) { console.log("--json\\n--cd\\n--sandbox"); process.exit(0); }
+if (args[0] === "exec") { for (let i = 0; i < 10; i += 1) { console.log(JSON.stringify({ type: "item.completed", item: { type: "command_execution", command: "dotnet test" } })); await new Promise((r) => setTimeout(r, 10)); } }
+`, "utf8");
+    chmodSync(cli, 0o755);
+    const adapter = new CodexCliAdapter({
+      executable: process.execPath, baseArgs: [cli], testedVersionRanges: ["0.146.0-alpha.3.1"], requiresCapabilitySmokeTest: false,
+      idleTimeoutMs: 1_000, maximumRuntimeMs: 2_000, maximumRepeatedProgressEvents: 3
+    });
+    const execution = await adapter.startAsync({ ...startRequest("exec-loop", "TASK-LOOP"), worktreePath: root });
+    assert.equal(execution.result.status, "FAILED");
+    assert.match(execution.result.failures[0]?.message ?? "", /loop guard/i);
   });
 });
 

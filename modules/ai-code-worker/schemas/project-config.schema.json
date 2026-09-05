@@ -121,8 +121,25 @@
               "enum": ["none", "low", "medium", "high", "xhigh", "max"]
             },
             "timeoutSeconds": {
+              "description": "Legacy compatibility setting. For providers it is interpreted as an idle watchdog, not a rigid wall-clock task limit. Prefer idleTimeoutSeconds.",
               "type": "integer",
               "minimum": 1
+            },
+            "idleTimeoutSeconds": {
+              "description": "Maximum period without semantic provider progress or a task-worktree mutation.",
+              "type": "integer",
+              "minimum": 10
+            },
+            "maximumRuntimeSeconds": {
+              "description": "High provider circuit breaker. This is a safety ceiling, not the benchmark task budget.",
+              "type": "integer",
+              "minimum": 60
+            },
+            "maximumRepeatedProgressEvents": {
+              "description": "Consecutive identical semantic provider actions before the worker stops a loop.",
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 100
             },
             "maximumOutputBytes": {
               "type": "integer",
@@ -167,8 +184,25 @@
               "type": "boolean"
             },
             "timeoutSeconds": {
+              "description": "Legacy compatibility setting. For providers it is interpreted as an idle watchdog, not a rigid wall-clock task limit. Prefer idleTimeoutSeconds.",
               "type": "integer",
               "minimum": 1
+            },
+            "idleTimeoutSeconds": {
+              "description": "Maximum period without semantic provider progress or a task-worktree mutation.",
+              "type": "integer",
+              "minimum": 10
+            },
+            "maximumRuntimeSeconds": {
+              "description": "High provider circuit breaker. This is a safety ceiling, not the benchmark task budget.",
+              "type": "integer",
+              "minimum": 60
+            },
+            "maximumRepeatedProgressEvents": {
+              "description": "Consecutive identical semantic provider actions before the worker stops a loop.",
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 100
             },
             "maximumOutputBytes": {
               "type": "integer",

@@ -36,11 +36,11 @@ after(() => {
 });
 
 describe("codex run coordinator", () => {
-  it("executes a single-writer codex run through worktree, commit, gates, review, and report", () => {
+  it("executes a single-writer codex run through worktree, commit, gates, review, and report", async () => {
     const repo = createGitRepository();
     const beforeFiles = listRepositoryFiles(repo);
     const cli = fakeCli("0.146.0-alpha.3.1", "src/codex-output.txt");
-    const report = runCodex({
+    const report = await runCodex({
       repositoryPath: repo,
       codexSessionsDir: emptyCodexSessionsDir,
       planPath: "Plan/RUN.md",
@@ -76,7 +76,7 @@ describe("codex run coordinator", () => {
     assert.deepEqual(runReport.taskCommits, report.taskCommits);
   });
 
-  it("honors testedVersionRanges from .ai-code-worker/config.json (previously dead config)", () => {
+  it("honors testedVersionRanges from .ai-code-worker/config.json (previously dead config)", async () => {
     const repo = createGitRepository();
     mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
     writeFileSync(
@@ -86,7 +86,7 @@ describe("codex run coordinator", () => {
     );
     const cli = fakeCli("9.9.9-project-configured", "src/codex-output.txt");
 
-    const report = runCodex({
+    const report = await runCodex({
       repositoryPath: repo,
       codexSessionsDir: emptyCodexSessionsDir,
       planPath: "Plan/RUN.md",
@@ -103,7 +103,7 @@ describe("codex run coordinator", () => {
     assert.equal(report.status, "DONE");
   });
 
-  it("enforce mode binds the exact context digest to the engine prompt and event log", () => {
+  it("enforce mode binds the exact context digest to the engine prompt and event log", async () => {
     const repo = createGitRepository();
     const captureRoot = mkdtempSync(join(tmpdir(), "aicw-context-prompt-"));
     tempRoots.push(captureRoot);
@@ -111,7 +111,7 @@ describe("codex run coordinator", () => {
     const cli = fakeCli("0.146.0-alpha.3.1", "src/codex-output.txt", capturePath);
     const contextPackage = packageFor("run-codex-context", "TASK-01");
 
-    const report = runCodex({
+    const report = await runCodex({
       repositoryPath: repo,
       codexSessionsDir: emptyCodexSessionsDir,
       planPath: "Plan/RUN.md",

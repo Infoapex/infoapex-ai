@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { runCodex } from "../../src/run/codex-run.js";
+import { taskWorktreeBranch, taskWorktreePath } from "../../src/git/worktree.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
 
 // Real-world finding (a consumer project's Orders feature pilot, 2026-08-30): a 10-task
@@ -42,14 +43,14 @@ interface TaskUsagePlan {
 }
 
 describe("usage persistence: a task's own usage survives even when that task fails", () => {
-  it("folds a rate-limited task's partial usage into the run's BLOCKED report instead of discarding it", () => {
+  it("folds a rate-limited task's partial usage into the run's BLOCKED report instead of discarding it", async () => {
     const repo = createTwoTaskRepository("run-usage-drop-on-failure");
     const cli = fakeCodexCli({
       "TASK-01": { outcome: "done", inputTokens: 1000, cachedInputTokens: 500, outputTokens: 200 },
       "TASK-02": { outcome: "rate-limited", inputTokens: 2000, cachedInputTokens: 800, outputTokens: 50 }
     });
 
-    const report = runCodex({
+    const report = await runCodex({
       repositoryPath: repo,
       planPath: "Plan/RUN.md",
       runId: "run-usage-drop-on-failure",
@@ -70,7 +71,7 @@ describe("usage persistence: a task's own usage survives even when that task fai
 });
 
 describe("usage persistence: resuming a run recovers real usage instead of substituting unknown", () => {
-  it("reads an already-finished task's real usage from its evidence.json on resume, not unknownUsage()", () => {
+  it("reads an already-finished task's real usage from its evidence.json on resume, not unknownUsage()", async () => {
     const runId = "run-usage-resume";
     const repo = createTwoTaskRepository("run-usage-resume");
     const firstAttemptCli = fakeCodexCli({
@@ -78,7 +79,7 @@ describe("usage persistence: resuming a run recovers real usage instead of subst
       "TASK-02": { outcome: "done", inputTokens: 2000, cachedInputTokens: 800, outputTokens: 50 }
     });
 
-    const first = runCodex({
+    const first = await runCodex({
       repositoryPath: repo,
       planPath: "Plan/RUN.md",
       runId,
@@ -103,7 +104,7 @@ describe("usage persistence: resuming a run recovers real usage instead of subst
       "TASK-02": { outcome: "done", inputTokens: 3000, cachedInputTokens: 1000, outputTokens: 400 }
     });
 
-    const resumed = runCodex({
+    const resumed = await runCodex({
       repositoryPath: repo,
       planPath: "Plan/RUN.md",
       runId,
@@ -153,8 +154,8 @@ function simulateCrashAfterTaskFinished(
   writeFileSync(eventLogPath, `${events.slice(0, cutIndex + 1).map((event) => JSON.stringify(event)).join("\n")}\n`, "utf8");
 
   const stateRoot = resolveStateRoot({ repoRoot: repo }).path;
-  const branch = `aiw/task/${runId}/${neverStartedTaskId}/attempt-1`;
-  rmSync(join(stateRoot, "worktrees", runId, neverStartedTaskId), { recursive: true, force: true });
+  const branch = taskWorktreeBranch({ runId, taskId: neverStartedTaskId, attempt: 1 });
+  rmSync(taskWorktreePath({ stateRoot, runId, taskId: neverStartedTaskId, attempt: 1 }), { recursive: true, force: true });
   execFileSync("git", ["worktree", "prune"], { cwd: repo });
   execFileSync("git", ["branch", "-D", branch], { cwd: repo, stdio: "ignore" });
 }

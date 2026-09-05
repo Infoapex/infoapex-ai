@@ -12,7 +12,7 @@ import { ClaudeCliAdapter, type ClaudeCliAdapterConfig } from "../engines/claude
 import type { EngineUsage } from "../engines/engine-event.js";
 import { createWorkerCommit } from "../git/commit.js";
 import { currentHead, git } from "../git/diff.js";
-import { createTaskWorktree } from "../git/worktree.js";
+import { createTaskWorktree, taskWorktreePath } from "../git/worktree.js";
 import { buildTaskGraph, getTask, type ManifestTask, type TaskRuntimeState } from "../graph/task-graph.js";
 import { EventLog } from "../persistence/event-log.js";
 import { createRunTelemetry } from "../telemetry/run-telemetry.js";
@@ -95,7 +95,7 @@ export interface ClaudeRunFinding {
   readonly message: string;
 }
 
-export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
+export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunReport> {
   const registry = SchemaRegistry.load();
   const compile = runCompile(options);
 
@@ -111,7 +111,6 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
   const adapter = new ClaudeCliAdapter(
     claudeConfig({
       ...claudeAdapterConfigFromProject(projectConfig),
-      timeoutMs: Number(manifest.budgets.maximumTaskMinutes) * 60_000,
       ...options.adapterConfig
     }),
     registry
@@ -270,7 +269,7 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
     }
 
     const candidates = task.routing?.candidates ?? [{ engine: "claude" as const, model: options.adapterConfig?.defaultModel ?? null }];
-    const taskExecution = executeTaskWithFallback({
+    const taskExecution = await executeTaskWithFallback({
       candidates,
       projectConfig,
       request: {
@@ -509,7 +508,7 @@ export function runClaude(options: ClaudeRunOptions): ClaudeRunReport {
 
   const runEvidencePath = join(compile.state.runRoot, "run-evidence.json");
   const lastTaskId = graph.topologicalOrder.at(-1);
-  const lastTaskRoot = lastTaskId ? join(stateRootFromRunRoot(compile.state.runRoot), "worktrees", compile.runId, lastTaskId, "attempt-1") : compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath;
+  const lastTaskRoot = lastTaskId ? taskWorktreePath({ stateRoot: stateRootFromRunRoot(compile.state.runRoot), runId: compile.runId, taskId: lastTaskId, attempt: 1 }) : compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath;
   const globalGateReport = runGates({
     compile,
     eventLog,
@@ -805,7 +804,10 @@ export function claudeAdapterConfigFromProject(config: ProjectConfig | null): Pa
     ...(source?.allowedTools !== undefined ? { allowedTools: source.allowedTools } : {}),
     ...(source?.bareMode !== undefined ? { bareMode: source.bareMode } : {}),
     ...(source?.dangerouslySkipPermissions !== undefined ? { dangerouslySkipPermissions: source.dangerouslySkipPermissions } : {}),
-    ...(source?.timeoutSeconds !== undefined ? { timeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.timeoutSeconds !== undefined ? { idleTimeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.idleTimeoutSeconds !== undefined ? { idleTimeoutMs: source.idleTimeoutSeconds * 1000 } : {}),
+    ...(source?.maximumRuntimeSeconds !== undefined ? { maximumRuntimeMs: source.maximumRuntimeSeconds * 1000 } : {}),
+    ...(source?.maximumRepeatedProgressEvents !== undefined ? { maximumRepeatedProgressEvents: source.maximumRepeatedProgressEvents } : {}),
     ...(source?.maximumOutputBytes !== undefined ? { maximumOutputBytes: source.maximumOutputBytes } : {}),
     ...(source?.testedVersionRanges !== undefined ? { testedVersionRanges: source.testedVersionRanges } : {})
   };

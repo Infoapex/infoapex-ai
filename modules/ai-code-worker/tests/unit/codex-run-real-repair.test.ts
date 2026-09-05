@@ -142,14 +142,14 @@ ${JSON.stringify(
 }
 
 describe("codex run coordinator - real engine repair (todo.md #13, real-engine slice)", () => {
-  it("dispatches a real (fake-CLI) Codex repair attempt that writes the missing file, and verify decides DONE for real", () => {
+  it("dispatches a real (fake-CLI) Codex repair attempt that writes the missing file, and verify decides DONE for real", async () => {
     const repo = createReviewFailingRepository();
     const stateRoot = resolveStateRoot({ repoRoot: repo }).path;
     const runId = "run-codex-real-repair-pass";
     const taskCli = fakeCli("0.146.0-alpha.3.1", "src/original-output.txt");
     const repairCli = fakeCli("0.146.0-alpha.3.1", "target.txt");
 
-    const report = runCodex({
+    const report = await runCodex({
       repositoryPath: repo,
       planPath: "Plan/RUN.md",
       runId,

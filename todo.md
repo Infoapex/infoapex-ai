@@ -33,9 +33,17 @@ registru; nu se mareste timeout-ul si nu se porneste automat un alt provider.
 8. **Canary bounded:** ruleaza mai intai fake end-to-end, apoi maximum o observatie
    reala pentru `full-icm` si una pentru `candidate`. Evidence trebuie sa includa
    envelope JSON, finding redacted, diff, gate si usage. La prima anomalie se opreste.
-9. **Izolare si cai:** workspace-ul trebuie sa excluda `.git`, `node_modules`,
-   `.next`, `bin`, `obj` si cache-uri generate; verifica lungimea caii worktree si
-   faptul ca worktree-ul poate fi creat si curatat.
+9. **Izolare si cai:** workspace-ul trebuie sa excluda `.git`, `.infoapex-ai`,
+   `.ai-code-control`, `node_modules`, `.next`, `bin`, `obj` si cache-uri generate;
+   verifica lungimea caii worktree, branch ref-ul derivat si faptul ca worktree-ul
+   poate fi creat, testat si curatat pe Windows.
+10. **Environment toolchain:** root adapter-ul si quality gate-ul trebuie sa
+   pastreze allowlist-ul de runtime Windows (`ProgramData`, `PUBLIC`,
+   `ProgramFiles`, `CommonProgramFiles` si echivalentele lor), pe langa HOME si
+   NuGet. Nu se forwardeaza secrete sau variabile arbitrare.
+11. **Watchdog provider:** se folosesc trei limite distincte: idle progress,
+   runtime maxim si repetare semantica de actiuni. Nu se foloseste un plafon fix
+   de 120 s ca substitut pentru detectarea unui loop.
 10. **Autorizare P5:** numai dupa canary PASS se semneaza autorizarea pentru matricea
     completa. Claude, candidate capability si orice backend remote au autorizari
     separate; nu se reutilizeaza un hash de experiment vechi.
@@ -103,6 +111,44 @@ registru; nu se mareste timeout-ul si nu se porneste automat un alt provider.
   care are oracle-ul satisfacut inainte de agent. Rezolvare necesara: fiecare
   task nou trebuie sa demonstreze tranzitia evaluator-owned `baseline FAIL ->
   solution PASS`; se ingheata suite, hash si autorizare noi inainte de P5.
+- **INT-19 Git ref path prea lung:** ramurile de worktree construite din ID-uri
+  de run/task au depasit limita Windows pentru ref-uri. Rezolvare: nume de
+  branch deterministe, segmentate si hash-uite; ID-urile complete raman numai in
+  evidence, nu in cale.
+- **INT-20 Stare Infoapex copiata in benchmark:** `.infoapex-ai` generat a ajuns
+  in safe-copy si a marit arbitrar calea/volumul providerului. Rezolvare:
+  safe-copy si diff inventory exclud explicit state-ul Infoapex.
+- **INT-21 Long paths nu erau activate in worktree:** repository-ul consumator
+  poate contine deja cai lungi, iar `git worktree add` esua fara configurare
+  locala. Rezolvare: worker-ul seteaza numai in repository `core.longpaths=true`
+  inainte de crearea worktree-ului.
+- **INT-22 Testhost .NET are o limita proprie de cale:** chiar cu Git long paths,
+  testhost-ul .NET nu poate lansa unele executabile dintr-un worktree adanc.
+  Rezolvare: radacini de worktree compacte, hash-uite, sub stateRoot extern.
+- **INT-23 Loop guard fals pozitiv:** watchdog-ul numara atat `item.started`, cat
+  si `item.completed` pentru aceeasi comanda Codex, clasificand progres normal ca
+  loop. Rezolvare: numai actiunile terminale `item.completed` contribuie la
+  limita de repetare; exista test negativ de regresie.
+- **INT-24 Environment root -> worker incomplet:** allowlist-ul de la root
+  elimina directoare Windows de care NuGet are nevoie (`ProgramData` si familia
+  ProgramFiles), astfel gate-ul esua doar in procesul izolat. Rezolvare:
+  aceeasi allowlist minima, fara secrete, este aplicata la root adapter si
+  quality gate; testele acopera forwarding-ul Windows.
+- **INT-25 Artefacte harness interpretate ca schimbari de produs:** indexurile
+  SQLite `.ai-code-control/db/*.sqlite` au intrat in diff si au blocat scope-ul,
+  desi nu erau scrise de task. Rezolvare: `.ai-code-control` este exclus atat din
+  safe-copy, cat si din captura evaluatorului; testul confirma ca un diff cu
+  numai indexuri de control este gol.
+- **INT-26 Raport fara metrici persistate:** runner-ul consumer raporta doar
+  telemetria terminala, omitand `eligibleTraceCoverage` si leakage-ul capturate
+  in `execution.json`. Rezolvare: raportul consuma metricile persistate ale
+  observatiei, nu o copie partiala a terminalului.
+- **INT-27 Canary R9 validat:** experimentul
+  `e876c799f39a82c705e59cf89477280461628b5e3c701b18d5cf703027fb2d12` a executat
+  `full-icm` si `candidate` pe EuroCarScan. Ambele sunt PASS la gate, oracle si
+  scope; candidate are trace coverage 1 si leakage 0. Raportul este
+  INCONCLUSIVE numai fiindca aceasta este o pereche de canary fara ipoteza de
+  eficacitate, nu un reject tehnic.
 
 ## Regula de inchidere pentru onboarding
 

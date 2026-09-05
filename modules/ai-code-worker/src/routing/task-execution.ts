@@ -31,16 +31,19 @@ export interface RoutedTaskExecution {
 export interface RoutedAdapter {
   readonly doctor: () => { readonly status: "PASS" | "BLOCKED"; readonly findings: readonly { readonly message: string }[] };
   readonly start: (request: TaskExecutionRequest) => RoutedExecution;
+  /** Provider adapters implement this so P5 can enforce progress watchdogs without
+   * blocking Node's event loop. The synchronous member is retained for repair APIs. */
+  readonly startAsync?: (request: TaskExecutionRequest) => Promise<RoutedExecution>;
 }
 
-export function executeTaskWithFallback(input: {
+export async function executeTaskWithFallback(input: {
   readonly candidates: readonly RoutingCandidate[];
   readonly projectConfig: ProjectConfig | null;
   readonly request: TaskExecutionRequest;
   readonly codexOverrides?: Partial<CodexCliAdapterConfig>;
   readonly claudeOverrides?: Partial<ClaudeCliAdapterConfig>;
   readonly adapterFactory?: (candidate: RoutingCandidate) => RoutedAdapter;
-}): RoutedTaskExecution {
+}): Promise<RoutedTaskExecution> {
   const attempts: TaskExecutionAttempt[] = [];
 
   for (let index = 0; index < input.candidates.length; index += 1) {
@@ -54,11 +57,14 @@ export function executeTaskWithFallback(input: {
       continue;
     }
 
-    const execution = adapter.start({
+    const attemptRequest = {
       ...input.request,
       executionId: `${input.request.executionId}-candidate-${index + 1}`,
       sessionId: `${input.request.sessionId}-candidate-${index + 1}`
-    });
+    };
+    const execution = adapter.startAsync
+      ? await adapter.startAsync(attemptRequest)
+      : adapter.start(attemptRequest);
     const availabilityFailure = isAvailabilityFailure(execution);
     const attempt = { candidate, execution, availabilityFailure };
     attempts.push(attempt);
@@ -107,7 +113,10 @@ function codexProjectConfig(config: ProjectConfig | null): Partial<CodexCliAdapt
     ...(source?.executable !== undefined ? { executable: source.executable } : {}),
     ...(source?.sandboxMode !== undefined ? { sandboxMode: source.sandboxMode } : {}),
     ...(source?.testedVersionRanges !== undefined ? { testedVersionRanges: source.testedVersionRanges } : {}),
-    ...(source?.timeoutSeconds !== undefined ? { timeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.timeoutSeconds !== undefined ? { idleTimeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.idleTimeoutSeconds !== undefined ? { idleTimeoutMs: source.idleTimeoutSeconds * 1000 } : {}),
+    ...(source?.maximumRuntimeSeconds !== undefined ? { maximumRuntimeMs: source.maximumRuntimeSeconds * 1000 } : {}),
+    ...(source?.maximumRepeatedProgressEvents !== undefined ? { maximumRepeatedProgressEvents: source.maximumRepeatedProgressEvents } : {}),
     ...(source?.maximumOutputBytes !== undefined ? { maximumOutputBytes: source.maximumOutputBytes } : {})
   };
 }
@@ -121,7 +130,10 @@ function claudeProjectConfig(config: ProjectConfig | null): Partial<ClaudeCliAda
     ...(source?.bareMode !== undefined ? { bareMode: source.bareMode } : {}),
     ...(source?.dangerouslySkipPermissions !== undefined ? { dangerouslySkipPermissions: source.dangerouslySkipPermissions } : {}),
     ...(source?.testedVersionRanges !== undefined ? { testedVersionRanges: source.testedVersionRanges } : {}),
-    ...(source?.timeoutSeconds !== undefined ? { timeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.timeoutSeconds !== undefined ? { idleTimeoutMs: source.timeoutSeconds * 1000 } : {}),
+    ...(source?.idleTimeoutSeconds !== undefined ? { idleTimeoutMs: source.idleTimeoutSeconds * 1000 } : {}),
+    ...(source?.maximumRuntimeSeconds !== undefined ? { maximumRuntimeMs: source.maximumRuntimeSeconds * 1000 } : {}),
+    ...(source?.maximumRepeatedProgressEvents !== undefined ? { maximumRepeatedProgressEvents: source.maximumRepeatedProgressEvents } : {}),
     ...(source?.maximumOutputBytes !== undefined ? { maximumOutputBytes: source.maximumOutputBytes } : {})
   };
 }

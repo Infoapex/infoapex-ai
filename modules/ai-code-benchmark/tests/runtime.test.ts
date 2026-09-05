@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { sha256CanonicalJson } from "../src/canonical-json.js";
 import { ExecutionTimeoutError, scheduleBounded, withTimeout } from "../src/execution/scheduler.js";
-import { cleanupWorkspace, prepareWorkspace, preserveWorkspaceForEvaluation, renameWorkspaceWithRetry } from "../src/isolation/workspace.js";
+import { captureWorkspaceDiff, cleanupWorkspace, prepareWorkspace, preserveWorkspaceForEvaluation, renameWorkspaceWithRetry } from "../src/isolation/workspace.js";
 import { readEvents } from "../src/persistence/store.js";
 import { createObservationMatrix, resumeExperiment, runExperiment, type ObservationExecutor } from "../src/runtime/index.js";
 
@@ -215,6 +215,39 @@ test("path escapes, source symlinks, and forged cleanup records fail closed", as
     assert.throws(() => cleanupWorkspace(workspaces, forged, "obs-forged", "d".repeat(64)), /unexpected canonical path/);
     assert.equal(existsSync(join(paths.repository, "baseline.txt")), true);
     cleanupWorkspace(workspaces, join(records, "obs-safe.json"), "obs-safe", "d".repeat(64));
+  } finally { rmSync(paths.root, { recursive: true, force: true }); }
+});
+
+test("safe-copy excludes generated Infoapex state before a provider worktree is created", () => {
+  const paths = fixture();
+  try {
+    const generated = join(paths.repository, ".infoapex-ai", "runs", "deep");
+    mkdirSync(generated, { recursive: true });
+    writeFileSync(join(generated, "generated-evidence.json"), "private generated state\n");
+    const workspaces = join(paths.state, "workspace-generated-test");
+    const records = join(paths.state, "records-generated-test");
+    mkdirSync(workspaces); mkdirSync(records);
+
+    prepareWorkspace(paths.repository, workspaces, records, "obs-generated", "e".repeat(64));
+
+    assert.equal(existsSync(join(workspaces, "obs-generated", ".infoapex-ai")), false);
+    assert.equal(readFileSync(join(workspaces, "obs-generated", "baseline.txt"), "utf8"), "clean\n");
+  } finally { rmSync(paths.root, { recursive: true, force: true }); }
+});
+
+test("workspace diffs exclude harness-owned ai-code-control indexes", () => {
+  const paths = fixture();
+  try {
+    const workspaces = join(paths.state, "workspace-control-test");
+    const records = join(paths.state, "records-control-test");
+    prepareWorkspace(paths.repository, workspaces, records, "obs-control", "f".repeat(64));
+    const workspace = join(workspaces, "obs-control");
+    const db = join(workspace, ".ai-code-control", "db");
+    mkdirSync(db, { recursive: true });
+    writeFileSync(join(db, "memory.sqlite"), "harness-owned\n");
+    const diff = captureWorkspaceDiff(paths.repository, workspace);
+    assert.equal(diff.valid, true);
+    assert.deepEqual(diff.changedPaths, []);
   } finally { rmSync(paths.root, { recursive: true, force: true }); }
 });
 
