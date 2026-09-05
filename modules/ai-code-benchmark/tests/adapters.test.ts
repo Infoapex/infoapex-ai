@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { DirectClaudeAdapter, DirectCodexAdapter, FakeAdapter, InfoapexRootAdapter } from "../src/adapters/index.js";
-import { collectCandidateTelemetry } from "../src/adapters/infoapex-root.js";
+import { collectCandidateTelemetry, parseInfoapexFailure } from "../src/adapters/infoapex-root.js";
 import { safeEnvironment } from "../src/adapters/subprocess.js";
 import type { AdapterRequest } from "../src/types.js";
 
@@ -51,7 +51,7 @@ if (mode === "large") { console.log("x".repeat(10000)); process.exit(0); }
 if (mode === "malformed") { console.log("not JSON"); process.exit(0); }
 if (role === "codex" && args[0] === "exec") console.log(JSON.stringify({ type: "completed", model: "codex-fake", usage: { input_tokens: 10, cache_read_input_tokens: 20, cache_creation_input_tokens: 3, output_tokens: 5 }, total_cost_usd: 0.02 }));
 else if (role === "claude" && args[0] === "-p") console.log(JSON.stringify({ result: "done", model: "claude-fake", usage: { input_tokens: 11, cache_read_input_tokens: 21, cache_creation_input_tokens: 4, output_tokens: 6 }, total_cost_usd: 0.03 }));
-else if (role === "infoapex" && args[0] === "run") console.log(JSON.stringify({ schemaVersion: "1.0", status: "DONE", body: { model: "infoapex-fake", usage: { input_tokens: 12, cache_read_input_tokens: 22, cache_creation_input_tokens: 5, output_tokens: 7, total_cost_usd: 0.04 } } }));
+else if (role === "infoapex" && args[0] === "run" && args.includes("--json")) console.log(JSON.stringify({ schemaVersion: "1.0", status: "DONE", body: { model: "infoapex-fake", usage: { input_tokens: 12, cache_read_input_tokens: 22, cache_creation_input_tokens: 5, output_tokens: 7, total_cost_usd: 0.04 } } }));
 else process.exit(2);
 `;
   writeFileSync(path, source, "utf8");
@@ -111,6 +111,15 @@ test("Infoapex root fake CLI E2E accepts only explicit public B/C/D configuratio
   const promptLoss = await adapter.execute(request({ arm: "full-icm", provider: "fake", orchestrationPlanPath: taskIdOnly, armConfiguration: { contextProvider: "ai-code-control", contextPackageMode: "enforce" } }));
   assert.equal(promptLoss.status, "UNSUPPORTED");
   assert.match(promptLoss.message, /exact frozen generic task prompt/);
+});
+
+test("Infoapex root failure diagnostics keep only a bounded redacted public finding", () => {
+  const output = JSON.stringify({
+    status: "BLOCKED",
+    findings: [{ severity: "blocker", code: "CONTEXT_PACKAGE_ENFORCEMENT_FAILED", message: "token=sk-test-secret at C:\\Users\\operator\\private.txt" }]
+  });
+  assert.equal(parseInfoapexFailure(output), "CONTEXT_PACKAGE_ENFORCEMENT_FAILED: token=[REDACTED] at [PATH_REDACTED]");
+  assert.equal(parseInfoapexFailure("not-json"), null);
 });
 
 test("Infoapex root materializes public worker commits into the evaluator workspace", async () => {

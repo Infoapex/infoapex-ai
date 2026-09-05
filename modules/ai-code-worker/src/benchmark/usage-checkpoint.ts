@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { SchemaRegistry } from "../schema/json-schema.js";
 import { resolveStateRoot } from "../state/state-root.js";
+import { loadProjectConfig } from "../config/project-config.js";
 
 export type UsageCheckpointEngine = "fake" | "claude" | "codex";
 export type UsageCheckpointScope = "run" | "task" | "development";
@@ -182,7 +183,10 @@ export class UsageCheckpointLog {
  *  (same base as `runs/`), not inside a single run's directory - the estimator needs
  *  to see checkpoints from prior runs, not just the current one. */
 export function resolveUsageCheckpointLogPath(repositoryPath: string): string {
-  const stateRoot = resolveStateRoot({ repoRoot: repositoryPath });
+  const stateRoot = resolveStateRoot({
+    repoRoot: repositoryPath,
+    configuredStateRoot: loadProjectConfig(repositoryPath)?.stateRoot ?? null
+  });
   return join(stateRoot.path, "benchmarks", "usage-checkpoints.jsonl");
 }
 

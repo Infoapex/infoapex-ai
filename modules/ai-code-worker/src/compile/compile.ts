@@ -11,6 +11,7 @@ import { isPathInside, resolveStateRoot } from "../state/state-root.js";
 import { parsePlanMarkdown } from "./plan-parser.js";
 import { resolveRoutingProfile } from "../routing/routing-policy.js";
 import { validateManifestTraceability, type TraceableManifestTask } from "../manifest/traceability.js";
+import { loadProjectConfig } from "../config/project-config.js";
 
 export interface CompileOptions {
   readonly repositoryPath: string;
@@ -141,7 +142,15 @@ export function runCompile(options: CompileOptions): CompileReport {
     issuedAt: now,
     registry
   });
-  const stateRoot = resolveStateRoot({ repoRoot: repository.worktreeRoot });
+  // The project config is part of the public worker contract.  Compile must use
+  // its external stateRoot consistently with doctor/status; otherwise a consumer
+  // can authorize one state location and the runtime silently writes to the
+  // platform default, breaking isolation, resume and evidence discovery.
+  const projectConfig = loadProjectConfig(repository.worktreeRoot);
+  const stateRoot = resolveStateRoot({
+    repoRoot: repository.worktreeRoot,
+    configuredStateRoot: projectConfig?.stateRoot ?? null
+  });
   const runRoot = join(stateRoot.path, "runs", runId);
   const manifestPath = join(runRoot, "manifest.json");
   const authorizationPath = join(runRoot, "authorization.json");

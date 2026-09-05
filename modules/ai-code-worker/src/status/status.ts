@@ -4,6 +4,7 @@ import { EventLog } from "../persistence/event-log.js";
 import { evaluateLease, type LeaseStatus } from "../persistence/lease.js";
 import { replayRun, type RunReplay } from "../persistence/replay.js";
 import { resolveStateRoot } from "../state/state-root.js";
+import { loadProjectConfig } from "../config/project-config.js";
 
 export interface StatusOptions {
   readonly repositoryPath: string;
@@ -37,7 +38,11 @@ export function runStatus(options: StatusOptions): StatusReport {
     return blockedStatus(options.runId, "GIT_PREFLIGHT_FAILED", repository.reason);
   }
 
-  const stateRoot = resolveStateRoot({ repoRoot: repository.worktreeRoot });
+  const projectConfig = loadProjectConfig(repository.worktreeRoot);
+  const stateRoot = resolveStateRoot({
+    repoRoot: repository.worktreeRoot,
+    configuredStateRoot: projectConfig?.stateRoot ?? null
+  });
   const runRoot = join(stateRoot.path, "runs", options.runId);
   const eventLog = new EventLog(join(runRoot, "events.jsonl"));
   const readResult = eventLog.read();

@@ -5,6 +5,7 @@ import { join, relative, resolve, sep } from "node:path";
 import type { AdapterDoctorReport, AdapterRequest, AdapterResult, BenchmarkAdapter, CandidateTelemetryEvidence } from "../types.js";
 import { ADAPTER_VERSION, normalizedResult, probeCommand, unsupportedResult } from "./common.js";
 import { INFOAPEX_PARSER_VERSION, parseInfoapexOutput } from "./parse.js";
+import { redactSecrets } from "../metrics.js";
 import { runBoundedProcess } from "./subprocess.js";
 import { assertContained, canonicalPath, containedPath } from "../security/paths.js";
 
@@ -25,14 +26,21 @@ export class InfoapexRootAdapter implements BenchmarkAdapter {
     const doctor = await this.doctor();
     if (doctor.status !== "PASS") return unsupportedResult({ id: this.id, parserVersion: INFOAPEX_PARSER_VERSION, request, executable: this.command[0], executableVersion: doctor.executableVersion, message: doctor.message });
     const process = await runBoundedProcess({
-      command: [...this.command, "run", "--repo", request.repositoryPath, "--plan", request.orchestrationPlanPath, "--engine", request.provider],
+      // The public worker CLI only guarantees a machine-readable envelope when
+      // `--json` is supplied. Without it a successful run prints human-oriented
+      // progress lines, which the benchmark parser correctly rejects as malformed
+      // output; a blocked run then collapses to the unhelpful generic exit-code
+      // message. Keep the root→worker contract explicit and deterministic.
+      command: [...this.command, "run", "--repo", request.repositoryPath, "--plan", request.orchestrationPlanPath, "--engine", request.provider, "--json"],
       cwd: request.repositoryPath,
       timeoutMs: request.limits.timeoutMs,
       maximumOutputBytes: request.limits.maximumOutputBytes,
       environmentNames: request.environmentAllowlist
     });
     const normalized = normalizedResult({ id: this.id, parserVersion: INFOAPEX_PARSER_VERSION, request, executable: this.command[0]!, executableVersion: doctor.executableVersion, process, parsed: parseInfoapexOutput(process.stdout) });
-    if (normalized.status !== "DONE") return normalized;
+    const failure = normalized.status !== "DONE" ? parseInfoapexFailure(process.stdout) : null;
+    const diagnosed = failure === null ? normalized : { ...normalized, message: `Infoapex worker reported ${failure}.` };
+    if (diagnosed.status !== "DONE") return diagnosed;
 
     const candidateTelemetry = collectCandidateTelemetry(process.stdout, request);
     const materialization = await materializeWorkerCommits(process.stdout, request);
@@ -41,6 +49,25 @@ export class InfoapexRootAdapter implements BenchmarkAdapter {
       ? { ...normalized, ...(candidateTelemetry ? { candidateTelemetry } : {}) }
       : { ...normalized, message: `Adapter process completed and materialized ${materialization.count} worker commit(s) into the evaluator workspace.`, ...(candidateTelemetry ? { candidateTelemetry } : {}) };
   }
+}
+
+/** Extract only a bounded, redacted public finding from the root JSON envelope.
+ * Raw stdout/stderr never crosses the adapter boundary. */
+export function parseInfoapexFailure(output: string): string | null {
+  let value: unknown;
+  try { value = JSON.parse(output); } catch { return null; }
+  if (!record(value)) return null;
+  const body = record(value.body) ? value.body : value;
+  const findings = Array.isArray(body.findings) ? body.findings : [];
+  const finding = findings.find(record);
+  if (!finding) return null;
+  const code = typeof finding.code === "string" && /^[A-Z0-9_\-]{3,80}$/u.test(finding.code) ? finding.code : null;
+  const rawMessage = typeof finding.message === "string" ? finding.message : null;
+  if (code === null && rawMessage === null) return null;
+  const safeMessage = rawMessage === null ? null : redactSecrets(rawMessage)
+    .replace(/(?:[A-Za-z]:\\|\\\\|\/)(?:[^\s"']+\/)*[^\s"']+/gu, "[PATH_REDACTED]")
+    .slice(0, 400);
+  return [code, safeMessage].filter((part): part is string => part !== null && part.length > 0).join(": ");
 }
 
 const ALLOWED_SPAN_ATTRIBUTES = new Set([

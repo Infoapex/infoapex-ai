@@ -59,6 +59,26 @@ describe("compile command", () => {
     assert.equal(status.run.status, "AUTHORIZED");
   });
 
+  it("uses the repository's configured external stateRoot for compile and status", () => {
+    const repo = createGitRepository();
+    const configuredRoot = mkdtempSync(join(tmpdir(), "aicw-configured-state-"));
+    stateRoots.push(configuredRoot);
+    mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
+    writeFileSync(join(repo, ".ai-code-worker", "config.json"), JSON.stringify({ stateRoot: configuredRoot }, null, 2), "utf8");
+    execFileSync("git", ["add", ".ai-code-worker/config.json"], { cwd: repo, stdio: "ignore" });
+    execFileSync("git", ["-c", "user.name=ai-code-worker", "-c", "user.email=worker@example.test", "commit", "-m", "worker config"], { cwd: repo, stdio: "ignore" });
+    writePlan(repo, "Plan/CONFIGURED-STATE.md", "accepted");
+    execFileSync("git", ["add", "Plan/CONFIGURED-STATE.md"], { cwd: repo, stdio: "ignore" });
+    execFileSync("git", ["-c", "user.name=ai-code-worker", "-c", "user.email=worker@example.test", "commit", "-m", "accepted plan"], { cwd: repo, stdio: "ignore" });
+
+    const report = runCompile({ repositoryPath: repo, planPath: "Plan/CONFIGURED-STATE.md", runId: "run-configured-state", now: "2026-08-01T10:00:00Z" });
+    assert.equal(report.status, "PASS");
+    assert.equal(report.state.runRoot, join(configuredRoot, "runs", "run-configured-state"));
+    const status = runStatus({ repositoryPath: repo, runId: "run-configured-state", now: "2026-08-01T10:01:00Z" });
+    assert.equal(status.run.status, "AUTHORIZED");
+    assert.equal(status.eventLog.path, join(configuredRoot, "runs", "run-configured-state", "events.jsonl"));
+  });
+
   it("blocks proposed plans before writing run state", () => {
     const repo = createGitRepository();
     writePlan(repo, "Plan/PROPOSED.md", "proposed");
