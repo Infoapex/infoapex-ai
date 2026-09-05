@@ -84,7 +84,9 @@ console.log(JSON.stringify({ status: report.verdict, runtime, evaluated: { count
 
 function requestFor({ observation, workspacePath, task, arm, provider }) {
   const prompt = String(task.prompt);
-  const base = { arm, repositoryPath: workspacePath, taskId: String(task.id), seed: Number(observation.seed), prompt, provider, model: arm === "direct" ? String(experiment.arms.find((item) => item.id === arm)?.model ?? null) : "gpt-5.6-luna", effort: "medium", permissions: { sandbox: "workspace-write", mode: "dontAsk", allowedTools: [] }, limits: { timeoutMs: Number(task.limits.timeoutSeconds) * 1000, maximumOutputBytes: Number(task.limits.maximumOutputBytes) }, environmentAllowlist: arm === "candidate" ? ["INFOAPEX_OTEL_ENABLED"] : [] };
+  const armSpec = experiment.arms.find((item) => String(item.id) === arm);
+  if (!armSpec) throw new Error(`Consumer experiment does not define arm ${arm}.`);
+  const base = { arm, repositoryPath: workspacePath, taskId: String(task.id), seed: Number(observation.seed), prompt, provider, model: String(armSpec.model ?? ""), effort: String(armSpec.effort ?? ""), permissions: { sandbox: "workspace-write", mode: "dontAsk", allowedTools: [] }, limits: { timeoutMs: Number(task.limits.timeoutSeconds) * 1000, maximumOutputBytes: Number(task.limits.maximumOutputBytes) }, environmentAllowlist: arm === "candidate" ? ["INFOAPEX_OTEL_ENABLED"] : [] };
   if (arm === "direct") return base;
   return { ...base, provider: "codex", orchestrationPlanPath: scaffoldingPlan(workspacePath, task), armConfiguration: { contextProvider: "ai-code-control", contextPackageMode: "enforce", ...(arm === "candidate" ? { candidateCapability: "opentelemetry-redacted-v1" } : {}) } };
 }
@@ -92,8 +94,10 @@ function prepareWorkspace(workspace, observation, task, arm) {
   const oldGitignore = existsSync(join(workspace, ".gitignore")) ? readFileSync(join(workspace, ".gitignore"), "utf8") : null;
   const plan = arm === "direct" ? null : scaffoldingPlan(workspace, task);
   if (arm !== "direct") {
+    const armSpec = experiment.arms.find((item) => String(item.id) === arm);
+    if (!armSpec) throw new Error(`Consumer experiment does not define arm ${arm}.`);
     const worker = join(workspace, ".ai-code-worker"); mkdirSync(worker, { recursive: true });
-    writeFileSync(join(worker, "config.json"), JSON.stringify({ schemaVersion: "1.0", defaultEngine: "codex", contextProvider: "ai-code-control", contextPackage: { mode: "enforce", maximumTokens: 12000 }, stateRoot: join(workspace, "..", "worker-state", String(observation.id)), maximumParallelWriters: 1, maximumRepairCycles: 0, maximumRunMinutes: 3, executionEnvironment: { defaultProfile: "isolated", allowTrustedLocal: false }, syncRootPolicy: { sequentialWriter: "warn", parallelWriters: "block" }, adapters: { codex: { executable: codexCommand[0], baseArgs: codexCommand.slice(1), model: "gpt-5.6-luna", reasoningEffort: "medium", sandboxMode: "workspace-write", timeoutSeconds: 120, maximumOutputBytes: 65536 }, aiCodeControl: { executable: controlCommand[0], baseArgs: controlCommand.slice(1), timeoutSeconds: 30, maximumOutputBytes: 1000000 } } }, null, 2) + "\n", "utf8");
+    writeFileSync(join(worker, "config.json"), JSON.stringify({ schemaVersion: "1.0", defaultEngine: "codex", contextProvider: "ai-code-control", contextPackage: { mode: "enforce", maximumTokens: 12000 }, stateRoot: join(workspace, "..", "worker-state", String(observation.id)), maximumParallelWriters: 1, maximumRepairCycles: 0, maximumRunMinutes: 3, executionEnvironment: { defaultProfile: "isolated", allowTrustedLocal: false }, syncRootPolicy: { sequentialWriter: "warn", parallelWriters: "block" }, adapters: { codex: { executable: codexCommand[0], baseArgs: codexCommand.slice(1), model: String(armSpec.model ?? ""), reasoningEffort: String(armSpec.effort ?? ""), sandboxMode: "workspace-write", timeoutSeconds: 120, maximumOutputBytes: 65536 }, aiCodeControl: { executable: controlCommand[0], baseArgs: controlCommand.slice(1), timeoutSeconds: 30, maximumOutputBytes: 1000000 } } }, null, 2) + "\n", "utf8");
     writeFileSync(join(workspace, ".gitignore"), ".ai-code-control/\n", "utf8");
     if (arm === "full-icm" || arm === "candidate") execFileSync(controlCommand[0], [...controlCommand.slice(1), "init", "--repo", workspace], { cwd: workspace, stdio: "ignore", windowsHide: true });
   }
