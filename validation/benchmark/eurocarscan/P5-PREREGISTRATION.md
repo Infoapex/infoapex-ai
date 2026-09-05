@@ -19,3 +19,13 @@ rerun and stopped when the full-ICM/candidate adapters exited with code 2 and th
 direct arm produced generated Python cache artifacts outside task scope. The
 remaining matrix must not be run until the worker adapter and cache isolation are
 corrected in a new experiment revision.
+
+## Superseded by the 2026-09-05 stack migration
+
+The referenced `7c84e5a` revision is the historical Python foundation and is no
+longer the active consumer baseline. EuroCarScan now uses the approved split
+architecture: ASP.NET Core/C# API, Python-only ML boundary, and React/Next.js/
+TypeScript frontend (current revision `5689fb3`). This preregistration remains
+immutable evidence of the stopped Python canary; it must not be rerun against the
+new tree. A separate C#-architecture suite, contract, hypothesis and experiment
+authorization are required before P5 can resume.
