@@ -41,6 +41,20 @@ describe("quality gate runner", () => {
     assert.equal(result.failureClass, null);
   });
 
+  it("keeps standard toolchain profile/cache paths while dropping arbitrary host variables", async () => {
+    const result = await runQualityGate({
+      id: "toolchain-profile",
+      executable: process.execPath,
+      args: ["-e", "process.exit((process.env.HOME || process.env.USERPROFILE) && !process.env.AICW_RANDOM_SECRET ? 0 : 1)"],
+      cwd: process.cwd(),
+      timeoutMs: 5000,
+      maximumOutputBytes: 1024
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.failureClass, null);
+  });
+
   it("classifies non-zero exits as deterministic failures", async () => {
     const result = await runQualityGate({
       id: "node-fail",

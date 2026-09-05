@@ -58,6 +58,11 @@ Defectul rămas este diagnosticarea și stabilizarea contractului root → worke
 - Observatia 2 (`candidate`, `api-not-found`) a depasit timeout-ul providerului de 120 s; nu s-a obtinut envelope, diff sau usage comparabil.
 - Rularea a fost oprita dupa doua observatii. Claude si restul matricei nu au fost lansate.
 - Verdictul ramane `REJECT`; rezultatul nu autorizeaza comparatia P5 si cere experiment/autorizare noi dupa stabilizare.
+- Investigatia gate-ului a identificat si `INT-14`: environment scrub-ul workerului
+  pastra doar PATH/SystemRoot, insuficient pentru restore dotnet/NuGet. Workerul
+  permite acum doar caile standard de profil/cache (HOME, USERPROFILE,
+  LOCALAPPDATA, APPDATA, TEMP/TMP, DOTNET_ROOT, NUGET_PACKAGES), fara variabile
+  arbitrare sau secrete; testul de regresie este verde.
 
 ## Politica de interpretare
 

@@ -155,7 +155,15 @@ function runtimeEnvironment(explicit: Readonly<Record<string, string>> | undefin
   const runtime: Record<string, string> = {};
   const host = process.env;
 
-  for (const name of ["PATH", "Path", "PATHEXT", "SystemRoot", "ComSpec"]) {
+  // Toolchains such as dotnet/NuGet need the user's cache/profile locations
+  // during restore. These are runtime paths, not credentials; keep the
+  // allowlist explicit and continue to drop arbitrary variables (API keys,
+  // tokens and provider configuration never cross the gate boundary).
+  for (const name of [
+    "PATH", "Path", "PATHEXT", "SystemRoot", "ComSpec",
+    "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "APPDATA",
+    "TEMP", "TMP", "DOTNET_ROOT", "NUGET_PACKAGES"
+  ]) {
     const value = host[name];
     if (value !== undefined) {
       runtime[name] = value;

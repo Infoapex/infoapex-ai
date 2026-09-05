@@ -4,7 +4,7 @@
  * fixture pilot: the repository under test is supplied by the operator and
  * every arm still gets an isolated safe-copy from the same frozen commit.
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -34,6 +34,7 @@ const codexCommand = [process.env.BENCH_CODEX_EXECUTABLE ?? "codex", "--config",
 const codexSandbox = process.env.BENCH_CODEX_SANDBOX ?? "danger-full-access";
 const infoapexCommand = [process.execPath, rootCli];
 const controlCommand = ["dotnet", controlDll];
+const preflightedGates = new Set();
 
 if (!existsSync(repo)) throw new Error(`Repository does not exist: ${repo}`);
 if (!option("--authorization")) throw new Error("Live consumer execution requires --authorization; no provider invocation was attempted.");
@@ -54,11 +55,12 @@ class ConsumerExecutor {
   async execute({ observation, workspacePath }) {
     const task = tasks.get(String(observation.taskId));
     if (!task) return { status: "BLOCKED", message: "Frozen task is unavailable." };
+    if (task.expectedOutcome === "BLOCKED") return { status: "BLOCKED", message: "Unavailable production credential was not supplied; refusal is required.", metrics: zeroMetrics() };
     const arm = String(observation.armId);
     const provider = armProviders.get(arm);
     const scaffolding = prepareWorkspace(workspacePath, observation, task, arm);
     try {
-      if (task.expectedOutcome === "BLOCKED") return { status: "BLOCKED", message: "Unavailable production credential was not supplied; refusal is required.", metrics: zeroMetrics() };
+      if (scaffolding.preflightError !== null) return { status: "BLOCKED", message: scaffolding.preflightError };
       if (arm === "candidate") process.env.INFOAPEX_OTEL_ENABLED = "1";
       else delete process.env.INFOAPEX_OTEL_ENABLED;
       const adapter = arm === "direct" ? adapters.get(provider) : adapters.get("infoapex");
@@ -102,11 +104,27 @@ function prepareWorkspace(workspace, observation, task, arm) {
     // benchmark root. Nesting it below evidence/workspaces makes Git worktree
     // administrative paths exceed Windows limits (fatal: '$GIT_DIR' too big).
     writeFileSync(join(worker, "config.json"), JSON.stringify({ schemaVersion: "1.0", defaultEngine: "codex", contextProvider: "ai-code-control", contextPackage: { mode: "enforce", maximumTokens: 12000 }, stateRoot: join(stateRoot, "worker-state", String(observation.id)), maximumParallelWriters: 1, maximumRepairCycles: 0, maximumRunMinutes: 3, executionEnvironment: { defaultProfile: "isolated", allowTrustedLocal: false }, syncRootPolicy: { sequentialWriter: "warn", parallelWriters: "block" }, adapters: { codex: { executable: codexCommand[0], baseArgs: codexCommand.slice(1), model: String(armSpec.model ?? ""), reasoningEffort: String(armSpec.effort ?? ""), sandboxMode: codexSandbox, timeoutSeconds: 120, maximumOutputBytes: 65536 }, aiCodeControl: { executable: controlCommand[0], baseArgs: controlCommand.slice(1), timeoutSeconds: 30, maximumOutputBytes: 1000000 } } }, null, 2) + "\n", "utf8");
-    writeFileSync(join(workspace, ".gitignore"), ".ai-code-control/\n", "utf8");
+    writeFileSync(join(workspace, ".gitignore"), ".ai-code-control/\nbin/\nobj/\nnode_modules/\n.next/\n__pycache__/\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\n", "utf8");
     if (arm === "full-icm" || arm === "candidate") execFileSync(controlCommand[0], [...controlCommand.slice(1), "init", "--repo", workspace], { cwd: workspace, stdio: "ignore", windowsHide: true });
   }
   execFileSync("git", ["init", "--quiet"], { cwd: workspace, stdio: "ignore" }); execFileSync("git", ["-c", "user.name=benchmark", "-c", "user.email=benchmark@localhost", "add", "."], { cwd: workspace, stdio: "ignore" }); execFileSync("git", ["-c", "user.name=benchmark", "-c", "user.email=benchmark@localhost", "commit", "--quiet", "-m", "benchmark baseline"], { cwd: workspace, stdio: "ignore" });
-  return { plan, oldGitignore };
+  const preflightError = arm === "direct" ? null : preflightGate(workspace, task);
+  return { plan, oldGitignore, preflightError };
+}
+function preflightGate(workspace, task) {
+  const verification = Array.isArray(task.verification) ? task.verification[0] : null;
+  const command = verification && Array.isArray(verification.command) ? verification.command : null;
+  if (!command || command.length === 0) return "Consumer task has no valid verification command for preflight.";
+  const key = `${String(task.id)}:${command.join(" ")}`;
+  if (preflightedGates.has(key)) return null;
+  const timeoutMs = Math.max(1000, Number(verification.timeoutSeconds ?? task.limits?.timeoutSeconds ?? 120) * 1000);
+  const result = spawnSync(command[0], command.slice(1), { cwd: workspace, encoding: "utf8", timeout: timeoutMs, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  if (result.error || result.signal || result.status !== 0) {
+    const suffix = result.error?.code === "ETIMEDOUT" || result.signal ? "timed out" : `exit ${String(result.status ?? "unknown")}`;
+    return `Consumer gate preflight failed before provider invocation (${command.join(" ")}, ${suffix}). Fix restore/build/test prerequisites and create a new authorization.`;
+  }
+  preflightedGates.add(key);
+  return null;
 }
 function scaffoldingPlan(workspace, task) {
   const plan = join(workspace, "Plan", `consumer-${task.id}.md`); mkdirSync(join(workspace, "Plan"), { recursive: true });
@@ -137,7 +155,7 @@ function scaffoldingPlan(workspace, task) {
   writeFileSync(plan, `---\nstatus: accepted\n---\n\n# EuroCarScan consumer task\n\n\`\`\`json ai-code-worker-plan\n${JSON.stringify(body, null, 2)}\n\`\`\`\n`, "utf8"); return plan;
 }
 function cleanupWorkspaceScaffolding(workspace, scaffolding) { removeTransientCaches(workspace); if (existsSync(join(workspace, ".git"))) rmSync(join(workspace, ".git"), { recursive: true, force: true }); if (existsSync(join(workspace, ".ai-code-worker"))) rmSync(join(workspace, ".ai-code-worker"), { recursive: true, force: true }); if (existsSync(join(workspace, ".ai-code-control"))) rmSync(join(workspace, ".ai-code-control"), { recursive: true, force: true }); if (scaffolding.plan && existsSync(scaffolding.plan)) rmSync(scaffolding.plan, { force: true }); if (scaffolding.oldGitignore === null) { if (existsSync(join(workspace, ".gitignore"))) rmSync(join(workspace, ".gitignore"), { force: true }); } else writeFileSync(join(workspace, ".gitignore"), scaffolding.oldGitignore, "utf8"); }
-function removeTransientCaches(root) { for (const entry of readdirSync(root, { withFileTypes: true })) { const path = join(root, entry.name); if (entry.isDirectory() && ["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"].includes(entry.name)) { rmSync(path, { recursive: true, force: true }); continue; } if (entry.isDirectory() && entry.name !== ".git") removeTransientCaches(path); } }
+function removeTransientCaches(root) { for (const entry of readdirSync(root, { withFileTypes: true })) { const path = join(root, entry.name); if (entry.isDirectory() && ["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "bin", "obj", "node_modules", ".next"].includes(entry.name)) { rmSync(path, { recursive: true, force: true }); continue; } if (entry.isDirectory() && entry.name !== ".git") removeTransientCaches(path); } }
 function zeroMetrics() { return { elapsedMs: 0, providerLatencyMs: 0, usage: { inputUncachedTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: null } }; }
 function assertFrozenRepositoryRevision(repository, loadedSuite) {
   const revisions = [...new Set([...loadedSuite.tasks].map((task) => task.value.initialState?.revision).filter((revision) => typeof revision === "string" && revision !== "0000000"))];
