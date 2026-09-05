@@ -529,16 +529,14 @@ function failedResult(request: ClaudeStartRequest, message: string): AgentExecut
 }
 
 function childOutputMessage(child: ReturnType<typeof spawnSync> | BufferedProcessResult): string {
-  const output = [
-    typeof child.stdout === "string" ? child.stdout : "",
-    typeof child.stderr === "string" ? child.stderr : "",
-    child.error?.message ?? ""
-  ]
-    .filter((part) => part.length > 0)
-    .join("\n")
-    .trim();
-
-  return output.length > 0 ? output.slice(0, 4000) : "Claude did not produce a valid agent result.";
+  // Provider output remains private evidence: it must not become a public
+  // worker finding, where it could expose prompt/source/secret fragments.
+  const error = child.error as (Error & { readonly code?: string }) | undefined;
+  if (("timedOut" in child && child.timedOut === true) || error?.code === "ETIMEDOUT") return "Claude Code CLI timed out before producing a valid agent result.";
+  if ("outputTruncated" in child && child.outputTruncated) return "Claude Code CLI output exceeded the configured maximum before producing a valid agent result.";
+  if (child.error) return "Claude Code CLI process failed before producing a valid agent result.";
+  if (child.status !== 0) return "Claude Code CLI exited unsuccessfully before producing a valid agent result.";
+  return "Claude did not produce a valid agent result.";
 }
 
 function terminalEvents(

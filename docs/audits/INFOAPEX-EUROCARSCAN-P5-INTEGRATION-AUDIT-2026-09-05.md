@@ -68,6 +68,13 @@ Defectul rămas este diagnosticarea și stabilizarea contractului root → worke
   cand workerul incerca sa emita finding-ul structurat. `InfoapexRootAdapter` are acum
   o marja de teardown de 15 s; un timeout real va fi raportat ca `TIMEOUT/BLOCKED`,
   nu ca un timeout opac al wrapper-ului.
+- Canary-ul C# post-stabilizare (`candidate/api-not-found`, experiment
+  `exp-eurocarscan-stabilization-20260905`) a confirmat marja: workerul a produs
+  finding `ENGINE_TASK_FAILED` dupa 123,739 ms. Codex a citit fisierele permise si
+  a inceput `dotnet test`, dar restore-ul din worktree-ul nou nu s-a incheiat in
+  bugetul inghetat de 120 s. Nu s-a produs commit. Finding-ul a expus initial
+  JSONL provider brut; aceasta regresie de confidentialitate este tratata prin
+  INT-16, care pastreaza numai o clasificare publica a erorii.
 
 ## Politica de interpretare
 

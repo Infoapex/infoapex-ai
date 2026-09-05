@@ -381,6 +381,25 @@ process.exit(2);
     assert.equal(execution.result.status, "FAILED");
     assert.equal(execution.events.at(-1)?.type, "execution.failed");
   });
+
+  it("keeps timed-out provider output out of the public failure finding", async () => {
+    const root = mkdtempSync(join(tmpdir(), "aicw-fake-codex-timeout-"));
+    tempRoots.push(root);
+    const cli = join(root, "codex-timeout.mjs");
+    writeFileSync(cli, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args.includes("--version")) { console.log("codex-cli 0.146.0-alpha.3.1"); process.exit(0); }
+if (args[0] === "exec" && args.includes("--help")) { console.log("--json\\n--cd\\n--sandbox"); process.exit(0); }
+if (args[0] === "exec") { console.log("PRIVATE_PROVIDER_OUTPUT=must-not-escape"); await new Promise((resolve) => setTimeout(resolve, 1000)); }
+`, "utf8");
+    chmodSync(cli, 0o755);
+    const adapter = new CodexCliAdapter({ executable: process.execPath, baseArgs: [cli], testedVersionRanges: ["0.146.0-alpha.3.1"], requiresCapabilitySmokeTest: false, timeoutMs: 20 });
+    const execution = await adapter.startAsync(startRequest("exec-timeout", "TASK-TIMEOUT"));
+
+    assert.equal(execution.result.status, "FAILED");
+    assert.match(execution.result.failures[0]?.message ?? "", /timed out/i);
+    assert.doesNotMatch(execution.result.failures[0]?.message ?? "", /PRIVATE_PROVIDER_OUTPUT/);
+  });
 });
 
 function fakeCli(

@@ -438,16 +438,19 @@ function failedResult(request: CodexStartRequest, message: string): AgentExecuti
 }
 
 function childOutputMessage(child: ReturnType<typeof spawnSync> | BufferedProcessResult): string {
-  const output = [
-    typeof child.stdout === "string" ? child.stdout : "",
-    typeof child.stderr === "string" ? child.stderr : "",
-    child.error?.message ?? ""
-  ]
-    .filter((part) => part.length > 0)
-    .join("\n")
-    .trim();
+  // Provider output is private evidence. It can contain source paths, prompt
+  // fragments, tool arguments, or a secret echoed by a failed command. Never
+  // propagate it through the public worker/root/benchmark finding chain.
+  if (childTimedOut(child)) return "Codex CLI timed out before producing a valid agent result.";
+  if ("outputTruncated" in child && child.outputTruncated) return "Codex CLI output exceeded the configured maximum before producing a valid agent result.";
+  if (child.error) return "Codex CLI process failed before producing a valid agent result.";
+  if (child.status !== 0) return "Codex CLI exited unsuccessfully before producing a valid agent result.";
+  return "Codex did not produce a valid agent result.";
+}
 
-  return output.length > 0 ? output.slice(0, 4000) : "Codex did not produce a valid agent result.";
+function childTimedOut(child: ReturnType<typeof spawnSync> | BufferedProcessResult): boolean {
+  const error = child.error as (Error & { readonly code?: string }) | undefined;
+  return ("timedOut" in child && child.timedOut === true) || error?.code === "ETIMEDOUT";
 }
 
 function terminalEvents(

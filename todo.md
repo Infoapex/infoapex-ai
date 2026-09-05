@@ -85,6 +85,18 @@ registru; nu se mareste timeout-ul si nu se porneste automat un alt provider.
   sa scrie finding-ul JSON (`TIMEOUT`). Rezolvare: adapterul public root aplica
   o marja fixa de teardown de 15 secunde peste limita providerului; verdictul
   ramane `BLOCKED/TIMEOUT`, dar cauza este observabila si recuperabila.
+- **INT-16 Output provider in finding public:** la primul canary dupa INT-15,
+  workerul a transmis stdout JSONL Codex in `ENGINE_TASK_FAILED`; acesta putea
+  include prompt, cod, cai sau secrete reflectate de comenzi. Rezolvare: Codex
+  si Claude expun numai clase stabile de eroare (`timeout`, output-limit, proces
+  esuat, rezultat invalid), niciodata stdout/stderr. Testul de regresie injecteaza
+  `PRIVATE_PROVIDER_OUTPUT` si confirma ca nu ajunge in finding.
+- **INT-17 Restore rece in worktree-ul workerului:** preflight-ul outer trece,
+  dar worktree-ul Git creat ulterior nu mosteneste `obj/bin`; Codex a ajuns la
+  `dotnet test`/restore si a depasit 120 s fara commit. Rezolvare necesara:
+  canary de readiness separat pentru provider si un buget P5 C# care include
+  restore-ul in worktree, inghetat printr-un nou experiment; nu se mareste
+  automat limita experimentului actual.
 
 ## Regula de inchidere pentru onboarding
 
