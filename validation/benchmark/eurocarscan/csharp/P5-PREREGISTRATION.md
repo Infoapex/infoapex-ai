@@ -4,7 +4,7 @@ Candidate: `eurocarscan-otel-redacted-csharp-v1`.
 
 This is a new experiment after the Python prototype was retired. The frozen
 consumer revision is the ASP.NET Core/C# backend, Python-only ML boundary and
-React/Next.js/TypeScript frontend baseline (`37f9210`). The candidate changes one
+React/Next.js/TypeScript frontend baseline (`d8aaa37`). The candidate changes one
 capability only: redacted local OpenTelemetry evidence enabled by
 `INFOAPEX_OTEL_ENABLED=1`; direct and full-ICM arms remain otherwise constant.
 
