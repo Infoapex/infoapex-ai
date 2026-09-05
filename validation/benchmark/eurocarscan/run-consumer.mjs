@@ -122,10 +122,17 @@ function assertFrozenRepositoryRevision(repository, loadedSuite) {
   const revisions = [...new Set([...loadedSuite.tasks].map((task) => task.value.initialState?.revision).filter((revision) => typeof revision === "string" && revision !== "0000000"))];
   if (revisions.length !== 1) throw new Error("Consumer suite must freeze exactly one repository revision.");
   const expected = revisions[0];
+  const taskPaths = [...new Set([...loadedSuite.tasks].map((task) => task.value.initialState?.repository).filter((path) => typeof path === "string"))];
   let actual;
   try { actual = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim(); }
   catch { throw new Error("Consumer benchmark repository must be a Git worktree at the frozen revision."); }
-  if (!actual.startsWith(expected)) throw new Error(`Frozen consumer suite targets revision ${expected}, but repository is at ${actual}. Create a new suite and experiment revision after architecture changes.`);
+  if (actual.startsWith(expected)) return;
+  try { execFileSync("git", ["merge-base", "--is-ancestor", expected, actual], { cwd: repository, stdio: "ignore" }); }
+  catch { throw new Error(`Frozen consumer suite targets revision ${expected}, but repository is at ${actual}. Create a new suite and experiment revision after architecture changes.`); }
+  for (const path of taskPaths) {
+    try { execFileSync("git", ["diff", "--quiet", `${expected}..${actual}`, "--", path], { cwd: repository, stdio: "ignore" }); }
+    catch { throw new Error(`Frozen consumer task baseline path ${path} changed after revision ${expected}. Create a new suite and experiment revision.`); }
+  }
 }
 function provider() { return option("--provider") ?? "codex"; }
 function option(name) { const index = process.argv.indexOf(name); return index >= 0 ? process.argv[index + 1] ?? null : null; }
