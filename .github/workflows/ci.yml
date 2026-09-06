@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Infoapex AI bundle
@@ -72,3 +72,6 @@ jobs:
 
       - name: P3 release smoke test (git-archive ZIP -> clean extract -> setup/build/test -> all gates -> installer both modes)
         run: npm run release:smoke-test
+
+      - name: P6 core-local contract, security, operations and compatibility gate
+        run: npm run p6:verify

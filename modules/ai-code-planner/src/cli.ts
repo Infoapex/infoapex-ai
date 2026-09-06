@@ -2,7 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { createClaudeAdapter } from './engine/claude-adapter.js';
+import { createProviderAdapter, preflightProvider, registeredProviders, validateProviderSelection } from './engine/provider-registry.js';
 import { decomposePrompt } from './decompose/decompose-prompt.js';
 import { validateAgainstSchema } from './schema-validate.js';
 import { lintPlan } from './linter/lint-plan.js';
@@ -19,52 +19,82 @@ import { replanFromWorkerFeedback } from './replan/replan-from-worker.js';
 const args = process.argv.slice(2);
 const command = args[0];
 
-if (command === 'propose') {
+if (command === 'providers') {
+  const asJson = args.includes('--json');
+  const report = { status: 'DONE', providers: registeredProviders() };
+  if (asJson) console.log(JSON.stringify(report));
+  else for (const provider of report.providers) console.log(`${provider.id}: executable=${provider.executable}, explicitEffort=${provider.supportsExplicitEffort}, automaticFallback=${provider.automaticFallback}`);
+  process.exitCode = 0;
+} else if (command === 'preflight') {
+  const asJson = args.includes('--json');
+  const selection = readProviderSelection();
+  if (!selection.ok) {
+    emitProviderBlocked(selection.errors, asJson);
+  } else {
+    const report = preflightProvider(selection.selection, readAdapterOptions());
+    if (asJson) console.log(JSON.stringify(report));
+    else {
+      console.log(`ai-code-planner preflight: ${report.status}`);
+      console.log(`  provider=${report.providerId} model=${report.requestedModel} effort=${report.reasoningEffort}`);
+      console.log(`  executable=${report.executable} version=${report.executableVersion ?? 'unknown'}`);
+      console.log(`  estimatedCostUsd=${report.estimatedCostUsd} fallbackApproved=${report.fallback.approved}`);
+      for (const finding of report.findings) console.log(`  BLOCKER: ${finding}`);
+    }
+    process.exitCode = report.status === 'PASS' ? 0 : 2;
+  }
+} else if (command === 'propose') {
   const prompt = args[1];
   const outPath = readOption('--out');
-  const claudeExecutable = readOption('--claude-executable');
-  const claudeModel = readOption('--claude-model');
-  const claudeTimeoutMs = parseIntOption('--claude-timeout-ms');
   const controlExecutable = readOption('--control-executable');
   const repositoryPath = readOption('--repo') ?? process.cwd();
   const asJson = args.includes('--json');
 
   if (!prompt || prompt.startsWith('--')) {
-    console.error('Usage: ai-code-planner propose <prompt> [--out <path>] [--repo <path>] [--no-context] [--control-executable <path>] [--claude-executable <path>] [--claude-model <model>] [--claude-timeout-ms <ms>]');
+    console.error('Usage: ai-code-planner propose <prompt> --provider <codex|claude> --model <model> --reasoning-effort <effort> --selection-reason <reason> --estimated-cost-usd <cap> [--out <path>] [--repo <path>]');
     process.exitCode = 1;
   } else {
-    const adapter = createClaudeAdapter({
-      ...(claudeExecutable !== null ? { executable: claudeExecutable } : {}),
-      ...(claudeModel !== null ? { defaultModel: claudeModel } : {}),
-      cwd: repositoryPath,
-      ...(claudeTimeoutMs !== null ? { timeoutMs: claudeTimeoutMs } : {})
-    });
-
-    const context = args.includes('--no-context')
-      ? undefined
-      : collectPlannerContext({ repositoryPath, ...(controlExecutable !== null ? { executable: controlExecutable } : {}) });
-    const result = decomposePrompt(adapter, prompt, { context, resolvedModel: claudeModel });
-
-    if (!result.ok) {
-      if (asJson) {
-        console.log(JSON.stringify({ status: 'BLOCKED', error: result.error }));
+    const selection = readProviderSelection();
+    if (!selection.ok) {
+      emitProviderBlocked(selection.errors, asJson);
+    } else {
+      const adapterOptions = { ...readAdapterOptions(), cwd: repositoryPath };
+      const preflight = preflightProvider(selection.selection, adapterOptions);
+      if (preflight.status !== 'PASS') {
+        if (asJson) console.log(JSON.stringify({ status: 'BLOCKED', stage: 'preflight', preflight }));
+        else {
+          console.error('ai-code-planner propose: BLOCKED during preflight');
+          for (const finding of preflight.findings) console.error(`  ${finding}`);
+        }
         process.exitCode = 2;
       } else {
-        console.error('ai-code-planner propose: BLOCKED');
-        console.error(result.error);
-        process.exitCode = 1;
+        const adapter = createProviderAdapter(selection.selection, adapterOptions);
+        const context = args.includes('--no-context')
+          ? undefined
+          : collectPlannerContext({ repositoryPath, ...(controlExecutable !== null ? { executable: controlExecutable } : {}) });
+        const result = decomposePrompt(adapter, prompt, { context, selection: selection.selection });
+
+        if (!result.ok) {
+          if (asJson) {
+            console.log(JSON.stringify({ status: 'BLOCKED', error: result.error, preflight }));
+            process.exitCode = 2;
+          } else {
+            console.error('ai-code-planner propose: BLOCKED');
+            console.error(result.error);
+            process.exitCode = 1;
+          }
+        } else {
+          const draftPath = outPath ?? join('.ai-code-planner', 'drafts', `${slugify(prompt)}-${shortId()}.plan.json`);
+          mkdirSync(dirname(draftPath), { recursive: true });
+          writeFileSync(draftPath, JSON.stringify(result.plan, null, 2), 'utf-8');
+          if (asJson) {
+            console.log(JSON.stringify({ status: 'DONE', draftPath, preflight }));
+          } else {
+            console.log('ai-code-planner propose: DONE');
+            console.log(`  draft: ${draftPath}`);
+          }
+          process.exitCode = 0;
+        }
       }
-    } else {
-      const draftPath = outPath ?? join('.ai-code-planner', 'drafts', `${slugify(prompt)}-${shortId()}.plan.json`);
-      mkdirSync(dirname(draftPath), { recursive: true });
-      writeFileSync(draftPath, JSON.stringify(result.plan, null, 2), 'utf-8');
-      if (asJson) {
-        console.log(JSON.stringify({ status: 'DONE', draftPath }));
-      } else {
-        console.log('ai-code-planner propose: DONE');
-        console.log(`  draft: ${draftPath}`);
-      }
-      process.exitCode = 0;
     }
   }
 } else if (command === 'inspect') {
@@ -123,6 +153,37 @@ if (command === 'propose') {
       }
 
       process.exitCode = schemaValid && lintOk ? 0 : 2;
+    }
+  }
+} else if (command === 'reroute') {
+  const draftPath = args[1];
+  const outPath = readOption('--out');
+  const asJson = args.includes('--json');
+  if (!draftPath || draftPath.startsWith('--') || !outPath) {
+    console.error('Usage: ai-code-planner reroute <draft-path> --out <draft-path>');
+    process.exitCode = 1;
+  } else {
+    try {
+      const raw = JSON.parse(readFileSync(draftPath, 'utf-8')) as unknown;
+      const schemaResult = validateAgainstSchema<Plan>('plan.schema.json', raw);
+      if (!schemaResult.valid) throw new Error(`Draft plan is invalid: ${schemaResult.errors.join('; ')}`);
+      const withoutResolvedProfiles: Plan = {
+        ...schemaResult.data,
+        tasks: schemaResult.data.tasks.map(task => ({ ...task, executionProfile: undefined }))
+      };
+      const routed = applyRoutingProposal(withoutResolvedProfiles);
+      const lintResult = lintPlan(routed);
+      if (!lintResult.ok) throw new Error(`Rerouted plan failed lint: ${lintResult.findings.map(finding => finding.id).join(', ')}`);
+      mkdirSync(dirname(outPath), { recursive: true });
+      writeFileSync(outPath, `${JSON.stringify(routed, null, 2)}\n`, 'utf8');
+      if (asJson) console.log(JSON.stringify({ status: 'DONE', draftPath: outPath, routingPolicyVersion: 'planner-logical-v2' }));
+      else console.log(`ai-code-planner reroute: DONE\n  draft: ${outPath}`);
+      process.exitCode = 0;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (asJson) console.log(JSON.stringify({ status: 'BLOCKED', error: message }));
+      else console.error(`ai-code-planner reroute: BLOCKED\n${message}`);
+      process.exitCode = 2;
     }
   }
 } else if (command === 'compile') {
@@ -362,7 +423,7 @@ if (command === 'propose') {
     }
   }
 } else {
-  console.error('Usage: ai-code-planner <propose|inspect|compile|explain-routing|ingest-worker-report|replan>');
+  console.error('Usage: ai-code-planner <providers|preflight|propose|inspect|reroute|compile|explain-routing|ingest-worker-report|replan>');
   process.exitCode = 1;
 }
 
@@ -377,6 +438,46 @@ function parseIntOption(name: string): number | null {
   if (value === null) return null;
   const n = parseInt(value, 10);
   return isNaN(n) ? null : n;
+}
+
+function parseFloatOption(name: string): number | null {
+  const value = readOption(name);
+  if (value === null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function readProviderSelection() {
+  return validateProviderSelection({
+    provider: readOption('--provider'),
+    model: readOption('--model'),
+    reasoningEffort: readOption('--reasoning-effort'),
+    selectionReason: readOption('--selection-reason'),
+    estimatedCostUsd: parseFloatOption('--estimated-cost-usd'),
+    fallbackProvider: readOption('--fallback-provider'),
+    fallbackModel: readOption('--fallback-model'),
+    fallbackReasoningEffort: readOption('--fallback-reasoning-effort'),
+    fallbackReason: readOption('--fallback-reason')
+  });
+}
+
+function readAdapterOptions() {
+  const providerExecutable = readOption('--provider-executable');
+  const legacyExecutable = readOption('--claude-executable') ?? readOption('--codex-executable');
+  const timeoutMs = parseIntOption('--provider-timeout-ms') ?? parseIntOption('--claude-timeout-ms') ?? parseIntOption('--codex-timeout-ms');
+  return {
+    ...(providerExecutable !== null ? { executable: providerExecutable } : legacyExecutable !== null ? { executable: legacyExecutable } : {}),
+    ...(timeoutMs !== null ? { timeoutMs } : {})
+  };
+}
+
+function emitProviderBlocked(errors: readonly string[], asJson: boolean): void {
+  if (asJson) console.log(JSON.stringify({ status: 'BLOCKED', stage: 'provider-selection', errors }));
+  else {
+    console.error('ai-code-planner: BLOCKED provider selection');
+    for (const error of errors) console.error(`  ${error}`);
+  }
+  process.exitCode = 2;
 }
 
 function slugify(text: string): string {

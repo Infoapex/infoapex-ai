@@ -36,8 +36,26 @@ test('routing proposal assigns logical profiles without concrete model identifie
   const routed = applyRoutingProposal(plan);
   assert.equal(routed.tasks[0]?.executionProfile, 'balanced-default-v1');
   assert.equal(routed.tasks[1]?.executionProfile, 'mechanical-fast-v1');
-  assert.match(JSON.stringify(routed), /planner-logical-v1/);
+  assert.match(JSON.stringify(routed), /planner-logical-v2/);
   assert.doesNotMatch(JSON.stringify(routed), /claude-sonnet|gpt-/i);
+});
+
+test('explicit high risk cannot be downgraded merely because acceptance criteria mention tests', () => {
+  const routed = applyRoutingProposal({
+    goal: 'High-risk migration',
+    tasks: [{
+      id: 'MIGRATION-01',
+      goal: 'Apply PostgreSQL migration and recovery path',
+      acceptanceCriteria: [{ criterionId: 'AC-1', text: 'Migration tests and fixture coverage pass.' }],
+      gates: [{ gateId: 'G-1', command: 'dotnet test', evidenceContract: 'Tests pass.', criterionIds: ['AC-1'] }],
+      dependsOn: [],
+      scope: { allowedPaths: ['backend/migrations/**'], forbiddenPaths: [] },
+      requiredInputs: [],
+      risk: 'high'
+    }]
+  });
+  assert.equal(routed.tasks[0]?.executionProfile, 'balanced-default-v1');
+  assert.match(JSON.stringify(routed), /planner-logical-v2/);
 });
 
 test('worker projection produces schema-compatible task primitives', () => {

@@ -111,3 +111,34 @@ test("installer rejects an unknown mode with a structured blocked result", () =>
     rmSync(repository, { recursive: true, force: true });
   }
 });
+
+test("full installer creates a reusable .NET/Next.js profile without module-relative paths", () => {
+  const repository = mkdtempSync(join(tmpdir(), "apex-cli-full-profile-"));
+  try {
+    const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "dotnet-nextjs", "--backend-dir", "server", "--frontend-dir", "client", "--ml-dir", "data"]);
+    assert.equal(init.status, 0, init.stderr);
+    const body = JSON.parse(init.stdout) as { status: string; profile: string; created: readonly string[] };
+    assert.equal(body.status, "DONE");
+    assert.equal(body.profile, "dotnet-nextjs");
+    assert.ok(body.created.includes("TODO.md"));
+    assert.equal(existsSync(join(repository, "AGENTS.md")), true);
+    assert.equal(existsSync(join(repository, "CLAUDE.md")), true);
+    assert.equal(existsSync(join(repository, ".ai-code-control", "memory", "PROJECT-STATE.md")), true);
+
+    const worker = JSON.parse(readFileSync(join(repository, ".ai-code-worker", "config.json"), "utf8")) as {
+      contextProvider: string;
+      adapters: { codex: { model: string; reasoningEffort: string }; aiCodeControl: { baseArgs: readonly string[] } };
+    };
+    assert.equal(worker.contextProvider, "ai-code-control");
+    assert.equal(worker.adapters.codex.model, "gpt-5.6");
+    assert.equal(worker.adapters.codex.reasoningEffort, "high");
+    assert.match(worker.adapters.aiCodeControl.baseArgs.join(" "), /AiCodeControl\.Cli/);
+
+    const control = JSON.parse(readFileSync(join(repository, ".ai-code-control", "config", "code-control.json"), "utf8")) as { toolchains: readonly { path: string }[] };
+    assert.deepEqual(control.toolchains.map((toolchain) => toolchain.path), ["server", "client", "data"]);
+    const review = JSON.parse(readFileSync(join(repository, ".ai-code-review", "config.json"), "utf8")) as { worker: readonly string[] };
+    assert.match(review.worker[1] ?? "", /modules[\\/]ai-code-worker[\\/]dist[\\/]src[\\/]cli\.js$/);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});

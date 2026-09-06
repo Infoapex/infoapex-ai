@@ -434,3 +434,13 @@ P5  per subproiect         # vezi matricea din secțiunea 10
 Această distribuție păstrează Sol acolo unde o eroare de raționament poate crea drift de
 contract sau risc de securitate, Terra acolo unde criteriile sunt deja înghețate și Luna acolo
 unde rezultatul este mecanic și verificabil.
+
+## 13. Etapa post-P5 — P6 Production Readiness & Developer Adoption
+
+P6 este o etapă distinctă de productizare și nu cere finalizarea tuturor opțiunilor P5.
+Profilul minim `core-local` poate ajunge la `v1.0.0` când izolarea reală, supply-chain-ul,
+upgrade/rollback, recovery, operabilitatea și pilotul consumator sunt închise. UI-ul, Draft PR,
+providerii suplimentari și agent teams pot rămâne opționale.
+
+Planul executabil complet este
+[`INFOAPEX-AI-P6-PRODUCTION-READINESS-PLAN.md`](INFOAPEX-AI-P6-PRODUCTION-READINESS-PLAN.md).

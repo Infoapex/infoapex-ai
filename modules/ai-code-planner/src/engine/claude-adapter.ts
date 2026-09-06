@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import type { PlannerAdapter, PlannerAskResult, PlannerUsage, ReasoningEffort } from './planner-adapter.js';
 
 /**
  * Windows cannot execute .cmd/.bat files directly via CreateProcess -- spawnSync given
@@ -21,24 +22,14 @@ export interface ClaudeAdapterConfig {
   readonly baseArgs?: readonly string[];
   readonly cwd?: string;
   readonly defaultModel?: string | null;
+  readonly reasoningEffort?: ReasoningEffort;
   readonly timeoutMs?: number;
   readonly maximumOutputBytes?: number;
 }
 
-export interface ClaudeUsage {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheCreationTokens: number;
-}
-
-export type AskResult =
-  | { ok: true; text: string; resolvedModel: string | null; usage: ClaudeUsage }
-  | { ok: false; error: string };
-
-export interface ClaudeAdapter {
-  ask(prompt: string): AskResult;
-}
+export type ClaudeUsage = PlannerUsage;
+export type AskResult = PlannerAskResult;
+export type ClaudeAdapter = PlannerAdapter;
 
 interface ClaudeEnvelopeUsage {
   readonly input_tokens?: unknown;
@@ -77,10 +68,12 @@ export function createClaudeAdapter(config: ClaudeAdapterConfig): ClaudeAdapter 
   const baseArgs = config.baseArgs ?? [];
   const cwd = config.cwd;
   const defaultModel = config.defaultModel ?? null;
-  const timeoutMs = config.timeoutMs ?? 60_000;
+  const reasoningEffort = config.reasoningEffort ?? 'high';
+  const timeoutMs = config.timeoutMs ?? 600_000;
   const maximumOutputBytes = config.maximumOutputBytes ?? 1024 * 1024;
 
   return {
+    providerId: 'claude',
     ask(prompt: string): AskResult {
       const args: string[] = [
         ...baseArgs,
@@ -89,7 +82,8 @@ export function createClaudeAdapter(config: ClaudeAdapterConfig): ClaudeAdapter 
         '--input-format', 'text',
         '--output-format', 'json',
         '--session-id', randomUUID(),
-        ...(defaultModel != null ? ['--model', defaultModel] : [])
+        ...(defaultModel != null ? ['--model', defaultModel] : []),
+        '--effort', reasoningEffort
       ];
 
       const child = spawnSync(executable, args, {
@@ -149,7 +143,10 @@ export function createClaudeAdapter(config: ClaudeAdapterConfig): ClaudeAdapter 
       return {
         ok: true,
         text: envelope.result,
+        providerId: 'claude',
+        requestedModel: defaultModel ?? resolveModel(envelope) ?? 'unspecified',
         resolvedModel: resolveModel(envelope),
+        reasoningEffort,
         usage: {
           inputTokens: readInt(usage.input_tokens),
           outputTokens: readInt(usage.output_tokens),

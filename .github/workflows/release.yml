@@ -1,0 +1,63 @@
+name: Signed GitHub Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require public repository for keyless public attestation
+        if: github.event.repository.visibility != 'public'
+        run: |
+          echo "Release blocked: make the repository public before producing the public signed release."
+          exit 2
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.x
+
+      - name: Build and verify release candidate
+        run: |
+          npm run setup
+          npm run build
+          npm run p6:verify
+          npm run release:build-zip -- --ref "$GITHUB_SHA" --out "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip"
+          npm run release:sbom -- --out "dist-release/infoapex-ai-${GITHUB_REF_NAME}.cdx.json"
+
+      - name: Attest release provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: dist-release/infoapex-ai-${{ github.ref_name }}.zip
+
+      - name: Attest release SBOM
+        uses: actions/attest@v4
+        with:
+          subject-path: dist-release/infoapex-ai-${{ github.ref_name }}.zip
+          sbom-path: dist-release/infoapex-ai-${{ github.ref_name }}.cdx.json
+
+      - name: Publish immutable release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip" \
+            "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip.sha256" \
+            "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip.manifest.json" \
+            "dist-release/infoapex-ai-${GITHUB_REF_NAME}.cdx.json" \
+            --verify-tag --generate-notes

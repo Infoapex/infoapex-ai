@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profile", "gates"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "profile": { "const": "core-local" },
+    "gates": { "type": "array", "minItems": 7, "items": { "$ref": "#/$defs/gate" } }
+  },
+  "$defs": { "gate": {
+    "type": "object", "additionalProperties": false,
+    "required": ["gateId", "owner", "status", "requiredFor", "evidence", "verifiedCommit", "expiresAt", "exception"],
+    "properties": {
+      "gateId": { "type": "string", "pattern": "^P6\\.[0-6]-[A-Z]+-[0-9]{3}$" },
+      "owner": { "type": "string", "minLength": 1 },
+      "status": { "enum": ["PENDING", "PASS", "FAIL", "INCONCLUSIVE", "WAIVED"] },
+      "requiredFor": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+      "evidence": { "type": "array", "items": { "type": "string" } },
+      "verifiedCommit": { "type": ["string", "null"], "pattern": "^[a-f0-9]{40}$" },
+      "expiresAt": { "type": ["string", "null"] },
+      "exception": { "type": ["object", "null"] }
+    }
+  }}
+}

@@ -33,8 +33,9 @@ function createFakeClaudeExec(dir: string, responseText: string): string {
     modelUsage: { 'claude-sonnet-5': { inputTokens: 10, outputTokens: 20 } }
   });
 
-  const scriptSource = `import { readFileSync } from 'node:fs';
+const scriptSource = `import { readFileSync } from 'node:fs';
 const args = process.argv.slice(2);
+if (args.includes('--version')) { console.log('fake claude 1.0'); process.exit(0); }
 if (args[0] === '-p') {
   try { readFileSync(0, 'utf8'); } catch {}
   console.log(${JSON.stringify(envelope)});
@@ -80,7 +81,12 @@ test('propose with fake --claude-executable produces a draft that inspect report
     const proposeResult = runCli([
       'propose', 'test implementation task',
       '--out', draftPath,
-      '--claude-executable', fakeClaudeExec
+      '--provider', 'claude',
+      '--model', 'claude-test',
+      '--reasoning-effort', 'high',
+      '--selection-reason', 'Unit test explicit selection',
+      '--estimated-cost-usd', '0.01',
+      '--provider-executable', fakeClaudeExec
     ]);
     assert.strictEqual(
       proposeResult.exitCode,
@@ -100,6 +106,21 @@ test('propose with fake --claude-executable produces a draft that inspect report
     assert.strictEqual(report.schemaValid, true, `Schema invalid: ${JSON.stringify(report.schemaErrors)}`);
     assert.strictEqual(report.lintOk, true, `Lint failed: ${JSON.stringify(report.findings)}`);
     assert.strictEqual(inspectResult.exitCode, 0);
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('propose rejects missing explicit provider selection instead of falling back to Claude', () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), 'cli-test-selection-'));
+  try {
+    const draftPath = join(tmpDir, 'draft.plan.json');
+    const result = runCli(['propose', 'test implementation task', '--out', draftPath, '--json']);
+    assert.strictEqual(result.exitCode, 2);
+    const body = JSON.parse(result.stdout) as { status: string; stage: string; errors: string[] };
+    assert.equal(body.status, 'BLOCKED');
+    assert.equal(body.stage, 'provider-selection');
+    assert.ok(body.errors.some(error => error.includes('--provider')));
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }

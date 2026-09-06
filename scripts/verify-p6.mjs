@@ -1,0 +1,19 @@
+import Ajv2020 from "ajv/dist/2020.js";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+const root = resolve(import.meta.dirname, ".."); const checks = [];
+check("governance-files", ["SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md", ".github/CODEOWNERS", "docs/P6-DATA-CLASSIFICATION.md", "docs/P6-THREAT-MODEL.md", "docs/P6-OPERATIONS.md", "docs/P6-SUPPORT-POLICY.md"].every((path) => existsSync(join(root, path))));
+try { const schema = JSON.parse(readFileSync(join(root, "validation/p6/release-gates.schema.json"))); const value = JSON.parse(readFileSync(join(root, "validation/p6/release-gates.json"))); const validate = new Ajv2020({ strict: false }).compile(schema); check("release-gate-contract", validate(value), validate.errors ?? null); } catch (error) { check("release-gate-contract", false, String(error)); }
+try { const registry = JSON.parse(readFileSync(join(root, "validation/p6/contracts.json"))); check("contract-version-registry", registry.schemaVersion === "1.0" && registry.compatibilityPolicy === "same-major" && registry.contracts.every((item) => item.current === "1.0" && item.supported.includes("1.0"))); } catch (error) { check("contract-version-registry", false, String(error)); }
+try { execFileSync(process.execPath, [join(root, "scripts/generate-sbom.mjs"), "--out", join(root, "dist-release/p6-sbom.cdx.json")], { cwd: root, stdio: "pipe" }); const sbom = JSON.parse(readFileSync(join(root, "dist-release/p6-sbom.cdx.json"))); check("cyclonedx-sbom", sbom.bomFormat === "CycloneDX" && sbom.components.length >= 7); } catch (error) { check("cyclonedx-sbom", false, String(error)); }
+const workflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8"); check("platform-matrix", workflow.includes("ubuntu-latest") && workflow.includes("windows-latest") && workflow.includes("macos-latest"));
+const releaseWorkflow = readFileSync(join(root, ".github/workflows/release.yml"), "utf8"); check("signed-github-release", releaseWorkflow.includes("actions/attest@v4") && releaseWorkflow.includes("sbom-path:") && releaseWorkflow.includes("gh release create") && releaseWorkflow.includes("visibility != 'public'"));
+try { execFileSync(process.execPath, ["--test", "dist/tests/production.test.js", "dist/tests/config-lifecycle.test.js", "dist/tests/cli.test.js"], { cwd: root, stdio: "pipe" }); check("root-production-tests", true); } catch (error) { check("root-production-tests", false, String(error)); }
+const status = checks.every((item) => item.status === "PASS") ? "PASS" : "BLOCKED"; const report = { schemaVersion: "1.0", status, commit: gitCommit(), checks };
+const output = option("--out"); if (output) writeFileSync(resolve(root, output), `${JSON.stringify(report, null, 2)}\n`); console.log(JSON.stringify(report, null, 2)); process.exitCode = status === "PASS" ? 0 : 2;
+function check(id, pass, detail = null) { checks.push({ id, status: pass ? "PASS" : "BLOCKED", detail }); }
+function option(name) { const index = process.argv.indexOf(name); return index < 0 ? null : process.argv[index + 1] ?? null; }
+function gitCommit() { try { return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(); } catch { return null; } }

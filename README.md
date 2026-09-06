@@ -261,15 +261,14 @@ regulile de sincronizare sunt în [`docs/MODULE-PROVENANCE.md`](docs/MODULE-PROV
 **1. Inițializează bootstrap-ul în proiectul țintă**
 
 ```bash
-npx --package . infoapex-ai init --repo /cale/catre/proiect --mode independent
+npx --package . infoapex-ai init --repo /cale/catre/proiect --mode integrated --full --profile dotnet-nextjs --backend-dir backend --frontend-dir frontend --ml-dir ml
 npx --package . infoapex-ai status --repo /cale/catre/proiect
 ```
 
 **2. Pregătește worker-ul și verifică mediul**
 
 ```bash
-node modules/ai-code-worker/dist/src/cli.js init --repo /cale/catre/proiect --engines codex,claude
-node modules/ai-code-worker/dist/src/cli.js doctor --repo /cale/catre/proiect --engine codex
+node dist/src/cli.js preflight --repo /cale/catre/proiect
 ```
 
 **3. Propune, inspectează și compilează un plan**
@@ -333,8 +332,10 @@ sunt echivalente cu apelurile directe din pașii 2-4). Detalii complete: ADR
 ## Moduri de integrare
 
 ```text
-infoapex-ai init --repo <cale> --mode independent   # implicit
+infoapex-ai init --repo <cale> --mode independent   # bootstrap implicit
 infoapex-ai init --repo <cale> --mode integrated
+infoapex-ai init --repo <cale> --mode integrated --full --profile generic
+infoapex-ai init --repo <cale> --mode integrated --full --profile dotnet-nextjs --backend-dir <dir> --frontend-dir <dir> [--ml-dir <dir>]
 ```
 
 În modul `independent`, modulele nu folosesc canalul comun și pot fi rulate separat.
@@ -408,6 +409,7 @@ trebuie pornite explicit.
 | **P4** | CLI root unificat | ✅ închis — ADR-0003, registry, mecanism de delegare, comenzile `doctor`/`plan`/`run`/`resume`/`review`/`docs`, `infoapex-ai help` și testele lor sunt gata; fiecare modul rămâne complet utilizabil de sine stătător (niciun modul nu a fost modificat pentru delegare) |
 | **P4.5 / BENCH** | [`ai-code-benchmark`](docs/plans/AI-CODE-BENCHMARK-IMPLEMENTATION-PLAN.md): direct vs. orchestration-only vs. full ICM | ✅ închis — modul standalone publicat și pinned, integrare root/CI/ZIP cu BENCH-D și BENCH-09 R5 live 30/30 valid |
 | **P5** | SDK-uri și operare avansată (9 subproiecte independente, fiecare cu ADR + threat model propriu — nu un singur milestone) | 🟡 în progres — OpenTelemetry redactat este primul subproiect acceptat intern (20/20 valid, toate cele 4 praguri PASS); celelalte subproiecte rămân independente |
+| **P6** | [Production Readiness & Developer Adoption](docs/plans/INFOAPEX-AI-P6-PRODUCTION-READINESS-PLAN.md): lifecycle, security, recovery, operare, suport și pilot consumator | 🟡 în curs — P6.0 introduce `init --full` + profiluri și `preflight` strict; lifecycle-ul de release rămâne deschis |
 
 De ce `0.1.0` este pre-release și nu producție:
 

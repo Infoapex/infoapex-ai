@@ -1,4 +1,5 @@
-import { createClaudeAdapter } from '../engine/claude-adapter.js';
+import type { PlannerAdapter } from '../engine/planner-adapter.js';
+import type { ProviderSelection } from '../engine/provider-registry.js';
 import { validateAgainstSchema } from '../schema-validate.js';
 import { applyRoutingProposal } from '../routing/propose-routing.js';
 import { contextForPrompt, type PlannerContext } from '../context/types.js';
@@ -6,14 +7,15 @@ import type { Plan } from '../types.js';
 
 export interface DecomposeOptions {
   readonly context?: PlannerContext;
-  readonly resolvedModel?: string | null;
+  readonly selection: ProviderSelection;
 }
 
 export function decomposePrompt(
-  adapter: ReturnType<typeof createClaudeAdapter>,
+  adapter: PlannerAdapter,
   prompt: string,
-  options: DecomposeOptions = {}
+  options: DecomposeOptions
 ): { ok: true; plan: Plan } | { ok: false; error: string } {
+  const startedAt = Date.now();
   const firstAsk = adapter.ask(buildInitialPrompt(prompt, options.context));
   if (!firstAsk.ok) {
     return { ok: false, error: firstAsk.error };
@@ -21,7 +23,7 @@ export function decomposePrompt(
 
   const firstExtract = extractAndValidatePlan(firstAsk.text);
   if (firstExtract.ok) {
-    return { ok: true, plan: finalizePlan(firstExtract.plan, firstAsk.resolvedModel ?? options.resolvedModel ?? null) };
+    return { ok: true, plan: finalizePlan(firstExtract.plan, firstAsk, options.selection, startedAt) };
   }
 
   const retryAsk = adapter.ask(
@@ -33,7 +35,7 @@ export function decomposePrompt(
 
   const retryExtract = extractAndValidatePlan(retryAsk.text);
   if (retryExtract.ok) {
-    return { ok: true, plan: finalizePlan(retryExtract.plan, retryAsk.resolvedModel ?? firstAsk.resolvedModel ?? options.resolvedModel ?? null) };
+    return { ok: true, plan: finalizePlan(retryExtract.plan, retryAsk, options.selection, startedAt) };
   }
 
   return {
@@ -87,7 +89,7 @@ Required fields:
   - dependsOn: array of task id strings (empty array if no dependencies)
   - scope: object with allowedPaths (string array) and forbiddenPaths (string array)
 - requiredInputs: array of objects with kind ("file" | "symbol" | "external") and ref (string)
-- risk and relevantSymbols are optional, but should be included when the task has elevated risk or indexed symbols are relevant
+- risk is required for every task: classify migrations, persistence, security, ML boundaries, and P5 readiness conservatively; relevantSymbols is optional
 
 Respond with ONLY the JSON object. It must be the final thing in your response.`;
 }
@@ -148,26 +150,39 @@ Required fields:
   - dependsOn: array of task id strings (empty array if no dependencies)
   - scope: object with allowedPaths (string array) and forbiddenPaths (string array)
 - requiredInputs: array of objects with kind ("file" | "symbol" | "external") and ref (string)
-- risk and relevantSymbols are optional, but should be included when the task has elevated risk or indexed symbols are relevant
+- risk is required for every task: classify migrations, persistence, security, ML boundaries, and P5 readiness conservatively; relevantSymbols is optional
 
 Respond with ONLY the JSON object. It must be the final thing in your response.`;
 }
 
-function finalizePlan(plan: Plan, resolvedModel: string | null): Plan {
+function finalizePlan(plan: Plan, result: Extract<ReturnType<PlannerAdapter['ask']>, { ok: true }>, selection: ProviderSelection, startedAt: number): Plan {
   const routed = applyRoutingProposal(plan);
-  if (resolvedModel === null) return routed;
   return {
     ...routed,
     planningProvenance: {
       ...(routed.planningProvenance ?? {}),
+      schemaVersion: 'planner-provenance-v2',
       mode: 'single-agent',
-      panelMembers: [{ id: 'planner', role: 'proposer', resolvedModel, policyVersion: 'planner-logical-v1' }],
+      panelMembers: [{
+        id: 'planner',
+        role: 'proposer',
+        providerId: result.providerId,
+        requestedModel: selection.model,
+        resolvedModel: result.resolvedModel,
+        reasoningEffort: selection.reasoningEffort,
+        selectionReason: selection.selectionReason,
+        fallback: selection.fallback,
+        policyVersion: 'planner-provider-registry-v1'
+      }],
       roundsUsed: 1,
       roundsAllowed: 1,
       outcome: 'CONSENSUS',
       findings: { total: 0, verified: 0, refuted: 0, acceptedAsAssumption: 0, needsHuman: 0 },
-      planningCostUsd: 0,
-      planningDurationSec: 0
+      estimatedPlanningCostUsd: selection.estimatedCostUsd,
+      actualPlanningCostUsd: null,
+      planningCostSource: 'operator-declared-cap; provider usage is recorded separately and must not be converted into a billed cost without provider billing evidence',
+      planningUsage: result.usage,
+      planningDurationSec: Math.max(0, Math.ceil((Date.now() - startedAt) / 1000))
     }
   };
 }

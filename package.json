@@ -24,6 +24,8 @@
     "review-gate:internal": "node scripts/review-gate.mjs",
     "docs-gate:internal": "node scripts/docs-gate.mjs",
     "release:build-zip": "node scripts/build-release-zip.mjs",
+    "release:sbom": "node scripts/generate-sbom.mjs",
+    "p6:verify": "node scripts/verify-p6.mjs",
     "release:smoke-test": "node scripts/release-smoke-test.mjs"
   },
   "dependencies": {

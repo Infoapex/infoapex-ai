@@ -6,6 +6,46 @@ Planner v1 is implemented and verified for the planner-worker contract. It inclu
 
 Live production acceptance with real Claude/Codex quota signals and the separate three-plan consumer project value gate remain operational validation, not missing planner code.
 
+## Provider policy (mandatory)
+
+`propose` never chooses a provider, model, or reasoning effort on the user's
+behalf. Every live proposal must declare all of the following:
+
+```powershell
+ai-code-planner propose "<goal>" `
+  --provider codex `
+  --model gpt-5.6-sol `
+  --reasoning-effort xhigh `
+  --selection-reason "Architecture plan needs maximum available reasoning." `
+  --estimated-cost-usd 2.00
+```
+
+The registry currently supports `codex` and `claude`. `providers --json` lists
+the supported adapters and `preflight` verifies that the selected executable is
+available before any model prompt is sent. A model is proven available only by
+the explicitly selected live call; neither CLI exposes a reliable local list of
+models available to a particular subscription.
+
+There is no automatic fallback. A fallback can be recorded only by explicitly
+supplying all four `--fallback-*` fields; it is evidence for a separately
+authorized retry, never permission for the current run to switch provider or
+model. Every generated plan records provider, requested and resolved model,
+reasoning effort, selection reason, fallback decision, operator-declared cost
+cap, usage reported by the provider, and elapsed time in `planningProvenance`.
+
+The Codex adapter uses `codex exec --sandbox read-only --ephemeral
+--ignore-user-config` with a
+schema-constrained final message. It relies on the authenticated Codex CLI, so
+it does not require an OpenAI API key or silently fall back to another provider.
+The bounded default provider budget is ten minutes; use
+`--provider-timeout-ms` to declare a smaller or larger approved budget for a
+particular planning run. It is a cancellation bound, not a 60/120-second
+hard-stop inherited from a shell wrapper.
+
+When the deterministic routing policy changes, use `reroute <draft> --out
+<new-draft>` rather than silently keeping old resolved profiles. `reroute`
+preserves the model provenance and recalculates only logical execution profiles.
+
 Turns a task prompt into a **scoped, linted, routed implementation plan** that `ai-code-worker` executes.
 
 > **Status: Phase 1 mechanically complete, optional Infoapex AI handoff implemented, value gate not yet demonstrated.** `propose`/`inspect`/`compile`/`explain-routing`/`ingest-worker-report` exist and are exercised by tests, including projection to the worker manifest and opt-in planner-to-worker handoff. What has NOT been demonstrated: `_FINAL.md`'s actual Phase 1 exit gate — "3 real consumer project plans pass the linter and run on the existing worker." See `docs/PHASE-1.md`.

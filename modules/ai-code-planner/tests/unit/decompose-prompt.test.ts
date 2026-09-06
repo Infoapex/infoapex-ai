@@ -7,6 +7,7 @@ import { createClaudeAdapter } from '../../src/engine/claude-adapter.js';
 import { writeFakeClaudeCli } from '../helpers/fake-claude-cli.js';
 import { decomposePrompt } from '../../src/decompose/decompose-prompt.js';
 import type { Plan } from '../../src/types.js';
+import type { ProviderSelection } from '../../src/engine/provider-registry.js';
 
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), 'decompose-prompt-test-'));
@@ -36,6 +37,15 @@ const MINIMAL_PLAN: Plan = {
   ]
 };
 
+const SELECTION: ProviderSelection = {
+  providerId: 'claude',
+  model: 'claude-test',
+  reasoningEffort: 'high',
+  selectionReason: 'Unit test uses an explicit provider selection.',
+  estimatedCostUsd: 0.01,
+  fallback: { approved: false }
+};
+
 test('decomposePrompt returns ok:true when adapter returns prose wrapping a valid Plan JSON', () => {
   const dir = makeTempDir();
   const scriptPath = join(dir, 'fake-claude.mjs');
@@ -50,7 +60,7 @@ test('decomposePrompt returns ok:true when adapter returns prose wrapping a vali
     baseArgs: [scriptPath]
   });
 
-  const result = decomposePrompt(adapter, 'Implement a hello world function');
+  const result = decomposePrompt(adapter, 'Implement a hello world function', { selection: SELECTION });
 
   assert.strictEqual(result.ok, true);
   if (result.ok) {
@@ -99,7 +109,7 @@ process.exit(2);
     baseArgs: [scriptPath]
   });
 
-  const result = decomposePrompt(adapter, 'Do something');
+  const result = decomposePrompt(adapter, 'Do something', { selection: SELECTION });
 
   // Must return ok:false after the retry, not before
   assert.strictEqual(result.ok, false);

@@ -60,3 +60,16 @@
 - `.ai-code-control/config/memory-control.json`'s narrow `include` list (see above)
   now also misses `docs/PHASE-1.md` and this file's own updates — same gap, not
   re-opened as a separate item.
+## Resolved / observed in the EuroCarScan pilot (2026-09-05)
+
+- **The planner was hard-coded to Claude and allowed an implicit model. FIXED.**
+  The `codex`/`claude` registry now requires provider, model, reasoning effort,
+  selection reason, and estimated cost cap; it has no automatic fallback.
+  Provenance separates requested/resolved models and estimated/actual cost.
+- **The first real Codex call was rejected by Structured Outputs. FIXED.** The
+  output schema now declares `additionalProperties: false` at every object and
+  the planner schema remains the final contract authority.
+- **Operational observation:** an external launcher that kills Node before the
+  adapter timeout can leave its Codex child process active. The pilot process
+  was identified by PID/timestamp and stopped. Add a process-tree cancellation
+  integration test before declaring the adapter production-hardened.

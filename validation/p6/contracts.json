@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "compatibilityPolicy": "same-major",
+  "contracts": [
+    { "name": "root-config", "producer": "infoapex-ai", "consumer": "infoapex-ai", "current": "1.0", "supported": ["1.0"] },
+    { "name": "install-profile", "producer": "infoapex-ai", "consumer": "infoapex-ai", "current": "1.0", "supported": ["1.0"] },
+    { "name": "worker-config", "producer": "infoapex-ai", "consumer": "ai-code-worker", "current": "1.0", "supported": ["1.0"] },
+    { "name": "routing-policy", "producer": "infoapex-ai", "consumer": "ai-code-worker", "current": "1.0", "supported": ["1.0"] },
+    { "name": "review-config", "producer": "infoapex-ai", "consumer": "ai-code-review", "current": "1.0", "supported": ["1.0"] },
+    { "name": "docs-config", "producer": "infoapex-ai", "consumer": "ai-code-docs", "current": "1.0", "supported": ["1.0"] }
+  ]
+}
