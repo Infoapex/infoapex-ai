@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { defaultProductionPolicy } from "./production.js";
 
 /** Technology profiles, never consumer-project names. */
@@ -77,7 +77,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   };
 
   const paths = modulePaths(bundle);
-  writeManaged(".ai-code-control/config/code-control.json", json(controlConfig(options.profile, options.layout)));
+  writeManaged(".ai-code-control/config/code-control.json", json(controlConfig(repo, options.profile, options.layout)));
   writeManaged(".ai-code-control/config/memory-control.json", json(memoryConfig()));
   writeManaged(".ai-code-control/reports/refactor/current-plan.json", json(refactorPlan(options.profile)));
   writeSeed(".ai-code-control/memory/PROJECT-STATE.md", projectState(options.profile, options.layout));
@@ -92,6 +92,9 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   writeSeed(".ai-code-worker/README.md", "# ai-code-worker\n\nConfigurat de `infoapex-ai init --full`. Nu modifica politica de rutare fără un experiment/autorizare nouă.\n");
   writeManaged(".ai-code-review/config.json", json(reviewConfig(paths)));
   writeManaged(".ai-code-docs/config.json", json(docsConfig(paths)));
+  writeManaged(".mcp.json", json(mcpConfig(repo, paths)));
+  writeManaged(".claude/settings.json", json(claudeSettings(paths)));
+  writeManaged(".codex/config.toml", codexConfig(repo, paths));
   writeManaged(".infoapex-ai/install-profile.json", json({
     schemaVersion: "1.0",
     profile: options.profile,
@@ -103,6 +106,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
     contextProvider: { kind: "ai-code-control", mode: "observe" }
   }));
   writeManaged(".infoapex-ai/production-policy.json", json(defaultProductionPolicy()));
+  ensureRuntimeGitignore(repo, created, updated, skipped);
 
   // Build the C# CLI once, then invoke its DLL directly. `dotnet run` in every
   // doctor/provider call was both slow and capable of leaving compiler children
@@ -143,7 +147,7 @@ export function preflight(repositoryRoot: string, bundleRoot: string): Preflight
   const required = [
     ".infoapex-ai/config.json", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".ai-code-control/config/code-control.json",
     ".ai-code-control/config/memory-control.json", ".ai-code-control/memory/PROJECT-STATE.md", "TODO.md", "AGENTS.md", "CLAUDE.md",
-    ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-review/config.json", ".ai-code-docs/config.json"
+    ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".mcp.json", ".claude/settings.json", ".codex/config.toml"
   ];
   const absent = required.filter((relative) => !existsSync(join(repo, relative)));
   checks.push({ id: "required-project-files", status: absent.length === 0 ? "PASS" : "BLOCKED", detail: absent.length === 0 ? "All full-install artifacts exist." : `Missing: ${absent.join(", ")}` });
@@ -171,15 +175,16 @@ export function preflight(repositoryRoot: string, bundleRoot: string): Preflight
   }
 
   const paths = modulePaths(bundle);
-  const commands: readonly { readonly id: string; readonly executable: string; readonly args: readonly string[] }[] = [
+  const commands: readonly { readonly id: string; readonly executable: string; readonly args: readonly string[]; readonly timeoutMs?: number }[] = [
     { id: "control-health", executable: "dotnet", args: [paths.controlDll, "health", "--json", "--repo", repo] },
     { id: "control-brief", executable: "dotnet", args: [paths.controlDll, "brief", "--json", "--task", "P6 preflight", "--repo", repo] },
+    { id: "project-validation", executable: "dotnet", args: [paths.controlDll, "run-validation", "--repo", repo], timeoutMs: 1_200_000 },
     { id: "worker-doctor", executable: process.execPath, args: [paths.workerCli, "doctor", "--repo", repo, "--engine", "codex", "--json"] },
     { id: "review-doctor", executable: process.execPath, args: [paths.reviewCli, "doctor", "--repo", repo, "--engine", "codex", "--json"] },
     { id: "docs-doctor", executable: process.execPath, args: [paths.docsCli, "doctor", "--repo", repo, "--json"] }
   ];
   for (const command of commands) {
-    const result = run(command.executable, command.args, repo);
+    const result = run(command.executable, command.args, repo, command.timeoutMs);
     checks.push({ id: command.id, status: result.exitCode === 0 ? "PASS" : "BLOCKED", detail: result.exitCode === 0 ? "PASS" : boundedFailure(result) });
   }
   return { status: checks.every((check) => check.status === "PASS") ? "PASS" : "BLOCKED", profile, checks };
@@ -192,7 +197,9 @@ function modulePaths(bundleRoot: string) {
     reviewCli: join(bundleRoot, "modules", "ai-code-review", "dist", "src", "cli.js"),
     docsCli: join(bundleRoot, "modules", "ai-code-docs", "dist", "src", "cli.js"),
     controlProject: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "src", "AiCodeControl.Cli"),
-    controlDll: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "src", "AiCodeControl.Cli", "bin", "Debug", "net9.0", "AiCodeControl.Cli.dll")
+    controlDll: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "src", "AiCodeControl.Cli", "bin", "Debug", "net9.0", "AiCodeControl.Cli.dll"),
+    controlModuleRoot: join(bundleRoot, "modules", "ai-code-control"),
+    controlMcp: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "mcp-server", "dist", "server.js")
   };
 }
 
@@ -216,14 +223,106 @@ function routingPolicy() {
 
 function reviewConfig(paths: ReturnType<typeof modulePaths>) { return { schemaVersion: "1.0", planner: [process.execPath, paths.plannerCli], worker: [process.execPath, paths.workerCli], control: ["dotnet", paths.controlDll], defaultEngine: "codex" }; }
 function docsConfig(paths: ReturnType<typeof modulePaths>) { return { schemaVersion: "1.0", planner: [process.execPath, paths.plannerCli], worker: [process.execPath, paths.workerCli], control: ["dotnet", paths.controlDll], review: [process.execPath, paths.reviewCli], defaultEngine: "codex", defaultReviewEngine: "codex" }; }
+function mcpConfig(repo: string, paths: ReturnType<typeof modulePaths>) { return { mcpServers: { "ai-code-control": { command: process.execPath, args: [paths.controlMcp], env: { REPO_ROOT: repo, ACC_TOOL_ROOT: paths.controlModuleRoot, ACC_TOOL_TIMEOUT_MS: "300000" } } } }; }
+function claudeSettings(paths: ReturnType<typeof modulePaths>) { const cli = `dotnet \"${paths.controlDll}\"`; return { hooks: { SessionStart: [{ hooks: [{ type: "command", command: `${cli} memory-brief` }] }], Stop: [{ hooks: [{ type: "command", command: `${cli} refresh` }] }] } }; }
+function codexConfig(repo: string, paths: ReturnType<typeof modulePaths>) { const esc = (value: string) => value.replaceAll("\\", "/").replaceAll('"', '\\"'); return `[mcp_servers.ai-code-control]\ncommand = \"${esc(process.execPath)}\"\nargs = [\"${esc(paths.controlMcp)}\"]\ncwd = \"${esc(repo)}\"\nstartup_timeout_sec = 30\ntool_timeout_sec = 600\nrequired = false\n\n[mcp_servers.ai-code-control.env]\nREPO_ROOT = \"${esc(repo)}\"\nACC_TOOL_ROOT = \"${esc(paths.controlModuleRoot)}\"\nACC_TOOL_TIMEOUT_MS = \"300000\"\n`; }
 
-function controlConfig(profile: InstallProfile, layout: FullInstallOptions["layout"]) {
+interface ToolchainCommand { readonly name: string; readonly run: string; readonly timeoutSeconds: number }
+
+function controlConfig(repo: string, profile: InstallProfile, layout: FullInstallOptions["layout"]) {
   const dotnet = profile === "dotnet-nextjs";
   return { toolchains: dotnet ? [
-    { name: "dotnet", enabled: true, path: layout.backendDir, commands: [{ name: "build", run: "dotnet build --nologo", timeoutSeconds: 300 }, { name: "test", run: "dotnet test --nologo --no-build", timeoutSeconds: 600 }] },
-    { name: "node", enabled: true, path: layout.frontendDir, commands: [{ name: "lint", run: "npm run lint", timeoutSeconds: 300 }, { name: "typecheck", run: "npx tsc --noEmit", timeoutSeconds: 300 }, { name: "test", run: "npm test", timeoutSeconds: 600 }] },
-    ...(layout.mlDir ? [{ name: "python", enabled: false, path: layout.mlDir, commands: [{ name: "test", run: "pytest", timeoutSeconds: 300 }] }] : [])
+    discoveredDotnetToolchain(repo, layout.backendDir),
+    discoveredNodeToolchain(repo, layout.frontendDir),
+    ...(layout.mlDir ? [discoveredPythonToolchain(repo, layout.mlDir)] : [])
   ] : [{ name: "example", enabled: false, path: ".", commands: [{ name: "build", run: "echo configure-project-toolchain", timeoutSeconds: 300 }] }], git: { protectedBranches: ["main", "master", "develop", "release"], forbiddenPaths: ["node_modules/", ".next/", "dist/", "bin/", "obj/", "coverage/", ".turbo/", "generated/"] }, indexing: { database: ".ai-code-control/db/codegraph.sqlite", exclude: ["**/node_modules/**", "**/.next/**", "**/dist/**", "**/bin/**", "**/obj/**", "**/.git/**", "**/coverage/**"] }, logging: { level: "info", file: ".ai-code-control/reports/tool.log", maxFileSizeMb: 10 } };
+}
+
+function discoveredDotnetToolchain(repo: string, directory: string) {
+  const root = join(repo, directory);
+  const solutions = discoverFiles(root, (name) => name.endsWith(".sln") || name.endsWith(".slnx"));
+  const projects = discoverFiles(root, (name) => name.endsWith(".csproj"));
+  const commands: ToolchainCommand[] = [];
+  if (solutions.length > 0) {
+    const target = quoteCommandPath(relative(root, solutions[0]));
+    commands.push({ name: "build", run: `dotnet build ${target} --nologo`, timeoutSeconds: 600 });
+    commands.push({ name: "test", run: `dotnet test ${target} --nologo --no-build`, timeoutSeconds: 900 });
+  } else {
+    for (const project of projects) {
+      const target = quoteCommandPath(relative(root, project));
+      const label = commandLabel(project);
+      commands.push({ name: `build-${label}`, run: `dotnet build ${target} --nologo`, timeoutSeconds: 600 });
+    }
+    for (const project of projects.filter(isTestProject)) {
+      const target = quoteCommandPath(relative(root, project));
+      commands.push({ name: `test-${commandLabel(project)}`, run: `dotnet test ${target} --nologo --no-build`, timeoutSeconds: 900 });
+    }
+  }
+  return { name: "dotnet", enabled: commands.length > 0, path: directory, commands };
+}
+
+function discoveredNodeToolchain(repo: string, directory: string) {
+  const packagePath = join(repo, directory, "package.json");
+  const commands: ToolchainCommand[] = [];
+  if (existsSync(packagePath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(packagePath, "utf8")) as { scripts?: Record<string, unknown> };
+      const scripts = pkg.scripts ?? {};
+      for (const candidate of ["lint", "typecheck", "test", "build"] as const) {
+        if (typeof scripts[candidate] === "string") {
+          commands.push({ name: candidate, run: `npm run ${candidate}`, timeoutSeconds: candidate === "test" ? 900 : 600 });
+        }
+      }
+    } catch {
+      // Config validation reports malformed application manifests separately;
+      // installation must never invent commands for a package it cannot parse.
+    }
+  }
+  return { name: "node", enabled: commands.length > 0, path: directory, commands };
+}
+
+function discoveredPythonToolchain(repo: string, directory: string) {
+  const root = join(repo, directory);
+  const configured = ["pyproject.toml", "pytest.ini", "setup.cfg", "tox.ini"].some((name) => existsSync(join(root, name)));
+  const tests = existsSync(join(root, "tests")) || discoverFiles(root, (name) => /^test_.*\.py$/i.test(name)).length > 0;
+  const commands: ToolchainCommand[] = configured && tests ? [{ name: "test", run: "python -m pytest", timeoutSeconds: 900 }] : [];
+  return { name: "python", enabled: commands.length > 0, path: directory, commands };
+}
+
+function discoverFiles(root: string, predicate: (name: string) => boolean): string[] {
+  if (!existsSync(root)) return [];
+  const result: string[] = [];
+  const visit = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory() && ["bin", "obj", "node_modules", ".git", ".next"].includes(entry.name)) continue;
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) visit(path);
+      else if (entry.isFile() && predicate(entry.name.toLowerCase())) result.push(path);
+    }
+  };
+  visit(root);
+  return result.sort((left, right) => left.localeCompare(right));
+}
+
+function isTestProject(path: string): boolean { return /(?:\.tests?|test)\.csproj$/i.test(basename(path)); }
+function commandLabel(path: string): string { return basename(path, ".csproj").replace(/[^a-zA-Z0-9_.-]/g, "-"); }
+function quoteCommandPath(value: string): string { return `"${value.replaceAll("\\", "/").replaceAll('"', '\\"')}"`; }
+
+function ensureRuntimeGitignore(repo: string, created: string[], updated: string[], skipped: string[]): void {
+  const relativePath = ".gitignore";
+  const path = join(repo, relativePath);
+  const marker = "# Infoapex AI local runtime (managed)";
+  const entries = [".ai-code-control/db/", ".ai-code-control/reports/tool.log", ".infoapex-ai/backups/", ".infoapex-ai/diagnostics/", ".infoapex-ai/runs/"];
+  const current = existsSync(path) ? readFileSync(path, "utf8") : "";
+  const missing = entries.filter((entry) => !current.split(/\r?\n/).includes(entry));
+  if (missing.length === 0) {
+    skipped.push(relativePath);
+    return;
+  }
+  const prefix = current.length === 0 || current.endsWith("\n") ? current : `${current}\n`;
+  const block = `${prefix.length > 0 ? "\n" : ""}${marker}\n${missing.join("\n")}\n`;
+  writeText(path, `${prefix}${block}`);
+  (current.length === 0 ? created : updated).push(relativePath);
 }
 function memoryConfig() { return { memory: { enabled: true, store: ".ai-code-control/db/memory.sqlite", root: ".ai-code-control/memory", include: [".ai-code-control/memory/**/*.md", "AGENTS.md", "CLAUDE.md", "TODO.md", ".ai-code-control/reports/refactor/**/*.json", ".ai-code-control/reports/validation/**/*.md"], exclude: ["**/secrets/**", "**/.env", "**/.env.*", "**/*.pem", "**/*.pfx", "**/*password*", "**/*secret*", "**/*token*", "**/appsettings.Production.json"], maxRecallItems: 8, maxBriefingTokens: 3000, briefCommands: null, rawConversationStorage: { enabled: false, reason: "Canonical summaries only; raw conversations can contain sensitive data." } } }; }
 function refactorPlan(profile: InstallProfile) { return { task: "none", language: profile === "dotnet-nextjs" ? "csharp" : "", affectedSymbol: "", allowedFiles: [], forbiddenPaths: ["node_modules/", ".next/", ".ai-code-control/db/"], allowedUntrackedPatterns: [".ai-code-control/memory/"], requiredValidation: ["run-validation"], riskLevel: "low" }; }
@@ -233,6 +332,6 @@ function agentGuide() { return "# Agent guide\n\nCanonical project memory is `.a
 function claudeGuide() { return "# Claude Code bootstrap\n\nRead `AGENTS.md`, `TODO.md`, and `.ai-code-control/memory/PROJECT-STATE.md` before changing code. This repository is governed by Infoapex AI; its configured provider policy must not be bypassed.\n"; }
 function json(value: unknown): string { return `${JSON.stringify(value, null, 2)}\n`; }
 function writeText(path: string, value: string): void { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, value, "utf8"); }
-function run(executable: string, args: readonly string[], cwd: string): ProcessResult { const result = spawnSync(executable, args, { cwd, encoding: "utf8", windowsHide: true, timeout: 120_000 }); return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? (result.error?.message ?? "") }; }
+function run(executable: string, args: readonly string[], cwd: string, timeoutMs = 120_000): ProcessResult { const result = spawnSync(executable, args, { cwd, encoding: "utf8", windowsHide: true, timeout: timeoutMs }); return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? (result.error?.message ?? "") }; }
 function boundedFailure(result: ProcessResult): string { return (result.stderr || result.stdout || `exit ${result.exitCode}`).trim().replace(/\s+/g, " ").slice(-1000); }
 function isSafeRelativePath(value: string): boolean { return value.length > 0 && !value.includes("..") && !value.startsWith("/") && !/^[a-zA-Z]:/.test(value) && !value.includes("\\"); }

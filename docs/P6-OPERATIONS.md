@@ -2,6 +2,10 @@
 
 Readiness: run `infoapex-ai preflight`, `config validate`, and `production doctor`.
 Supported terminal states are explicit PASS/BLOCKED; an absent report is not success.
+The full installer derives .NET targets and npm checks from the consumer repository,
+writes MCP configuration for compatible clients, and leaves unavailable toolchains
+disabled. Review `.ai-code-control/config/code-control.json` after application manifests
+change, then rerun `init --full --repair` and `preflight`.
 
 Incident order: stop new runs, preserve the lease/state, create a redacted diagnostics
 bundle, verify the migration backup, classify provider/policy/deterministic failure,

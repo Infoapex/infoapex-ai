@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
@@ -115,6 +115,13 @@ test("installer rejects an unknown mode with a structured blocked result", () =>
 test("full installer creates a reusable .NET/Next.js profile without module-relative paths", () => {
   const repository = mkdtempSync(join(tmpdir(), "apex-cli-full-profile-"));
   try {
+    mkdirSync(join(repository, "server", "Product.Api"), { recursive: true });
+    mkdirSync(join(repository, "server", "Product.Api.Tests"), { recursive: true });
+    mkdirSync(join(repository, "client"), { recursive: true });
+    mkdirSync(join(repository, "data"), { recursive: true });
+    writeFileSync(join(repository, "server", "Product.Api", "Product.Api.csproj"), '<Project Sdk="Microsoft.NET.Sdk.Web" />');
+    writeFileSync(join(repository, "server", "Product.Api.Tests", "Product.Api.Tests.csproj"), '<Project Sdk="Microsoft.NET.Sdk" />');
+    writeFileSync(join(repository, "client", "package.json"), JSON.stringify({ scripts: { build: "next build", typecheck: "tsc --noEmit" } }));
     const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "dotnet-nextjs", "--backend-dir", "server", "--frontend-dir", "client", "--ml-dir", "data"]);
     assert.equal(init.status, 0, init.stderr);
     const body = JSON.parse(init.stdout) as { status: string; profile: string; created: readonly string[] };
@@ -134,10 +141,20 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
     assert.equal(worker.adapters.codex.reasoningEffort, "high");
     assert.match(worker.adapters.aiCodeControl.baseArgs.join(" "), /AiCodeControl\.Cli/);
 
-    const control = JSON.parse(readFileSync(join(repository, ".ai-code-control", "config", "code-control.json"), "utf8")) as { toolchains: readonly { path: string }[] };
+    const control = JSON.parse(readFileSync(join(repository, ".ai-code-control", "config", "code-control.json"), "utf8")) as { toolchains: readonly { path: string; enabled: boolean; commands: readonly { name: string; run: string }[] }[] };
     assert.deepEqual(control.toolchains.map((toolchain) => toolchain.path), ["server", "client", "data"]);
+    assert.deepEqual(control.toolchains[1]?.commands.map((command) => command.name), ["typecheck", "build"]);
+    assert.equal(control.toolchains[1]?.commands.some((command) => command.run.includes("npm test") || command.run.includes("npm run lint")), false);
+    assert.equal(control.toolchains[0]?.commands.some((command) => command.run.includes("Product.Api.Tests/Product.Api.Tests.csproj")), true);
+    assert.equal(control.toolchains[2]?.enabled, false);
     const review = JSON.parse(readFileSync(join(repository, ".ai-code-review", "config.json"), "utf8")) as { worker: readonly string[] };
     assert.match(review.worker[1] ?? "", /modules[\\/]ai-code-worker[\\/]dist[\\/]src[\\/]cli\.js$/);
+    const mcp = JSON.parse(readFileSync(join(repository, ".mcp.json"), "utf8")) as { mcpServers: { "ai-code-control": { args: readonly string[]; env: Record<string, string> } } };
+    assert.match(mcp.mcpServers["ai-code-control"].args[0] ?? "", /mcp-server[\\/]dist[\\/]server\.js$/);
+    assert.equal(mcp.mcpServers["ai-code-control"].env.REPO_ROOT, repository);
+    assert.equal(existsSync(join(repository, ".claude", "settings.json")), true);
+    assert.match(readFileSync(join(repository, ".codex", "config.toml"), "utf8"), /\[mcp_servers\.ai-code-control\]/);
+    assert.match(readFileSync(join(repository, ".gitignore"), "utf8"), /\.infoapex-ai\/runs\//);
   } finally {
     rmSync(repository, { recursive: true, force: true });
   }
