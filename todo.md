@@ -149,6 +149,15 @@ registru; nu se mareste timeout-ul si nu se porneste automat un alt provider.
   scope; candidate are trace coverage 1 si leakage 0. Raportul este
   INCONCLUSIVE numai fiindca aceasta este o pereche de canary fara ipoteza de
   eficacitate, nu un reject tehnic.
+- **INT-28 Preflight fals pozitiv dupa full-install:** profilul `dotnet-nextjs`
+  genera `npm run lint`, `npm test` si `dotnet build` generic chiar daca proiectul
+  nu avea acele scripturi sau continea mai multe `.csproj` fara solution; in plus,
+  instalarea nu crea wiring MCP pentru clienti. Rezolvare: installerul descopera
+  proiectele/solution-urile si scripturile npm reale, dezactiveaza Python fara
+  teste, genereaza `.mcp.json`, `.codex/config.toml` si hook-urile Claude, iar
+  preflight-ul ruleaza validarea aplicatiei cu timeout-uri individuale si plafon
+  exterior de 20 minute. EuroCarScan a trecut build/test/typecheck/build si un
+  handshake MCP stdio cu 25 de tool-uri.
 
 ## Regula de inchidere pentru onboarding
 
