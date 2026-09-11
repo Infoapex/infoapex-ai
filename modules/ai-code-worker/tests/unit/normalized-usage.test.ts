@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   aggregateNormalizedUsage,
   assessUsageTotals,
+  NormalizedUsageAccumulator,
   UsageAggregationError,
   type UsageSample
 } from "../../src/usage/normalized-usage.js";
@@ -47,6 +48,26 @@ describe("normalized usage accounting", () => {
       () => aggregateNormalizedUsage([sample("a", "one", 1, "incremental", 1), sample("b", "one", 2, "cumulative", 2)]),
       (error) => error instanceof UsageAggregationError && error.code === "MIXED_ACCOUNTING_MODE"
     );
+  });
+
+  it("keeps the last committed report when a new sample is rejected", () => {
+    const accumulator = new NormalizedUsageAccumulator();
+    accumulator.add(sample("stable", "attempt-1", 1, "incremental", 100));
+
+    assert.throws(
+      () => accumulator.add(sample("stable", "attempt-1", 1, "incremental", 999)),
+      (error) => error instanceof UsageAggregationError && error.code === "DUPLICATE_SAMPLE_DRIFT"
+    );
+
+    assert.deepEqual(accumulator.report().totals, {
+      agentInvocations: 1,
+      inputUncachedTokens: 100,
+      cacheReadTokens: 10,
+      cacheWriteTokens: 2,
+      outputTokens: 5,
+      costUsd: 0.01
+    });
+    assert.equal(accumulator.currentSamples.length, 1);
   });
 
   it("never converts an unavailable report into a comparable zero", () => {

@@ -40,6 +40,42 @@ export class UsageAggregationError extends Error {
   }
 }
 
+/** Stateful facade for the run pipeline. Samples are validated and aggregated
+ * before they are committed, so a rejected sample never corrupts the current
+ * totals. The sample list is intentionally exposed as a copy for persistence
+ * in task evidence and recovery. */
+export class NormalizedUsageAccumulator {
+  private samples: UsageSample[] = [];
+
+  get currentSamples(): readonly UsageSample[] {
+    return [...this.samples];
+  }
+
+  add(sample: UsageSample): NormalizedUsageReport {
+    return this.addMany([sample]);
+  }
+
+  addMany(samples: readonly UsageSample[]): NormalizedUsageReport {
+    if (samples.length === 0) {
+      return aggregateNormalizedUsage(this.samples);
+    }
+    const next = [...this.samples, ...samples];
+    const report = aggregateNormalizedUsage(next);
+    this.samples = next;
+    return report;
+  }
+
+  restore(samples: readonly UsageSample[]): NormalizedUsageReport {
+    const report = aggregateNormalizedUsage(samples);
+    this.samples = [...samples];
+    return report;
+  }
+
+  report(): NormalizedUsageReport {
+    return aggregateNormalizedUsage(this.samples);
+  }
+}
+
 /**
  * Aggregates provider invocations without double-counting cumulative events.
  * Replayed samples are deduplicated by sampleId. Incremental samples are summed;

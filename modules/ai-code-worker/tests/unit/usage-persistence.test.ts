@@ -67,6 +67,12 @@ describe("usage persistence: a task's own usage survives even when that task fai
     assert.equal(runReport.usage.inputUncachedTokens, 500 + 1200);
     assert.equal(runReport.usage.cacheReadTokens, 500 + 800);
     assert.equal(runReport.usage.outputTokens, 200 + 50);
+
+    const taskEvidence = JSON.parse(readFileSync(join(report.state.runRoot!, "tasks", "TASK-01", "evidence.json"), "utf8"));
+    const taskSamples = JSON.parse(readFileSync(join(report.state.runRoot!, "tasks", "TASK-01", "usage-samples.json"), "utf8"));
+    assert.equal(taskEvidence.usageSamples.length, taskSamples.length);
+    assert.equal(taskSamples[0].accountingMode, "incremental");
+    assert.equal(taskSamples[0].usage.inputUncachedTokens, 500);
   });
 });
 
@@ -123,6 +129,9 @@ describe("usage persistence: resuming a run recovers real usage instead of subst
     assert.equal(runReport.usage.inputUncachedTokens, 500 + 2000);
     assert.equal(runReport.usage.cacheReadTokens, 500 + 1000);
     assert.equal(runReport.usage.outputTokens, 200 + 400);
+
+    const recoveredEvidence = JSON.parse(readFileSync(join(resumed.state.runRoot!, "tasks", "TASK-01", "evidence.json"), "utf8"));
+    assert.equal(recoveredEvidence.usageSamples[0].usage.inputUncachedTokens, 500);
   });
 });
 

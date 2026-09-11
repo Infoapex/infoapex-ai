@@ -42,6 +42,7 @@ import type { FrozenRoutingSnapshot } from "../routing/routing-policy.js";
 import { buildTaskEvidenceTraceability } from "../evidence/task-traceability.js";
 import type { ManifestTaskTraceability } from "../manifest/traceability.js";
 import { buildSemanticSourceMap, writeSemanticSourceMap } from "../source-map/semantic-source-map.js";
+import { NormalizedUsageAccumulator, type UsageSample } from "../usage/normalized-usage.js";
 
 export interface ClaudeRunOptions {
   readonly repositoryPath: string;
@@ -128,16 +129,24 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
     resolveUsageCheckpointLogPath(compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath),
     registry
   );
+  const usageAccumulator = new NormalizedUsageAccumulator();
   let usageTotals = emptyUsageTotals;
   let tick = 0;
 
+  const recordUsageSamples = (samples: readonly UsageSample[]): UsageTotals => {
+    if (samples.length > 0) {
+      usageTotals = usageAccumulator.addMany(samples).totals;
+    }
+    return usageTotals;
+  };
+
   if (recovery.terminal === "DONE") {
-    return recoveredTerminalRun(compile, graph.topologicalOrder, recovery, "DONE");
+    return recoveredTerminalRun(compile, graph.topologicalOrder, recovery, "DONE", "claude");
   }
 
   if (recovery.terminal === "BLOCKED") {
     return {
-      ...recoveredTerminalRun(compile, graph.topologicalOrder, recovery, "BLOCKED"),
+      ...recoveredTerminalRun(compile, graph.topologicalOrder, recovery, "BLOCKED", "claude"),
       findings: [
         {
           severity: "blocker",
@@ -174,7 +183,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
       taskCommits[taskId] = checkpoint.finishedCommit;
       evidenceByTask[taskId] = `tasks/${taskId}/evidence.json`;
       executedTasks.push(taskId);
-      usageTotals = addUsage(usageTotals, usageFromTaskEvidence(taskRoot));
+      recordUsageSamples(readUsageSamplesFromEvidence(taskRoot, "claude", taskId));
       tick += 1;
       continue;
     }
@@ -210,6 +219,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
         evidenceByTask,
         gateResults,
         usageTotals,
+        recordUsageSamples,
         engineVersion: doctor.version
       });
 
@@ -293,11 +303,12 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
     const execution = taskExecution.execution;
     const activeEngine = taskExecution.candidate.engine;
     const activeVersion = activeEngine === "claude" ? doctor.version : null;
+    const taskUsageSamples = usageSamplesFromAttempts(taskExecution.attempts, taskId, "claude");
     // Recorded as soon as the engine returns, regardless of what this task does next
     // (mismatch/failure/gate-block below all return BLOCKED before this task's usage
     // was previously folded in) - a task that consumed real, billable tokens before
     // failing must not have that consumption silently discarded from the run's total.
-    usageTotals = addUsage(usageTotals, execution.usage);
+    recordUsageSamples(taskUsageSamples);
 
     checkpointLog.append({
       checkpointId: `${compile.runId}-${taskId}-start`,
@@ -330,6 +341,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
     writeJson(join(taskRoot, "task-input.json"), snapshot);
     writeJson(join(taskRoot, "engine-events.json"), taskExecution.attempts.flatMap((attempt) => attempt.execution.events));
     writeJson(join(taskRoot, "agent-result.json"), execution.result);
+    writeJson(join(taskRoot, "usage-samples.json"), taskUsageSamples);
 
     eventLog.append({
       eventId: `${compile.runId}-${String(eventLog.read().events.length).padStart(4, "0")}-${taskId}-input-frozen`,
@@ -434,7 +446,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
       now: timestamp
     });
     gateResults.push(...taskGateReport.results);
-    writeJson(join(taskRoot, "evidence.json"), evidenceFor(compile.runId, activeEngine, activeVersion, execution.usage, taskGateReport.results, task));
+    writeJson(join(taskRoot, "evidence.json"), evidenceFor(compile.runId, activeEngine, activeVersion, usageFromSamples(taskUsageSamples), taskGateReport.results, task, taskUsageSamples));
     evidenceByTask[taskId] = `tasks/${taskId}/evidence.json`;
 
     if (taskGateReport.status === "BLOCKED") {
@@ -865,7 +877,8 @@ function evidenceFor(
   engineVersion: string | null,
   usage: EngineUsage,
   commands: readonly QualityGateResult[],
-  task: RunManifestTask
+  task: RunManifestTask,
+  usageSamples: readonly UsageSample[] = []
 ): unknown {
   const inputTotal =
     usage.inputUncachedTokens === null &&
@@ -901,6 +914,7 @@ function evidenceFor(
     },
     commands: commands.map(toEvidenceCommand),
     artifacts: [],
+    ...(usageSamples.length > 0 ? { usageSamples } : {}),
     ...(taskTraceability ? { taskTraceability } : {})
   };
 }
@@ -961,6 +975,7 @@ function continueFromCommittedTask(input: {
   readonly evidenceByTask: Record<string, string>;
   readonly gateResults: QualityGateResult[];
   readonly usageTotals: UsageTotals;
+  readonly recordUsageSamples: (samples: readonly UsageSample[]) => UsageTotals;
   readonly engineVersion: string | null;
 }):
   | { readonly status: "PASS"; readonly usageTotals: UsageTotals }
@@ -982,6 +997,9 @@ function continueFromCommittedTask(input: {
     };
   }
 
+  const taskUsageSamples = readUsageSamplesFromEvidence(input.taskRoot, "claude", input.taskId);
+  const recoveredUsageTotals = input.recordUsageSamples(taskUsageSamples);
+
   mkdirSync(input.taskRoot, { recursive: true });
   const taskGateReport = runGates({
     compile: input.compile,
@@ -997,7 +1015,7 @@ function continueFromCommittedTask(input: {
   input.gateResults.push(...taskGateReport.results);
   writeJson(
     join(input.taskRoot, "evidence.json"),
-    evidenceFor(input.compile.runId!, "claude", input.engineVersion, unknownUsage(), taskGateReport.results, input.task)
+    evidenceFor(input.compile.runId!, "claude", input.engineVersion, usageFromSamples(taskUsageSamples), taskGateReport.results, input.task, taskUsageSamples)
   );
   input.evidenceByTask[input.taskId] = `tasks/${input.taskId}/evidence.json`;
 
@@ -1012,7 +1030,7 @@ function continueFromCommittedTask(input: {
         executedTasks: input.executedTasks,
         taskCommits: input.taskCommits,
         gateResults: input.gateResults,
-        usageTotals: input.usageTotals,
+        usageTotals: recoveredUsageTotals,
         now: input.timestamp
       })
     };
@@ -1032,7 +1050,7 @@ function continueFromCommittedTask(input: {
 
   return {
     status: "PASS",
-    usageTotals: addUsage(input.usageTotals, unknownUsage())
+    usageTotals: recoveredUsageTotals
   };
 }
 
@@ -1040,9 +1058,10 @@ function recoveredTerminalRun(
   compile: CompileReport,
   taskOrder: readonly string[],
   recovery: RunCheckpoints,
-  status: "DONE" | "BLOCKED"
+  status: "DONE" | "BLOCKED",
+  provider: "codex" | "claude"
 ): ClaudeRunReport {
-  let usageTotals = emptyUsageTotals;
+  const usageAccumulator = new NormalizedUsageAccumulator();
   const taskCommits: Record<string, string> = {};
   const executedTasks: string[] = [];
 
@@ -1051,7 +1070,7 @@ function recoveredTerminalRun(
     if (commit) {
       taskCommits[taskId] = commit;
       executedTasks.push(taskId);
-      usageTotals = addUsage(usageTotals, unknownUsage());
+      usageAccumulator.addMany(readUsageSamplesFromEvidence(join(compile.state.runRoot!, "tasks", taskId), provider, taskId));
     }
   }
 
@@ -1067,7 +1086,7 @@ function recoveredTerminalRun(
     },
     taskCommits,
     gateResults: [],
-    usageTotals,
+    usageTotals: usageAccumulator.report().totals,
     findings: []
   };
 }
@@ -1259,27 +1278,68 @@ interface PersistedTaskEvidence {
   readonly cost?: {
     readonly reportedCostUsd?: number | null;
   };
+  readonly usageSamples?: readonly UsageSample[];
 }
 
-/** Recovers a previously-finished task's real usage from its persisted evidence.json
- *  on resume, instead of discarding it as unknownUsage() (all-null). A task.finished
- *  event (the only thing that makes recovery mark a task as finishedCommit) is only
- *  ever appended after evidenceFor()'s writeJson() call for that task, so the file is
- *  guaranteed to exist for any task this is called for. Falls back to unknownUsage()
- *  defensively if it is somehow missing or unparseable - never throws. */
-function usageFromTaskEvidence(taskRoot: string): EngineUsage {
+function readUsageSamplesFromEvidence(taskRoot: string, provider: "codex" | "claude" | "fake", taskId: string): UsageSample[] {
+  try {
+    const persistedSamples = JSON.parse(readFileSync(join(taskRoot, "usage-samples.json"), "utf8")) as unknown;
+    if (Array.isArray(persistedSamples) && persistedSamples.length > 0) {
+      return persistedSamples as UsageSample[];
+    }
+  } catch {
+    // Older runs do not have the separate sample file; evidence.json is the fallback.
+  }
   try {
     const evidence = JSON.parse(readFileSync(join(taskRoot, "evidence.json"), "utf8")) as PersistedTaskEvidence;
-    return {
-      inputUncachedTokens: evidence.input?.uncachedTokens ?? null,
-      cacheReadTokens: evidence.input?.cacheReadTokens ?? null,
-      cacheWriteTokens: evidence.input?.cacheWriteTokens ?? null,
-      outputTokens: evidence.output?.standardTokens ?? null,
-      costUsd: evidence.cost?.reportedCostUsd ?? null
-    };
+    if (Array.isArray(evidence.usageSamples) && evidence.usageSamples.length > 0) {
+      return [...evidence.usageSamples];
+    }
+    return [legacyUsageSample(provider, `recovered:${taskId}`, `task:${taskId}`, usageFromPersistedEvidence(evidence))];
   } catch {
-    return unknownUsage();
+    return [legacyUsageSample(provider, `recovered:${taskId}`, `task:${taskId}`, unknownUsage())];
   }
+}
+
+function usageFromPersistedEvidence(evidence: PersistedTaskEvidence): EngineUsage {
+  return {
+    inputUncachedTokens: evidence.input?.uncachedTokens ?? null,
+    cacheReadTokens: evidence.input?.cacheReadTokens ?? null,
+    cacheWriteTokens: evidence.input?.cacheWriteTokens ?? null,
+    outputTokens: evidence.output?.standardTokens ?? null,
+    costUsd: evidence.cost?.reportedCostUsd ?? null
+  };
+}
+
+function legacyUsageSample(provider: "codex" | "claude" | "fake", sampleId: string, seriesId: string, usage: EngineUsage): UsageSample {
+  return { sampleId, seriesId, sequence: 1, provider, parserVersion: "evidence.v1", accountingMode: "incremental", usage };
+}
+
+function usageSamplesFromAttempts(attempts: readonly { readonly candidate: { readonly engine: "codex" | "claude" }; readonly execution: { readonly executionId: string; readonly events: readonly { readonly type: string }[]; readonly usage: EngineUsage } }[], taskId: string, provider: "codex" | "claude"): UsageSample[] {
+  const samples = attempts
+    .filter((attempt) => attempt.execution.events.some((event) => event.type === "execution.started"))
+    .map((attempt, index) => ({
+      sampleId: attempt.execution.executionId,
+      seriesId: `task:${taskId}:attempt:${index + 1}`,
+      sequence: 1,
+      provider: attempt.candidate.engine,
+      parserVersion: `${attempt.candidate.engine}.cli.v1`,
+      accountingMode: "incremental" as const,
+      usage: attempt.execution.usage
+    }));
+  return samples.length > 0 ? samples : [legacyUsageSample(provider, `execution:${taskId}`, `task:${taskId}:attempt:1`, unknownUsage())];
+}
+
+function usageFromSamples(samples: readonly UsageSample[]): EngineUsage {
+  if (samples.length === 0) return unknownUsage();
+  const report = new NormalizedUsageAccumulator().addMany(samples);
+  return {
+    inputUncachedTokens: report.totals.inputUncachedTokens,
+    cacheReadTokens: report.totals.cacheReadTokens,
+    cacheWriteTokens: report.totals.cacheWriteTokens,
+    outputTokens: report.totals.outputTokens,
+    costUsd: report.totals.costUsd
+  };
 }
 
 function stateRootFromRunRoot(runRoot: string): string {

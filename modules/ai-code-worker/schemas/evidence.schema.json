@@ -130,6 +130,34 @@
         }
       }
     },
+    "usageSamples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sampleId", "seriesId", "sequence", "provider", "parserVersion", "accountingMode", "usage"],
+        "properties": {
+          "sampleId": { "type": "string", "minLength": 1 },
+          "seriesId": { "type": "string", "minLength": 1 },
+          "sequence": { "type": "integer", "minimum": 0 },
+          "provider": { "enum": ["codex", "claude", "fake"] },
+          "parserVersion": { "type": "string", "minLength": 1 },
+          "accountingMode": { "enum": ["incremental", "cumulative"] },
+          "usage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["inputUncachedTokens", "cacheReadTokens", "cacheWriteTokens", "outputTokens", "costUsd"],
+            "properties": {
+              "inputUncachedTokens": { "$ref": "#/$defs/nullableCount" },
+              "cacheReadTokens": { "$ref": "#/$defs/nullableCount" },
+              "cacheWriteTokens": { "$ref": "#/$defs/nullableCount" },
+              "outputTokens": { "$ref": "#/$defs/nullableCount" },
+              "costUsd": { "$ref": "#/$defs/nullableMoney" }
+            }
+          }
+        }
+      }
+    },
     "taskTraceability": {
       "type": "object",
       "additionalProperties": false,
