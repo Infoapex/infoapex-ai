@@ -338,18 +338,20 @@ function runControlBuild(project: string, cwd: string): ProcessResult {
   // Full-install checks can run in parallel across test workers or automation
   // processes against the same extracted bundle. MSBuild's generated
   // `*.FileListAbsolute.txt` is not concurrency-safe and reports MSB3491 while
-  // the other build is finishing. Retry only that known transient collision;
-  // all other build failures remain fail-closed and are returned immediately.
-  for (let attempt = 0; attempt < 5 && isMsbuildFileListCollision(result); attempt += 1) {
+  // the other build is finishing. Windows antivirus and the Roslyn build server
+  // can produce the equivalent CS2012 lock while the output is being scanned.
+  // Retry only these known transient file-lock collisions; all other build
+  // failures remain fail-closed and are returned immediately.
+  for (let attempt = 0; attempt < 5 && isTransientMsbuildFileLock(result); attempt += 1) {
     sleepSync(500);
     result = run("dotnet", ["build", project, "--nologo"], cwd);
   }
   return result;
 }
 
-function isMsbuildFileListCollision(result: ProcessResult): boolean {
+function isTransientMsbuildFileLock(result: ProcessResult): boolean {
   const output = `${result.stdout}\n${result.stderr}`;
-  return result.exitCode !== 0 && /MSB3491|FileListAbsolute\.txt/i.test(output);
+  return result.exitCode !== 0 && /MSB3491|FileListAbsolute\.txt|CS2012|being used by another process|file may be locked/i.test(output);
 }
 
 function sleepSync(milliseconds: number): void {
