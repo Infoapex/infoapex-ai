@@ -112,7 +112,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   // doctor/provider call was both slow and capable of leaving compiler children
   // behind when an outer process was interrupted.
   if (findings.length === 0) {
-    const build = run("dotnet", ["build", paths.controlProject, "--nologo"], repo);
+    const build = runControlBuild(paths.controlProject, repo);
     if (build.exitCode !== 0) findings.push(`ai-code-control build failed: ${boundedFailure(build)}`);
   }
   // The C# CLI creates its rebuildable SQLite caches. It does not choose a
@@ -333,5 +333,28 @@ function claudeGuide() { return "# Claude Code bootstrap\n\nRead `AGENTS.md`, `T
 function json(value: unknown): string { return `${JSON.stringify(value, null, 2)}\n`; }
 function writeText(path: string, value: string): void { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, value, "utf8"); }
 function run(executable: string, args: readonly string[], cwd: string, timeoutMs = 120_000): ProcessResult { const result = spawnSync(executable, args, { cwd, encoding: "utf8", windowsHide: true, timeout: timeoutMs }); return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? (result.error?.message ?? "") }; }
+function runControlBuild(project: string, cwd: string): ProcessResult {
+  let result = run("dotnet", ["build", project, "--nologo"], cwd);
+  // Full-install checks can run in parallel across test workers or automation
+  // processes against the same extracted bundle. MSBuild's generated
+  // `*.FileListAbsolute.txt` is not concurrency-safe and reports MSB3491 while
+  // the other build is finishing. Retry only that known transient collision;
+  // all other build failures remain fail-closed and are returned immediately.
+  for (let attempt = 0; attempt < 5 && isMsbuildFileListCollision(result); attempt += 1) {
+    sleepSync(500);
+    result = run("dotnet", ["build", project, "--nologo"], cwd);
+  }
+  return result;
+}
+
+function isMsbuildFileListCollision(result: ProcessResult): boolean {
+  const output = `${result.stdout}\n${result.stderr}`;
+  return result.exitCode !== 0 && /MSB3491|FileListAbsolute\.txt/i.test(output);
+}
+
+function sleepSync(milliseconds: number): void {
+  const shared = new Int32Array(new SharedArrayBuffer(4));
+  Atomics.wait(shared, 0, 0, milliseconds);
+}
 function boundedFailure(result: ProcessResult): string { return (result.stderr || result.stdout || `exit ${result.exitCode}`).trim().replace(/\s+/g, " ").slice(-1000); }
 function isSafeRelativePath(value: string): boolean { return value.length > 0 && !value.includes("..") && !value.startsWith("/") && !/^[a-zA-Z]:/.test(value) && !value.includes("\\"); }

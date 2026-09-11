@@ -71,6 +71,11 @@ function runJson(command, args, cwd) {
 function createFakeClaude(directory, plans) {
   const script = join(directory, "fake-claude.mjs");
   const source = `import { readFileSync } from "node:fs";
+const args = process.argv.slice(2);
+if (args.includes("--version")) {
+  console.log("claude 1.0.0-fake");
+  process.exit(0);
+}
 const prompt = readFileSync(0, "utf8");
 const plans = ${JSON.stringify(plans)};
 const key = Object.keys(plans).find((entry) => prompt.includes(entry));
@@ -137,7 +142,15 @@ function main() {
   try {
     for (const seed of taskSeeds) {
       const draft = join(workspace, `${seed.label}.plan.json`);
-      const proposeArgs = ["propose", `Build ${seed.goal} for value gate`, "--repo", repository, "--out", draft, "--no-context", "--json"];
+      const proposeArgs = [
+        "propose", `Build ${seed.goal} for value gate`,
+        "--provider", "claude",
+        "--model", "claude-value-gate-fake",
+        "--reasoning-effort", "high",
+        "--selection-reason", "Deterministic internal value-gate fixture; no production provider usage.",
+        "--estimated-cost-usd", "0",
+        "--repo", repository, "--out", draft, "--no-context", "--json"
+      ];
       if (fakeClaude) proposeArgs.push("--claude-executable", fakeClaude);
       else proposeArgs.push("--claude-timeout-ms", String(timeoutMs));
 
