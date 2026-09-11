@@ -3,6 +3,29 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "files": [
+    "dist/src",
+    "modules/ai-code-planner/dist/src",
+    "modules/ai-code-planner/schemas",
+    "modules/ai-code-worker/dist/src",
+    "modules/ai-code-worker/schemas",
+    "modules/ai-code-worker/templates",
+    "modules/ai-code-review/dist/src",
+    "modules/ai-code-review/schemas",
+    "modules/ai-code-docs/dist/src",
+    "modules/ai-code-docs/schemas",
+    "modules/ai-code-benchmark/dist/src",
+    "modules/ai-code-benchmark/schemas",
+    "modules/ai-code-benchmark/datasets",
+    "modules/ai-code-control/tools/ai-code-control/mcp-server",
+    "modules/ai-code-control/tools/ai-code-control/src",
+    "modules/provenance.json",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "RELEASE-NOTES.md",
+    "SECURITY.md"
+  ],
   "bin": {
     "infoapex-ai": "dist/src/cli.js"
   },
@@ -25,12 +48,21 @@
     "docs-gate:internal": "node scripts/docs-gate.mjs",
     "release:build-zip": "node scripts/build-release-zip.mjs",
     "release:sbom": "node scripts/generate-sbom.mjs",
+    "release:package-check": "node scripts/check-npm-package.mjs",
+    "release:package-smoke": "node scripts/package-smoke-test.mjs",
     "p6:verify": "node scripts/verify-p6.mjs",
     "release:smoke-test": "node scripts/release-smoke-test.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/core": "^2.11.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-trace-base": "^2.11.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
     "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.0"
+    "ajv-formats": "^3.0.0",
+    "execa": "^9.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

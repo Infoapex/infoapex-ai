@@ -1,0 +1,27 @@
+# The published package is a prebuilt runtime bundle. Keep source, validation
+# state, CI metadata, and generated test output out of the npm artefact.
+src/
+tests/
+scripts/
+docs/
+validation/
+.github/
+.claude/
+.codex/
+todo.md
+dist/tests/
+**/dist/tests/
+**/node_modules/
+**/.local/
+**/coverage/
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
+**/*.log
+
+# The runtime entry points are generated during the release build and are
+# explicitly allowlisted by package.json.
+!dist/src/
+!dist/src/**
+!modules/**/dist/
+!modules/**/dist/**

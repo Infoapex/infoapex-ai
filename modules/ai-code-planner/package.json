@@ -18,6 +18,7 @@
     "node": ">=22"
   },
   "files": [
+    "dist",
     "docs",
     "schemas",
     "src",

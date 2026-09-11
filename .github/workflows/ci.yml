@@ -74,4 +74,7 @@ jobs:
         run: npm run release:smoke-test
 
       - name: P6 core-local contract, security, operations and compatibility gate
-        run: npm run p6:verify
+        run: |
+          npm run release:package-check
+          npm run release:package-smoke
+          npm run p6:verify

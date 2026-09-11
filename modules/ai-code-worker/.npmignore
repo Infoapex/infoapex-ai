@@ -1,0 +1,3 @@
+# The parent Infoapex bundle includes this module's prebuilt runtime.
+!dist/
+!dist/**

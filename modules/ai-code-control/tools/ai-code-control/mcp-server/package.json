@@ -4,6 +4,7 @@
   "description": "MCP server exposing AI Code Control tools to Claude and compatible clients",
   "type": "module",
   "main": "dist/server.js",
+  "files": ["dist"],
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",

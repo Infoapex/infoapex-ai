@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { delegate, type RootEnvelope } from "./delegate.js";
 import { fullInstall, preflight, type InstallProfile } from "./full-install.js";
 import { explainConfig, migrate, rollbackConfig, validateConfig } from "./config-lifecycle.js";
+import { checkInstall, rollbackRelease, upgrade } from "./release-lifecycle.js";
 import { acquireLease, diagnosticsBundle, productionDoctor, retention } from "./production.js";
 import { MODULE_REGISTRY, modulesForCommand, moduleSubcommand, type RootCommand } from "./registry.js";
 
@@ -23,10 +24,12 @@ interface CommandHelp {
  *  already surfaces that module's own usage message inside the BLOCKED envelope. */
 const COMMAND_HELP: Readonly<Record<string, CommandHelp>> = {
   init: { usage: "infoapex-ai init --repo <path> [--mode independent|integrated] [--full --profile generic|dotnet-nextjs] [--backend-dir <dir> --frontend-dir <dir> --ml-dir <dir>] [--repair]", summary: "Bootstrap handoff only, or install a reusable P6 technology profile with --full.", delegatesTo: null },
+  install: { usage: "infoapex-ai install --check --repo <path>", summary: "Check an existing full installation and the active bundle without changing it.", delegatesTo: null },
+  upgrade: { usage: "infoapex-ai upgrade [--check] --repo <path>", summary: "Back up installer-owned files and retarget a full installation to this bundle.", delegatesTo: null },
   preflight: { usage: "infoapex-ai preflight --repo <path>", summary: "Run the strict no-provider readiness gate for a full installation.", delegatesTo: null },
   config: { usage: "infoapex-ai config <validate|explain> --repo <path>", summary: "Validate or explain installer-owned configuration without changing it.", delegatesTo: null },
   migrate: { usage: "infoapex-ai migrate <--check|--dry-run|--apply> --repo <path>", summary: "Validate, back up, and journal an idempotent configuration migration.", delegatesTo: null },
-  rollback: { usage: "infoapex-ai rollback --repo <path> [--migration config-v1] [--dry-run]", summary: "Restore only files proven by a verified migration backup journal.", delegatesTo: null },
+  rollback: { usage: "infoapex-ai rollback --repo <path> [--migration config-v1] [--release [--upgrade-id <id>]] [--dry-run]", summary: "Restore a verified configuration migration or release-upgrade backup.", delegatesTo: null },
   production: { usage: "infoapex-ai production <doctor|lease|retention> --repo <path>", summary: "Verify production policy, acquire an atomic lease, or inventory retention expiry.", delegatesTo: null },
   diagnostics: { usage: "infoapex-ai diagnostics bundle --repo <path> [--out <relative-path>]", summary: "Create a local redacted support bundle without source or secrets.", delegatesTo: null },
   status: { usage: "infoapex-ai status --repo <path>", summary: "Report this repository's integration mode and each vendored module's pinned commit. Not run state - see 'resume' for that.", delegatesTo: null },
@@ -106,6 +109,17 @@ if (command === "help" || command === "--help" || command === "-h") {
   const result = preflight(repo, bundleRoot());
   console.log(JSON.stringify(result, null, 2));
   process.exitCode = result.status === "PASS" ? 0 : 2;
+} else if (command === "install") {
+  if (!args.includes("--check")) fail("Usage: infoapex-ai install --check --repo <path>");
+  const repo = resolve(option("--repo") ?? process.cwd());
+  const result = checkInstall(repo, bundleRoot());
+  console.log(JSON.stringify(result, null, 2));
+  process.exitCode = result.status === "PASS" ? 0 : 2;
+} else if (command === "upgrade") {
+  const repo = resolve(option("--repo") ?? process.cwd());
+  const result = args.includes("--check") ? checkInstall(repo, bundleRoot(), false) : upgrade(repo, bundleRoot());
+  console.log(JSON.stringify(result, null, 2));
+  process.exitCode = result.status === "PASS" ? 0 : 2;
 } else if (command === "config") {
   const repo = resolve(option("--repo") ?? process.cwd());
   const subcommand = args[1];
@@ -121,7 +135,9 @@ if (command === "help" || command === "--help" || command === "-h") {
   const result = migrate(repo, selected); console.log(JSON.stringify(result, null, 2)); process.exitCode = result.status === "PASS" ? 0 : 2;
 } else if (command === "rollback") {
   const repo = resolve(option("--repo") ?? process.cwd());
-  const result = rollbackConfig(repo, option("--migration") ?? "config-v1", args.includes("--dry-run"));
+  const result = args.includes("--release")
+    ? rollbackRelease(repo, option("--upgrade-id") ?? null, args.includes("--dry-run"))
+    : rollbackConfig(repo, option("--migration") ?? "config-v1", args.includes("--dry-run"));
   console.log(JSON.stringify(result, null, 2)); process.exitCode = result.status === "PASS" ? 0 : 2;
 } else if (command === "production") {
   const repo = resolve(option("--repo") ?? process.cwd()); const subcommand = args[1];
@@ -198,7 +214,7 @@ if (command === "help" || command === "--help" || command === "-h") {
     printEnvelope(delegate({ command, module: module!, subcommand, bundleRoot: bundleRoot(), args: moduleArgs }));
   }
 } else {
-  console.error(`Usage: infoapex-ai <init|preflight|config|migrate|rollback|production|diagnostics|status|handoff|${DELEGATED_COMMANDS.join("|")}>. Run 'infoapex-ai help' for details on each command.`);
+  console.error(`Usage: infoapex-ai <init|install|upgrade|preflight|config|migrate|rollback|production|diagnostics|status|handoff|${DELEGATED_COMMANDS.join("|")}>. Run 'infoapex-ai help' for details on each command.`);
   process.exitCode = 1;
 }
 
