@@ -266,9 +266,14 @@ configurează wiring-ul modulelor și directoarele sale gestionate; nu modifică
 nu instalează runtime-urile Node/.NET/Python sau CLI-urile Codex/Claude.
 
 ```bash
-npx --package . infoapex-ai init --repo /cale/catre/proiect --mode integrated --full --profile dotnet-nextjs --backend-dir backend --frontend-dir frontend --ml-dir ml
+npx --package . infoapex-ai init --repo /cale/catre/proiect --mode integrated --full --profile dotnet-nextjs --backend-dir backend --frontend-dir frontend --ml-dir ml --verify
 npx --package . infoapex-ai status --repo /cale/catre/proiect
 ```
+
+`--verify` rulează imediat gate-ul local `preflight`, fără provider de coding, și
+returnează `BLOCKED` dacă instalarea sau toolchain-ul proiectului nu este pregătit.
+Pentru modificarea unui bootstrap deja existent, folosește `--repair` numai după
+revizuirea fișierelor gestionate.
 
 **2. Pregătește worker-ul și verifică mediul**
 
@@ -340,7 +345,7 @@ sunt echivalente cu apelurile directe din pașii 2-4). Detalii complete: ADR
 infoapex-ai init --repo <cale> --mode independent   # bootstrap implicit
 infoapex-ai init --repo <cale> --mode integrated
 infoapex-ai init --repo <cale> --mode integrated --full --profile generic
-infoapex-ai init --repo <cale> --mode integrated --full --profile dotnet-nextjs --backend-dir <dir> --frontend-dir <dir> [--ml-dir <dir>]
+infoapex-ai init --repo <cale> --mode integrated --full --profile dotnet-nextjs --backend-dir <dir> --frontend-dir <dir> [--ml-dir <dir>] [--verify]
 ```
 
 În modul `independent`, modulele nu folosesc canalul comun și pot fi rulate separat.

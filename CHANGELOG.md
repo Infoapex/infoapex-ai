@@ -15,3 +15,6 @@
 - Solo-maintainer public-release preflight now requires an explicit committed Go/No-Go
   decision and verifies the tagged artifact, checksum, provenance, SBOM, and signed
   release workflow before any publication step.
+- Full installation now supports `--verify` for an immediate no-provider preflight,
+  blocks partial bootstrap state on invalid targets, and requires `--repair` before
+  replacing a differing bootstrap file.

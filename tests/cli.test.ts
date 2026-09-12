@@ -182,3 +182,22 @@ test("full CLI install blocks before creating partial bootstrap state", () => {
     rmSync(repository, { recursive: true, force: true });
   }
 });
+
+test("full init preserves a differing bootstrap until repair is explicit", () => {
+  const repository = mkdtempSync(join(tmpdir(), "apex-cli-bootstrap-conflict-"));
+  try {
+    const bootstrap = runCli(repository, ["init", "--repo", repository, "--mode", "integrated"]);
+    assert.equal(bootstrap.status, 0, bootstrap.stderr || bootstrap.stdout);
+    writeFileSync(join(repository, ".infoapex-ai", "README.md"), "# Consumer-owned notes\n", "utf8");
+    initializeGit(repository);
+    const result = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "generic"]);
+    assert.equal(result.status, 2, result.stderr || result.stdout);
+    const body = JSON.parse(result.stdout) as { status: string; findings: readonly string[] };
+    assert.equal(body.status, "BLOCKED");
+    assert.match(body.findings.join(" "), /README\.md differs/);
+    assert.equal(readFileSync(join(repository, ".infoapex-ai", "README.md"), "utf8"), "# Consumer-owned notes\n");
+    assert.equal(existsSync(join(repository, ".ai-code-worker", "config.json")), false);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
