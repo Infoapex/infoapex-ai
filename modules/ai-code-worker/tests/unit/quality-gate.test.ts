@@ -71,6 +71,22 @@ describe("quality gate runner", () => {
     assert.equal(result.failureClass, null);
   });
 
+  it("resolves a bare Windows command name to its PATH shim", () => {
+    if (process.platform !== "win32") return;
+
+    const result = runQualityGateSync({
+      id: "npm-bare-name",
+      executable: "npm",
+      args: ["--version"],
+      cwd: process.cwd(),
+      timeoutMs: 5000,
+      maximumOutputBytes: 1024
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.failureClass, null);
+  });
+
   it("classifies non-zero exits as deterministic failures", async () => {
     const result = await runQualityGate({
       id: "node-fail",

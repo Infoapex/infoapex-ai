@@ -1,4 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { delimiter, join } from "node:path";
 import { redactText } from "./redaction.js";
 import { needsShellWrapper } from "../engines/spawn-shell.js";
 
@@ -35,12 +37,14 @@ export interface QualityGateResult {
 
 export function runQualityGate(command: CommandSpec): Promise<QualityGateResult> {
   const startedAt = Date.now();
+  const env = runtimeEnvironment(command.env);
+  const executable = resolveCommandShim(command.executable, env);
 
   return new Promise((resolve) => {
-    const child = spawn(command.executable, command.args, {
+    const child = spawn(executable, command.args, {
       cwd: command.cwd,
-      env: runtimeEnvironment(command.env),
-      shell: needsShellWrapper(command.executable),
+      env,
+      shell: needsShellWrapper(executable),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
     });
@@ -115,10 +119,12 @@ export function runQualityGate(command: CommandSpec): Promise<QualityGateResult>
 
 export function runQualityGateSync(command: CommandSpec): QualityGateResult {
   const startedAt = Date.now();
-  const result = spawnSync(command.executable, command.args, {
+  const env = runtimeEnvironment(command.env);
+  const executable = resolveCommandShim(command.executable, env);
+  const result = spawnSync(executable, command.args, {
     cwd: command.cwd,
-    env: runtimeEnvironment(command.env),
-    shell: needsShellWrapper(command.executable),
+    env,
+    shell: needsShellWrapper(executable),
     encoding: "buffer",
     maxBuffer: command.maximumOutputBytes,
     stdio: ["ignore", "pipe", "pipe"],
@@ -177,6 +183,30 @@ function runtimeEnvironment(explicit: Readonly<Record<string, string>> | undefin
 
   Object.assign(runtime, explicit ?? {});
   return runtime;
+}
+
+/** Resolve a bare Windows command to a PATH-local shim without enabling shell
+ * interpolation for arbitrary commands. Node's CreateProcess path lookup does
+ * not reliably apply PATHEXT to .cmd/.bat files, while npm and npx are commonly
+ * installed only as those shims. Explicit paths and commands with extensions
+ * retain their existing behavior. */
+function resolveCommandShim(executable: string, env: Readonly<Record<string, string>>): string {
+  if (process.platform !== "win32" || executable.includes("\\") || executable.includes("/") || /\.[^./\\]+$/i.test(executable)) {
+    return executable;
+  }
+  const pathValue = env.Path ?? env.PATH;
+  if (!pathValue) return executable;
+  for (const directory of pathValue.split(delimiter)) {
+    if (!directory) continue;
+    for (const extension of [".cmd", ".bat"]) {
+      const candidate = join(directory, `${executable}${extension}`);
+      // Keep the resolved name relative to PATH. Passing an absolute shim path
+      // to shell:true reintroduces the spaces-in-path failure this wrapper is
+      // meant to avoid (for example, C:\\Program Files\\nodejs\\npm.cmd).
+      if (existsSync(candidate)) return `${executable}${extension}`;
+    }
+  }
+  return executable;
 }
 
 export function toEvidenceCommand(result: QualityGateResult): {

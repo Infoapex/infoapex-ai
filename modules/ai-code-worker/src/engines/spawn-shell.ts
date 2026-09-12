@@ -11,10 +11,9 @@
  * working invocation into "'C:\Program' is not recognized..."). Scoping the wrapper to
  * only .cmd/.bat executables avoids that regression while still fixing the real case.
  *
- * A bare command name (e.g. "codex") that resolves via PATH to a .cmd/.bat is not
- * covered here - both real engine installs on this machine resolve to .exe, so this is
- * a known, accepted gap for the PATH-resolved-bare-name-to-.cmd case specifically, not
- * the full-path case this function does cover.
+ * Bare command names that resolve via PATH to a .cmd/.bat are normalized by the
+ * quality-gate runner before this predicate is called; this predicate remains
+ * deliberately concerned only with the final executable form.
  */
 export function needsShellWrapper(executable: string): boolean {
   return process.platform === "win32" && /\.(cmd|bat)$/i.test(executable);
