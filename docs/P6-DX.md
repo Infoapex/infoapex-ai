@@ -32,6 +32,10 @@ Windows și nu ridică privilegii; dacă un check este `BLOCKED`, administratoru
 repository-ului trebuie să corecteze ACL-ul sau să mute proiectul într-o locație
 accesibilă, apoi să ruleze din nou verificarea.
 
+Full install-ul creează și `.ai-code-benchmark/config.json`, cu căile exacte către
+root CLI și ai-code-control. Benchmarkul rămâne dezactivat pentru execuție live și
+nu primește automat un state root; pilotul live necesită autorizarea sa explicită.
+
 Pentru primul run, folosește motorul determinist `fake` și un plan acceptat, revizuit de
 operator. Acest pas verifică wiring-ul și gate-urile, nu calitatea unui provider:
 

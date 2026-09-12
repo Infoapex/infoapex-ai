@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { migrate, rollbackConfig, validateConfig } from "../src/config-lifecycle.js";
 
-const managed = [".infoapex-ai/config.json", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-worker/execution-environment.example.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".ai-code-control/config/code-control.json", ".ai-code-control/config/memory-control.json"];
+const managed = [".infoapex-ai/config.json", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-worker/execution-environment.example.json", ".ai-code-benchmark/config.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".ai-code-control/config/code-control.json", ".ai-code-control/config/memory-control.json"];
 
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "infoapex-migrate-"));

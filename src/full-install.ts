@@ -91,7 +91,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   };
 
   const paths = modulePaths(bundle);
-  for (const path of [paths.plannerCli, paths.workerCli, paths.reviewCli, paths.docsCli, paths.controlProject, paths.controlMcp]) {
+  for (const path of [paths.plannerCli, paths.workerCli, paths.reviewCli, paths.docsCli, paths.benchmarkCli, paths.controlProject, paths.controlMcp]) {
     if (!bundlePath(bundle, relative(bundle, path).replaceAll("\\", "/"))) findings.push(`Unsafe bundle runtime path '${path}'.`);
   }
   if (findings.length > 0) return { status: "BLOCKED", profile: options.profile, created, updated, skipped, findings };
@@ -108,6 +108,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   writeManaged(".ai-code-worker/config.json", json(workerConfig(paths)));
   writeManaged(".ai-code-worker/routing-policy.json", json(routingPolicy()));
   writeManaged(".ai-code-worker/execution-environment.example.json", json(executionEnvironmentConfig()));
+  writeManaged(".ai-code-benchmark/config.json", json(benchmarkConfig(paths)));
   writeSeed(".ai-code-worker/README.md", "# ai-code-worker\n\nConfigurat de `infoapex-ai init --full`. Nu modifica politica de rutare fără un experiment/autorizare nouă.\n");
   writeManaged(".ai-code-review/config.json", json(reviewConfig(paths)));
   writeManaged(".ai-code-docs/config.json", json(docsConfig(paths)));
@@ -173,6 +174,7 @@ export function verifyFilesystemPermissions(repositoryRoot: string, bundleRoot: 
     join(repo, ".infoapex-ai"),
     join(repo, ".ai-code-control"),
     join(repo, ".ai-code-worker"),
+    join(repo, ".ai-code-benchmark"),
     join(repo, ".ai-code-review"),
     join(repo, ".ai-code-docs")
   ];
@@ -187,10 +189,13 @@ export function verifyFilesystemPermissions(repositoryRoot: string, bundleRoot: 
   });
   const runtime = [
     "dist/src/cli.js",
+    "modules/ai-code-planner/dist/src/cli.js",
     "modules/ai-code-worker/dist/src/cli.js",
     "modules/ai-code-review/dist/src/cli.js",
     "modules/ai-code-docs/dist/src/cli.js",
-    "modules/ai-code-control/tools/ai-code-control/mcp-server/dist/server.js"
+    "modules/ai-code-benchmark/dist/src/cli.js",
+    "modules/ai-code-control/tools/ai-code-control/mcp-server/dist/server.js",
+    "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.Cli/bin/Debug/net9.0/AiCodeControl.Cli.dll"
   ];
   const unreadable = runtime.filter((path) => !existsSync(join(bundle, path)) || !hasAccess(join(bundle, path), constants.R_OK));
   checks.push({
@@ -209,7 +214,7 @@ export function preflight(repositoryRoot: string, bundleRoot: string): Preflight
   const required = [
     ".infoapex-ai/config.json", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".ai-code-control/config/code-control.json",
     ".ai-code-control/config/memory-control.json", ".ai-code-control/memory/PROJECT-STATE.md", "TODO.md", "AGENTS.md", "CLAUDE.md",
-    ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-worker/execution-environment.example.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".mcp.json", ".claude/settings.json", ".codex/config.toml"
+    ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-worker/execution-environment.example.json", ".ai-code-benchmark/config.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".mcp.json", ".claude/settings.json", ".codex/config.toml"
   ];
   const absent = required.filter((relative) => !existsSync(join(repo, relative)));
   checks.push({ id: "required-project-files", status: absent.length === 0 ? "PASS" : "BLOCKED", detail: absent.length === 0 ? "All full-install artifacts exist." : `Missing: ${absent.join(", ")}` });
@@ -256,10 +261,12 @@ export function preflight(repositoryRoot: string, bundleRoot: string): Preflight
 
 function modulePaths(bundleRoot: string) {
   return {
+    rootCli: join(bundleRoot, "dist", "src", "cli.js"),
     plannerCli: join(bundleRoot, "modules", "ai-code-planner", "dist", "src", "cli.js"),
     workerCli: join(bundleRoot, "modules", "ai-code-worker", "dist", "src", "cli.js"),
     reviewCli: join(bundleRoot, "modules", "ai-code-review", "dist", "src", "cli.js"),
     docsCli: join(bundleRoot, "modules", "ai-code-docs", "dist", "src", "cli.js"),
+    benchmarkCli: join(bundleRoot, "modules", "ai-code-benchmark", "dist", "src", "cli.js"),
     controlProject: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "src", "AiCodeControl.Cli"),
     controlDll: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "src", "AiCodeControl.Cli", "bin", "Debug", "net9.0", "AiCodeControl.Cli.dll"),
     controlModuleRoot: join(bundleRoot, "modules", "ai-code-control"),
@@ -298,6 +305,20 @@ function executionEnvironmentConfig() {
     network: { repositoryProcesses: "deny", adapterControlPlane: "provider-only" },
     environment: { inheritByDefault: false, allowedVariables: ["CI", "NO_COLOR"] },
     limits: { maximumDurationSeconds: 2700, maximumOutputBytes: 10485760, maximumProcesses: 64, maximumMemoryBytes: 4294967296, maximumCpuUnits: 2 }
+  };
+}
+
+function benchmarkConfig(paths: ReturnType<typeof modulePaths>) {
+  return {
+    schemaVersion: "1.0",
+    stateRoot: null,
+    commands: {
+      codex: ["codex"],
+      claude: ["claude"],
+      infoapex: [process.execPath, paths.rootCli],
+      aiCodeControl: ["dotnet", paths.controlDll]
+    },
+    capabilities: { liveExecution: false, networkExpansion: false, publish: false, secretForwarding: false }
   };
 }
 

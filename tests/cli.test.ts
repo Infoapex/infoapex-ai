@@ -143,6 +143,7 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
     assert.equal(existsSync(join(repository, "CLAUDE.md")), true);
     assert.equal(existsSync(join(repository, ".ai-code-control", "memory", "PROJECT-STATE.md")), true);
     assert.equal(existsSync(join(repository, ".ai-code-worker", "execution-environment.example.json")), true);
+    assert.equal(existsSync(join(repository, ".ai-code-benchmark", "config.json")), true);
 
     const worker = JSON.parse(readFileSync(join(repository, ".ai-code-worker", "config.json"), "utf8")) as {
       contextProvider: string;
@@ -166,6 +167,10 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
     assert.equal(mcp.mcpServers["ai-code-control"].env.REPO_ROOT, repository);
     assert.equal(existsSync(join(repository, ".claude", "settings.json")), true);
     assert.match(readFileSync(join(repository, ".codex", "config.toml"), "utf8"), /\[mcp_servers\.ai-code-control\]/);
+    const benchmark = JSON.parse(readFileSync(join(repository, ".ai-code-benchmark", "config.json"), "utf8")) as { commands: { infoapex: readonly string[]; aiCodeControl: readonly string[] }; capabilities: { liveExecution: boolean; networkExpansion: boolean; publish: boolean; secretForwarding: boolean } };
+    assert.match(benchmark.commands.infoapex.join(" "), /dist[\\/]src[\\/]cli\.js$/);
+    assert.match(benchmark.commands.aiCodeControl.join(" "), /AiCodeControl\.Cli\.dll$/);
+    assert.deepEqual(benchmark.capabilities, { liveExecution: false, networkExpansion: false, publish: false, secretForwarding: false });
     assert.match(readFileSync(join(repository, ".gitignore"), "utf8"), /\.infoapex-ai\/runs\//);
   } finally {
     rmSync(repository, { recursive: true, force: true });

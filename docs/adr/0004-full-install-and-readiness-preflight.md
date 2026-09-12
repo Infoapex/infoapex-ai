@@ -43,9 +43,11 @@ A full install:
 6. records the bundle path in an install profile so moving the bundle is detected;
 7. writes `.mcp.json`, `.codex/config.toml`, and Claude lifecycle hooks using the exact
    repository and bundle paths;
-8. adds only a bounded managed block for local runtime state to `.gitignore`;
-9. requires `--repair` before replacing a differing installer-owned configuration.
-10. validates the repository and bootstrap conflict before creating state; after a
+8. initializes the benchmark module with exact root/control command paths and all
+   externally expanding capabilities disabled;
+9. adds only a bounded managed block for local runtime state to `.gitignore`;
+10. requires `--repair` before replacing a differing installer-owned configuration.
+11. validates the repository and bootstrap conflict before creating state; after a
     successful full install, optional `--verify` runs the no-provider `preflight` and
     returns `BLOCKED` if the installed wiring is not ready.
 
