@@ -30,6 +30,36 @@
           "toWorktree": "node_modules"
         }
       ]
+    },
+    {
+      "id": "release-package-check",
+      "description": "Verify the npm package contains only supported release content.",
+      "workingDirectory": ".",
+      "executable": "npm",
+      "args": ["run", "release:package-check"],
+      "timeoutSeconds": 120,
+      "allowedEnvironmentVariables": ["PATH", "SystemRoot", "ComSpec", "TEMP", "TMP"],
+      "linkedDirectories": [
+        {
+          "fromRepository": "node_modules",
+          "toWorktree": "node_modules"
+        }
+      ]
+    },
+    {
+      "id": "release-package-smoke",
+      "description": "Install and exercise the built npm artifact in a disposable target.",
+      "workingDirectory": ".",
+      "executable": "npm",
+      "args": ["run", "release:package-smoke"],
+      "timeoutSeconds": 300,
+      "allowedEnvironmentVariables": ["PATH", "SystemRoot", "ComSpec", "TEMP", "TMP"],
+      "linkedDirectories": [
+        {
+          "fromRepository": "node_modules",
+          "toWorktree": "node_modules"
+        }
+      ]
     }
   ]
 }
