@@ -408,7 +408,7 @@ trebuie pornite explicit.
 | **P3** | Bundle ZIP, clean install, release privat | ✅ închis — smoke test complet dintr-un ZIP curat (10/10 pași), CI matrice Windows + Linux verde, `v0.1.0` publicat ca GitHub Release privat |
 | **P4** | CLI root unificat | ✅ închis — ADR-0003, registry, mecanism de delegare, comenzile `doctor`/`plan`/`run`/`resume`/`review`/`docs`, `infoapex-ai help` și testele lor sunt gata; fiecare modul rămâne complet utilizabil de sine stătător (niciun modul nu a fost modificat pentru delegare) |
 | **P4.5 / BENCH** | [`ai-code-benchmark`](docs/plans/AI-CODE-BENCHMARK-IMPLEMENTATION-PLAN.md): direct vs. orchestration-only vs. full ICM | ✅ închis — modul standalone publicat și pinned, integrare root/CI/ZIP cu BENCH-D și BENCH-09 R5 live 30/30 valid |
-| **P5** | SDK-uri și operare avansată (9 subproiecte independente, fiecare cu ADR + threat model propriu — nu un singur milestone) | 🟡 în progres — OpenTelemetry redactat este primul subproiect acceptat intern (20/20 valid, toate cele 4 praguri PASS); celelalte subproiecte rămân independente |
+| **P5** | SDK-uri și operare avansată (9 subproiecte independente, fiecare cu ADR + threat model propriu — nu un singur milestone) | 🟡 în progres — OpenTelemetry redactat este acceptat intern (20/20 valid), iar UI-ul local read-only P5.2 este implementat și testat; celelalte subproiecte rămân independente |
 | **P6** | [Production Readiness & Developer Adoption](docs/plans/INFOAPEX-AI-P6-PRODUCTION-READINESS-PLAN.md): lifecycle, security, recovery, operare, suport și pilot consumator | 🟡 în curs — P6.1–P6.8 local implementate și verificate; pilotul consumator real și RC/GA rămân deschise |
 
 De ce `0.1.0` este pre-release și nu producție:

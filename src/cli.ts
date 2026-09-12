@@ -8,6 +8,7 @@ import { fullInstall, preflight, type InstallProfile } from "./full-install.js";
 import { explainConfig, migrate, rollbackConfig, validateConfig } from "./config-lifecycle.js";
 import { checkInstall, rollbackRelease, upgrade } from "./release-lifecycle.js";
 import { acquireLease, diagnosticsBundle, productionDoctor, productionHealth, retention } from "./production.js";
+import { buildEvidenceView } from "./evidence-viewer.js";
 import { MODULE_REGISTRY, modulesForCommand, moduleSubcommand, type RootCommand } from "./registry.js";
 
 interface CommandHelp {
@@ -32,6 +33,7 @@ const COMMAND_HELP: Readonly<Record<string, CommandHelp>> = {
   rollback: { usage: "infoapex-ai rollback --repo <path> [--migration config-v1] [--release [--upgrade-id <id>]] [--dry-run]", summary: "Restore a verified configuration migration or release-upgrade backup.", delegatesTo: null },
   production: { usage: "infoapex-ai production <doctor|health|lease|retention> --repo <path> [--apply]", summary: "Report bounded local health, verify policy, acquire one lease, or inspect/apply evidence retention.", delegatesTo: null },
   diagnostics: { usage: "infoapex-ai diagnostics bundle --repo <path> [--out <relative-path>]", summary: "Explicitly create a local, redacted, size-bounded support bundle; it is never uploaded.", delegatesTo: null },
+  ui: { usage: "infoapex-ai ui --repo <path> [--run-id <id>] [--out <relative-path>]", summary: "Render a static, local, read-only HTML summary of bounded run evidence.", delegatesTo: null },
   status: { usage: "infoapex-ai status --repo <path>", summary: "Report this repository's integration mode and each vendored module's pinned commit. Not run state - see 'resume' for that.", delegatesTo: null },
   handoff: { usage: "infoapex-ai handoff --repo <path> --direction <planner-to-worker|worker-to-planner> --run-id <id> --payload <json>", summary: "Publish a versioned handoff file between planner and worker (integrated mode only).", delegatesTo: null },
   doctor: { usage: "infoapex-ai doctor --repo <path> [module flags...]", summary: "Aggregate: run doctor on every module present (ai-code-worker, ai-code-review, ai-code-docs) and report the worst status.", delegatesTo: "ai-code-worker, ai-code-review, ai-code-docs (doctor)" },
@@ -149,6 +151,22 @@ if (command === "help" || command === "--help" || command === "-h") {
   if (args[1] !== "bundle") fail("Usage: infoapex-ai diagnostics bundle --repo <path> [--out <relative-path>]");
   const repo = resolve(option("--repo") ?? process.cwd()); const result = diagnosticsBundle(repo, option("--out") ?? undefined);
   console.log(JSON.stringify(result, null, 2)); process.exitCode = result.status === "PASS" ? 0 : 2;
+} else if (command === "ui") {
+  const repo = resolve(option("--repo") ?? process.cwd());
+  const result = buildEvidenceView(repo, option("--run-id"));
+  if (result.status === "BLOCKED") {
+    console.log(JSON.stringify(result, null, 2));
+    process.exitCode = 2;
+  } else if (option("--out")) {
+    const output = resolve(repo, option("--out")!);
+    if (output === repo || !output.startsWith(`${repo}\\`)) fail("--out must be a file inside --repo");
+    writeText(output, result.html!);
+    console.log(JSON.stringify({ status: "PASS", output, runCount: result.runCount, runIds: result.runIds }, null, 2));
+    process.exitCode = 0;
+  } else {
+    process.stdout.write(result.html!);
+    process.exitCode = 0;
+  }
 } else if (command === "status") {
   const repo = resolve(option("--repo") ?? process.cwd());
   const path = join(repo, ".infoapex-ai", "config.json");
@@ -215,7 +233,7 @@ if (command === "help" || command === "--help" || command === "-h") {
     printEnvelope(delegate({ command, module: module!, subcommand, bundleRoot: bundleRoot(), args: moduleArgs }));
   }
 } else {
-  console.error(`Usage: infoapex-ai <init|install|upgrade|preflight|config|migrate|rollback|production|diagnostics|status|handoff|${DELEGATED_COMMANDS.join("|")}>. Run 'infoapex-ai help' for details on each command.`);
+  console.error(`Usage: infoapex-ai <init|install|upgrade|preflight|config|migrate|rollback|production|diagnostics|ui|status|handoff|${DELEGATED_COMMANDS.join("|")}>. Run 'infoapex-ai help' for details on each command.`);
   process.exitCode = 1;
 }
 
