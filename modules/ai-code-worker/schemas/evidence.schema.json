@@ -130,6 +130,32 @@
         }
       }
     },
+    "executionEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "profileSha256", "backend", "backendVersion", "securityBoundary"],
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profileSha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "backend": {
+          "type": "string",
+          "minLength": 1
+        },
+        "backendVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "securityBoundary": {
+          "enum": ["host-process", "os-isolated", "simulated"]
+        }
+      }
+    },
     "usageSamples": {
       "type": "array",
       "items": {

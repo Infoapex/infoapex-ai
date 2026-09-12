@@ -70,6 +70,11 @@ describe("codex run coordinator", () => {
     assert.deepEqual(registry.validate("agent-result.schema.json", agentResult), { valid: true, errors: [] });
     assert.deepEqual(registry.validate("evidence.schema.json", evidence), { valid: true, errors: [] });
     assert.deepEqual(registry.validate("evidence.schema.json", runEvidence), { valid: true, errors: [] });
+    assert.equal(evidence.executionEnvironment.profileId, "isolated");
+    assert.equal(evidence.executionEnvironment.backend, "local-isolated");
+    assert.equal(evidence.executionEnvironment.securityBoundary, "host-process");
+    assert.match(evidence.executionEnvironment.profileSha256, /^[a-f0-9]{64}$/);
+    assert.deepEqual(runEvidence.executionEnvironment, evidence.executionEnvironment);
     assert.equal(runReport.status, "DONE");
     assert.equal(runReport.engine, "codex");
     assert.equal(runReport.review.status, "PASS");

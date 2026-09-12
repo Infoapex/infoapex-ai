@@ -30,7 +30,7 @@ import { resolveQualityGate } from "../runner/quality-gate-config.js";
 import { runQualityGateSync, toEvidenceCommand, type QualityGateResult } from "../runner/quality-gate.js";
 import { buildCoverageReview } from "../review/coverage-review.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
-import { resolveExecutionEnvironment } from "../execution/environment.js";
+import { resolveExecutionEnvironment, type EnvironmentCapabilityReport } from "../execution/environment.js";
 import { buildTaskInputSnapshot, type SnapshotManifest } from "../snapshots/task-input-snapshot.js";
 import { buildSemanticTaskInputs, type SemanticTaskInputs } from "../snapshots/semantic-task-inputs.js";
 import { runIndependentReviewAndRepair, type IndependentReviewer } from "./independent-review-repair.js";
@@ -112,14 +112,6 @@ export async function runCodex(options: CodexRunOptions): Promise<CodexRunReport
   const currentEvents = eventLog.read().events;
   const manifest = JSON.parse(readFileSync(compile.state.manifestPath, "utf8")) as RunManifest;
   const projectConfig = loadProjectConfig(compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath);
-  const adapter = new CodexCliAdapter(
-    codexConfig({
-      ...codexAdapterConfigFromProject(projectConfig),
-      ...options.adapterConfig
-    }),
-    registry
-  );
-  const doctor = adapter.doctor();
   const graph = buildTaskGraph(manifest.tasks);
   const recovery = recoverRunCheckpoints(currentEvents);
   const states = new Map<string, TaskRuntimeState>();
@@ -135,6 +127,52 @@ export async function runCodex(options: CodexRunOptions): Promise<CodexRunReport
   const usageAccumulator = new NormalizedUsageAccumulator();
   let usageTotals = emptyUsageTotals;
   let tick = 0;
+
+  let executionProfile: unknown;
+  let executionEnvironment: ReturnType<typeof resolveExecutionEnvironment>;
+  let environmentReport: ReturnType<ReturnType<typeof resolveExecutionEnvironment>["doctor"]>;
+  try {
+    executionProfile = loadExecutionProfile(compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath);
+    executionEnvironment = resolveExecutionEnvironment(executionProfile, registry);
+    environmentReport = executionEnvironment.doctor(executionProfile);
+  } catch {
+    return blockRunningRun({
+      codexSessionsDir: options.codexSessionsDir,
+      compile,
+      eventLog,
+      code: "ENVIRONMENT_CONFIG_INVALID",
+      message: "The configured execution environment could not be loaded or validated.",
+      executedTasks,
+      taskCommits,
+      gateResults,
+      usageTotals,
+      now: options.now ?? new Date().toISOString()
+    });
+  }
+  if (!environmentReport.supported) {
+    const detail = environmentReport.warnings.join(" ") || environmentReport.missingCapabilities.join(", ");
+    return blockRunningRun({
+      codexSessionsDir: options.codexSessionsDir,
+      compile,
+      eventLog,
+      code: "ENVIRONMENT_UNAVAILABLE",
+      message: `The configured execution environment is unavailable${detail ? `: ${detail}` : "."}`,
+      executedTasks,
+      taskCommits,
+      gateResults,
+      usageTotals,
+      now: options.now ?? new Date().toISOString()
+    });
+  }
+
+  const adapter = new CodexCliAdapter(
+    codexConfig({
+      ...codexAdapterConfigFromProject(projectConfig),
+      ...options.adapterConfig
+    }),
+    registry
+  );
+  const doctor = adapter.doctor();
 
   const recordUsageSamples = (samples: readonly UsageSample[]): UsageTotals => {
     if (samples.length > 0) {
@@ -224,7 +262,8 @@ export async function runCodex(options: CodexRunOptions): Promise<CodexRunReport
         gateResults,
         usageTotals,
         recordUsageSamples,
-        engineVersion: doctor.version
+        engineVersion: doctor.version,
+        environmentReport
       });
 
       if (recovered.status === "BLOCKED") {
@@ -454,7 +493,19 @@ export async function runCodex(options: CodexRunOptions): Promise<CodexRunReport
       now: timestamp
     });
     gateResults.push(...taskGateReport.results);
-    writeJson(join(taskRoot, "evidence.json"), evidenceFor(compile.runId, activeEngine, activeVersion, usageFromSamples(taskUsageSamples), taskGateReport.results, task, taskUsageSamples));
+    writeJson(
+      join(taskRoot, "evidence.json"),
+      evidenceFor(
+        compile.runId,
+        activeEngine,
+        activeVersion,
+        usageFromSamples(taskUsageSamples),
+        taskGateReport.results,
+        task,
+        taskUsageSamples,
+        environmentReport
+      )
+    );
     evidenceByTask[taskId] = `tasks/${taskId}/evidence.json`;
 
     if (taskGateReport.status === "BLOCKED") {
@@ -489,7 +540,7 @@ export async function runCodex(options: CodexRunOptions): Promise<CodexRunReport
       const finding = budgetEvaluation.findings.find((candidate) => candidate.severity === "blocker")!;
       const runEvidencePath = join(compile.state.runRoot, "run-evidence.json");
 
-      writeJson(runEvidencePath, aggregateEvidenceFor(compile.runId, "codex", doctor.version, usageTotals, gateResults));
+      writeJson(runEvidencePath, aggregateEvidenceFor(compile.runId, "codex", doctor.version, usageTotals, gateResults, environmentReport));
       eventLog.append({
         eventId: `${compile.runId}-${String(eventLog.read().events.length).padStart(4, "0")}-run-blocked`,
         runId: compile.runId,
@@ -543,7 +594,7 @@ export async function runCodex(options: CodexRunOptions): Promise<CodexRunReport
     now: timestampAt(options.now ?? new Date().toISOString(), tick)
   });
   gateResults.push(...globalGateReport.results);
-  writeJson(runEvidencePath, aggregateEvidenceFor(compile.runId, "codex", doctor.version, usageTotals, gateResults));
+  writeJson(runEvidencePath, aggregateEvidenceFor(compile.runId, "codex", doctor.version, usageTotals, gateResults, environmentReport));
 
   if (globalGateReport.status === "BLOCKED") {
     return blockRunningRun({
@@ -892,7 +943,8 @@ function evidenceFor(
   usage: EngineUsage,
   commands: readonly QualityGateResult[],
   task: RunManifestTask,
-  usageSamples: readonly UsageSample[] = []
+  usageSamples: readonly UsageSample[] = [],
+  environmentReport?: EnvironmentCapabilityReport
 ): unknown {
   const inputTotal =
     usage.inputUncachedTokens === null &&
@@ -929,6 +981,7 @@ function evidenceFor(
     commands: commands.map(toEvidenceCommand),
     artifacts: [],
     ...(usageSamples.length > 0 ? { usageSamples } : {}),
+    ...(environmentReport ? { executionEnvironment: environmentEvidence(environmentReport) } : {}),
     ...(taskTraceability ? { taskTraceability } : {})
   };
 }
@@ -938,7 +991,8 @@ function aggregateEvidenceFor(
   engine: RoutedEngine,
   engineVersion: string | null,
   totals: UsageTotals,
-  commands: readonly QualityGateResult[] = []
+  commands: readonly QualityGateResult[] = [],
+  environmentReport?: EnvironmentCapabilityReport
 ): unknown {
   const inputTotal =
     totals.inputUncachedTokens === null && totals.cacheReadTokens === null && totals.cacheWriteTokens === null
@@ -970,7 +1024,24 @@ function aggregateEvidenceFor(
       currency: null
     },
     commands: commands.map(toEvidenceCommand),
-    artifacts: []
+    artifacts: [],
+    ...(environmentReport ? { executionEnvironment: environmentEvidence(environmentReport) } : {})
+  };
+}
+
+function environmentEvidence(report: EnvironmentCapabilityReport): {
+  readonly profileId: string;
+  readonly profileSha256: string;
+  readonly backend: string;
+  readonly backendVersion: string;
+  readonly securityBoundary: EnvironmentCapabilityReport["securityBoundary"];
+} {
+  return {
+    profileId: report.profileId,
+    profileSha256: report.profileSha256,
+    backend: report.backend,
+    backendVersion: report.backendVersion,
+    securityBoundary: report.securityBoundary
   };
 }
 
@@ -991,6 +1062,7 @@ function continueFromCommittedTask(input: {
   readonly usageTotals: UsageTotals;
   readonly recordUsageSamples: (samples: readonly UsageSample[]) => UsageTotals;
   readonly engineVersion: string | null;
+  readonly environmentReport: EnvironmentCapabilityReport;
 }):
   | { readonly status: "PASS"; readonly usageTotals: UsageTotals }
   | { readonly status: "BLOCKED"; readonly report: CodexRunReport } {
@@ -1029,7 +1101,16 @@ function continueFromCommittedTask(input: {
   input.gateResults.push(...taskGateReport.results);
   writeJson(
     join(input.taskRoot, "evidence.json"),
-    evidenceFor(input.compile.runId!, "codex", input.engineVersion, usageFromSamples(taskUsageSamples), taskGateReport.results, input.task, taskUsageSamples)
+    evidenceFor(
+      input.compile.runId!,
+      "codex",
+      input.engineVersion,
+      usageFromSamples(taskUsageSamples),
+      taskGateReport.results,
+      input.task,
+      taskUsageSamples,
+      input.environmentReport
+    )
   );
   input.evidenceByTask[input.taskId] = `tasks/${input.taskId}/evidence.json`;
 

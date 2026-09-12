@@ -98,6 +98,24 @@ describe("compile command", () => {
     assert.equal(existsSync(join(stateRoot, "runs", "run-proposed")), false);
   });
 
+  it("fails closed when the execution environment profile cannot be parsed", () => {
+    const repo = createGitRepository();
+    writePlan(repo, "Plan/INVALID-ENVIRONMENT.md", "accepted");
+    mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
+    writeFileSync(join(repo, ".ai-code-worker", "execution-environment.example.json"), "{ invalid", "utf8");
+
+    const report = runCompile({
+      repositoryPath: repo,
+      planPath: "Plan/INVALID-ENVIRONMENT.md",
+      runId: "run-invalid-environment",
+      now: "2026-08-01T10:00:00Z"
+    });
+
+    assert.equal(report.status, "BLOCKED");
+    assert.equal(report.findings[0]?.code, "EXECUTION_ENVIRONMENT_INVALID");
+    assert.equal(report.state.runRoot, null);
+  });
+
   it("compiles a v1.1 plan without losing criterion, gate, or evidence-contract identifiers", () => {
     const repo = createGitRepository();
     writePlan(repo, "Plan/TRACEABLE.md", "accepted", traceablePlanBody());

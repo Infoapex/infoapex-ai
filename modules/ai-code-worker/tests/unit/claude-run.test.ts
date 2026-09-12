@@ -63,6 +63,11 @@ describe("claude run coordinator", () => {
     assert.deepEqual(registry.validate("agent-result.schema.json", agentResult), { valid: true, errors: [] });
     assert.deepEqual(registry.validate("evidence.schema.json", evidence), { valid: true, errors: [] });
     assert.deepEqual(registry.validate("evidence.schema.json", runEvidence), { valid: true, errors: [] });
+    assert.equal(evidence.executionEnvironment.profileId, "isolated");
+    assert.equal(evidence.executionEnvironment.backend, "local-isolated");
+    assert.equal(evidence.executionEnvironment.securityBoundary, "host-process");
+    assert.match(evidence.executionEnvironment.profileSha256, /^[a-f0-9]{64}$/);
+    assert.deepEqual(runEvidence.executionEnvironment, evidence.executionEnvironment);
     assert.equal(runReport.status, "DONE");
     assert.equal(runReport.engine, "claude");
     assert.equal(runReport.review.status, "PASS");
@@ -97,6 +102,33 @@ describe("claude run coordinator", () => {
     assert.deepEqual(report.taskCommits, {});
     const afterHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
     assert.equal(afterHead, beforeHead);
+  });
+
+  it("blocks before the provider when the configured execution profile is unsupported", async () => {
+    const repo = createGitRepository();
+    const profile = JSON.parse(readFileSync("templates/project/.ai-code-worker/execution-environment.example.json", "utf8")) as Record<string, unknown>;
+    profile.filesystem = {
+      ...(profile.filesystem as Record<string, unknown>),
+      hostReadDefault: "allow"
+    };
+    mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
+    writeFileSync(join(repo, ".ai-code-worker", "execution-environment.example.json"), JSON.stringify(profile), "utf8");
+
+    const report = await runClaude({
+      repositoryPath: repo,
+      planPath: "Plan/RUN.md",
+      runId: "run-claude-environment-blocked",
+      now: "2026-08-01T10:00:00Z",
+      adapterConfig: {
+        executable: join(tmpdir(), "no-such-claude-binary-environment-gate"),
+        testedVersionRanges: ["2.1.x"],
+        requiresCapabilitySmokeTest: true
+      }
+    });
+
+    assert.equal(report.status, "BLOCKED");
+    assert.equal(report.findings[0]?.code, "ENVIRONMENT_UNAVAILABLE");
+    assert.deepEqual(report.executedTasks, []);
   });
 });
 

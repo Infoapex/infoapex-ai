@@ -169,6 +169,14 @@ export function spawnBuffered(
       collect(stderrChunks)(chunk);
       inspectLines("stderr", chunk);
     });
+    child.stdin.on("error", (error) => {
+      // Killing a provider tree while its request is still being written is
+      // expected to close stdin with EPIPE. It is already represented by the
+      // bounded stopReason and must not escape as an uncaught exception.
+      if ((error as NodeJS.ErrnoException).code !== "EPIPE") {
+        childError = error;
+      }
+    });
     child.on("error", (error) => {
       childError = error;
     });

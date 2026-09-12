@@ -123,7 +123,16 @@ export function runCompile(options: CompileOptions): CompileReport {
   }
   const frozenManifest = freezeManifest(manifest, registry);
   const repositoryFingerprint = sha256(`${repository.worktreeRoot}:${repository.gitCommonDir}:${repository.headCommit}`);
-  const executionProfile = loadExecutionProfile(repository.worktreeRoot);
+  let executionProfile: unknown;
+  try {
+    executionProfile = loadExecutionProfile(repository.worktreeRoot);
+  } catch {
+    return blocked(
+      repository,
+      "EXECUTION_ENVIRONMENT_INVALID",
+      "The configured execution environment could not be loaded or parsed."
+    );
+  }
   const intent = buildRunIntent({
     runId,
     planPath: manifest.plan.path,
@@ -133,15 +142,24 @@ export function runCompile(options: CompileOptions): CompileReport {
     budgets: manifest.budgets,
     now
   });
-  const authorization = bindRunAuthorization({
-    authorizationId: `auth-${sha256(`${runId}:${frozenManifest.sha256}`).slice(0, 16)}`,
-    intent,
-    manifest,
-    executionProfile,
-    repositoryFingerprint,
-    issuedAt: now,
-    registry
-  });
+  let authorization: RunAuthorization;
+  try {
+    authorization = bindRunAuthorization({
+      authorizationId: `auth-${sha256(`${runId}:${frozenManifest.sha256}`).slice(0, 16)}`,
+      intent,
+      manifest,
+      executionProfile,
+      repositoryFingerprint,
+      issuedAt: now,
+      registry
+    });
+  } catch (error) {
+    return blocked(
+      repository,
+      "AUTHORIZATION_BIND_FAILED",
+      error instanceof Error ? error.message : "The run authorization could not be bound."
+    );
+  }
   // The project config is part of the public worker contract.  Compile must use
   // its external stateRoot consistently with doctor/status; otherwise a consumer
   // can authorize one state location and the runtime silently writes to the
