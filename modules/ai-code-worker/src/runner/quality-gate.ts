@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { redactText } from "./redaction.js";
+import { needsShellWrapper } from "../engines/spawn-shell.js";
 
 export interface CommandSpec {
   readonly id: string;
@@ -39,7 +40,7 @@ export function runQualityGate(command: CommandSpec): Promise<QualityGateResult>
     const child = spawn(command.executable, command.args, {
       cwd: command.cwd,
       env: runtimeEnvironment(command.env),
-      shell: false,
+      shell: needsShellWrapper(command.executable),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
     });
@@ -117,7 +118,7 @@ export function runQualityGateSync(command: CommandSpec): QualityGateResult {
   const result = spawnSync(command.executable, command.args, {
     cwd: command.cwd,
     env: runtimeEnvironment(command.env),
-    shell: false,
+    shell: needsShellWrapper(command.executable),
     encoding: "buffer",
     maxBuffer: command.maximumOutputBytes,
     stdio: ["ignore", "pipe", "pipe"],

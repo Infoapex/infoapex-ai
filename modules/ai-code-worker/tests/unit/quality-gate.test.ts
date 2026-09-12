@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { runQualityGate, toEvidenceCommand } from "../../src/runner/quality-gate.js";
+import { runQualityGate, runQualityGateSync, toEvidenceCommand } from "../../src/runner/quality-gate.js";
 import { redactText } from "../../src/runner/redaction.js";
 
 describe("quality gate runner", () => {
@@ -46,6 +46,22 @@ describe("quality gate runner", () => {
       id: "toolchain-profile",
       executable: process.execPath,
       args: ["-e", "process.exit((process.env.HOME || process.env.USERPROFILE) && (process.env.ProgramData || process.env.PROGRAMDATA || process.platform !== 'win32') && !process.env.AICW_RANDOM_SECRET ? 0 : 1)"],
+      cwd: process.cwd(),
+      timeoutMs: 5000,
+      maximumOutputBytes: 1024
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.failureClass, null);
+  });
+
+  it("executes Windows command shims such as npm.cmd", () => {
+    if (process.platform !== "win32") return;
+
+    const result = runQualityGateSync({
+      id: "npm-version",
+      executable: "npm.cmd",
+      args: ["--version"],
       cwd: process.cwd(),
       timeoutMs: 5000,
       maximumOutputBytes: 1024
