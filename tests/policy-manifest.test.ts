@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 
-test("policy manifest hashes the exact committed policy blobs", () => {
+test("policy manifest hashes the exact committed policy blobs", { skip: !existsSync(join(process.cwd(), ".git")) }, () => {
   const outputRoot = mkdtempSync(join(tmpdir(), "infoapex-policy-manifest-"));
   const output = join(outputRoot, "policy.json");
   try {
