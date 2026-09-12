@@ -167,11 +167,11 @@ function verifyArtifactProvenance(zipPath) {
 
 function initializeGitRepository(repository) {
   writeFileSync(join(repository, "README.md"), "# Disposable Infoapex consumer\n", "utf8");
-  run("git", ["init", "--initial-branch", "main"], repository);
-  run("git", ["config", "user.name", "Infoapex Release Smoke"], repository);
-  run("git", ["config", "user.email", "release-smoke@example.invalid"], repository);
-  run("git", ["add", "."], repository);
-  run("git", ["commit", "-m", "initial consumer repository"], repository);
+  runGit(["init", "--initial-branch", "main"], repository);
+  runGit(["config", "user.name", "Infoapex Release Smoke"], repository);
+  runGit(["config", "user.email", "release-smoke@example.invalid"], repository);
+  runGit(["add", "."], repository);
+  runGit(["commit", "-m", "initial consumer repository"], repository);
 }
 
 function step(name, fn) {
@@ -190,6 +190,13 @@ function run(command, args, cwd) {
   const result = spawnSync(command, args, { cwd, stdio: "inherit", windowsHide: true, shell: process.platform === "win32", timeout: timeoutMs });
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(" ")} exited with status ${result.status}`);
+  }
+}
+
+function runGit(args, cwd) {
+  const result = spawnSync("git", args, { cwd, stdio: "inherit", windowsHide: true, shell: false, timeout: timeoutMs });
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(" ")} exited with status ${result.status}`);
   }
 }
 
