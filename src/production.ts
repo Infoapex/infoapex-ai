@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { explainConfig } from "./config-lifecycle.js";
 
 export interface ProductionPolicy {
@@ -36,20 +36,36 @@ export function acquireLease(repositoryRoot: string, runId: string): Record<stri
 }
 
 export function diagnosticsBundle(repositoryRoot: string, outputPath?: string): Record<string, unknown> {
-  const repo = resolve(repositoryRoot); const output = resolve(repo, outputPath ?? join(".infoapex-ai", "diagnostics", `bundle-${Date.now()}.json`));
-  if (!isInside(repo, output)) return { schemaVersion: "1.0", status: "BLOCKED", message: "Diagnostics output must remain inside the repository." };
+  const repo = resolve(repositoryRoot);
+  if (!isInside(repo, repo)) return { schemaVersion: "1.0", status: "BLOCKED", code: "REPOSITORY_UNSAFE", message: "Diagnostics repository is unsafe." };
+  if (outputPath !== undefined && isAbsolute(outputPath)) return { schemaVersion: "1.0", status: "BLOCKED", code: "PATH_UNSAFE", message: "Diagnostics output must be repository-relative." };
+  const output = resolve(repo, outputPath ?? join(".infoapex-ai", "diagnostics", `bundle-${Date.now()}.json`));
+  if (!isInside(repo, output) || !safeExistingParent(repo, output)) return { schemaVersion: "1.0", status: "BLOCKED", code: "PATH_UNSAFE", message: "Diagnostics output must remain inside the repository." };
   const value = { schemaVersion: "1.0", generatedAt: new Date().toISOString(), repositoryHash: hash(repo), production: productionDoctor(repo), config: explainConfig(repo), environment: { platform: process.platform, architecture: process.arch, node: process.version }, note: "No source, configuration values, environment variables, or raw provider output included." };
   mkdirSync(dirname(output), { recursive: true }); writeFileSync(output, `${JSON.stringify(value, null, 2)}\n`, "utf8"); return { status: "PASS", output, sha256: hash(readFileSync(output)), redacted: true };
 }
 
 export function retention(repositoryRoot: string, dryRun = true): Record<string, unknown> {
-  const repo = resolve(repositoryRoot); const policy = JSON.parse(readFileSync(join(repo, ".infoapex-ai", "production-policy.json"), "utf8")) as ProductionPolicy;
-  const cutoff = Date.now() - policy.retentionDays * 86_400_000; const roots = [join(repo, ".infoapex-ai", "diagnostics")]; const expired: string[] = [];
-  for (const root of roots) if (existsSync(root)) for (const name of readdirSync(root)) { const path = join(root, name); if (statSync(path).isFile() && statSync(path).mtimeMs < cutoff) expired.push(path); }
-  // Destructive deletion is intentionally not automatic in P6 core-local. The
-  // inventory is evidence; an operator performs deletion through an approved lifecycle action.
-  return { schemaVersion: "1.0", status: "PASS", mode: dryRun ? "dry-run" : "approval-required", cutoff: new Date(cutoff).toISOString(), expired };
+  const repo = resolve(repositoryRoot); const policyPath = join(repo, ".infoapex-ai", "production-policy.json");
+  let policy: ProductionPolicy;
+  try { policy = JSON.parse(readFileSync(policyPath, "utf8")) as ProductionPolicy; } catch { return { schemaVersion: "1.0", status: "BLOCKED", code: "POLICY_INVALID", message: "Production retention policy is missing or invalid." }; }
+  if (!Number.isInteger(policy.retentionDays) || policy.retentionDays < 1 || policy.retentionDays > 3650) return { schemaVersion: "1.0", status: "BLOCKED", code: "POLICY_INVALID", message: "Retention days must be an integer between 1 and 3650." };
+  const cutoffMs = Date.now() - policy.retentionDays * 86_400_000; const root = join(repo, ".infoapex-ai", "diagnostics"); const expired: string[] = [];
+  if (existsSync(root)) {
+    if (!isInside(repo, root) || !safeExistingPath(repo, root)) return { schemaVersion: "1.0", status: "BLOCKED", code: "PATH_UNSAFE", message: "Diagnostics retention root is unsafe." };
+    for (const name of readdirSync(root)) {
+      const path = join(root, name); const entry = lstatSync(path);
+      if (entry.isSymbolicLink()) return { schemaVersion: "1.0", status: "BLOCKED", code: "SYMLINK_UNSAFE", message: `Retention refuses symbolic link ${name}.` };
+      if (entry.isFile() && entry.mtimeMs < cutoffMs) expired.push(path);
+    }
+  }
+  const deleted: string[] = [];
+  if (!dryRun) for (const path of expired) { rmSync(path, { force: false }); deleted.push(path); }
+  return { schemaVersion: "1.0", status: "PASS", mode: dryRun ? "dry-run" : "apply", cutoff: new Date(cutoffMs).toISOString(), expired, deleted, remaining: expired.length - deleted.length };
 }
 
 function hash(value: string | Buffer): string { return createHash("sha256").update(value).digest("hex"); }
-function isInside(root: string, path: string): boolean { const relative = path.slice(root.length); return path === root || ((relative.startsWith("\\") || relative.startsWith("/")) && !relative.includes("..")); }
+function isInside(root: string, path: string): boolean { const rel = relative(resolve(root), resolve(path)); return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); }
+function safeExistingPath(repo: string, path: string): boolean { try { return isInside(repo, realPath(path)); } catch { return false; } }
+function safeExistingParent(repo: string, path: string): boolean { const parent = dirname(path); return existsSync(parent) ? safeExistingPath(repo, parent) : safeExistingParent(repo, parent); }
+function realPath(path: string): string { lstatSync(path); return realpathSync(path); }
