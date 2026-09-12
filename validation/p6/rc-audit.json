@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "status": "INCONCLUSIVE",
+  "code": "RC_LOCAL_AUDIT_PASS_EXTERNAL_EVIDENCE_MISSING",
+  "releaseAction": "NO_PUBLICATION",
+  "candidateVersion": "0.1.0",
+  "localEvidenceCommand": "node scripts/rc-audit.mjs",
+  "externalEvidenceRequired": ["consumer-pilot", "independent-security-audit", "owner-go-no-go", "signed-tag-and-publication"],
+  "verifiedCommit": null,
+  "notes": "This file is a template/result contract. A local PASS cannot promote the package to v1.0.0."
+}

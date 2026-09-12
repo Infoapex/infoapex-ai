@@ -1,5 +1,15 @@
 # Release notes
 
+## P6 readiness update — 2026-09-12
+
+P6.1–P6.8 local implementation and deterministic verification are available on the
+current branch. This remains a pre-release: the consumer pilot is preregistered but
+`NOT_STARTED`, and the local RC audit returns `INCONCLUSIVE` with `NO_PUBLICATION`.
+
+Known release blockers are the real consumer pilot, independent security/recovery/
+supply-chain audit, signed owner go/no-go, and a protected tag/publication workflow.
+Use `node scripts/rc-audit.mjs` to reproduce the local audit and see the missing evidence.
+
 ## v0.1.0 (pre-release, private) — 2026-09-02
 
 First private bundle candidate. This is an **implemented candidate, not a production
