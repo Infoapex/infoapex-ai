@@ -22,7 +22,7 @@ check("candidate-version", pkg?.version === "0.1.0", "GA version is not claimed 
 
 try {
   const gates = JSON.parse(readFileSync(join(root, "validation/p6/release-gates.json"), "utf8"));
-  const valid = Array.isArray(gates.gates) && gates.gates.length >= 7 && gates.gates.every((gate) => gate.status === "PENDING" || gate.status === "PASS" || gate.status === "INCONCLUSIVE");
+  const valid = Array.isArray(gates.gates) && gates.gates.length >= 9 && gates.gates.every((gate) => gate.status === "PENDING" || gate.status === "PASS" || gate.status === "INCONCLUSIVE");
   check("release-gate-registry", valid, valid ? `${gates.gates.length} gates retain explicit evidence state` : "release-gate registry is malformed");
 } catch { check("release-gate-registry", false, "release-gate registry is not readable"); }
 

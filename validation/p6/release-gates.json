@@ -8,6 +8,8 @@
     { "gateId": "P6.3-SECURITY-001", "owner": "security", "status": "PENDING", "requiredFor": ["core-local"], "evidence": [], "verifiedCommit": null, "expiresAt": null, "exception": null },
     { "gateId": "P6.4-RECOVERY-001", "owner": "reliability", "status": "PENDING", "requiredFor": ["core-local"], "evidence": [], "verifiedCommit": null, "expiresAt": null, "exception": null },
     { "gateId": "P6.5-OPS-001", "owner": "operations", "status": "PENDING", "requiredFor": ["core-local"], "evidence": [], "verifiedCommit": null, "expiresAt": null, "exception": null },
-    { "gateId": "P6.6-COMPAT-001", "owner": "release", "status": "PENDING", "requiredFor": ["core-local"], "evidence": [], "verifiedCommit": null, "expiresAt": null, "exception": null }
+    { "gateId": "P6.6-COMPAT-001", "owner": "release", "status": "PENDING", "requiredFor": ["core-local"], "evidence": [], "verifiedCommit": null, "expiresAt": null, "exception": null },
+    { "gateId": "P6.7-DX-001", "owner": "product", "status": "INCONCLUSIVE", "requiredFor": ["v1.0.0"], "evidence": ["validation/p6/pilot-preregistration.json"], "verifiedCommit": null, "expiresAt": null, "exception": null },
+    { "gateId": "P6.8-RC-001", "owner": "release", "status": "INCONCLUSIVE", "requiredFor": ["v1.0.0"], "evidence": ["validation/p6/rc-audit.json", "validation/p6/evidence-index.json"], "verifiedCommit": null, "expiresAt": null, "exception": null }
   ]
 }
