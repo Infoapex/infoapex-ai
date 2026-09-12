@@ -107,6 +107,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
 
   writeManaged(".ai-code-worker/config.json", json(workerConfig(paths)));
   writeManaged(".ai-code-worker/routing-policy.json", json(routingPolicy()));
+  writeManaged(".ai-code-worker/execution-environment.example.json", json(executionEnvironmentConfig()));
   writeSeed(".ai-code-worker/README.md", "# ai-code-worker\n\nConfigurat de `infoapex-ai init --full`. Nu modifica politica de rutare fără un experiment/autorizare nouă.\n");
   writeManaged(".ai-code-review/config.json", json(reviewConfig(paths)));
   writeManaged(".ai-code-docs/config.json", json(docsConfig(paths)));
@@ -208,7 +209,7 @@ export function preflight(repositoryRoot: string, bundleRoot: string): Preflight
   const required = [
     ".infoapex-ai/config.json", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".ai-code-control/config/code-control.json",
     ".ai-code-control/config/memory-control.json", ".ai-code-control/memory/PROJECT-STATE.md", "TODO.md", "AGENTS.md", "CLAUDE.md",
-    ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".mcp.json", ".claude/settings.json", ".codex/config.toml"
+    ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-worker/execution-environment.example.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".mcp.json", ".claude/settings.json", ".codex/config.toml"
   ];
   const absent = required.filter((relative) => !existsSync(join(repo, relative)));
   checks.push({ id: "required-project-files", status: absent.length === 0 ? "PASS" : "BLOCKED", detail: absent.length === 0 ? "All full-install artifacts exist." : `Missing: ${absent.join(", ")}` });
@@ -282,6 +283,22 @@ function routingPolicy() {
     "mechanical-fast-v1": { candidates: [{ engine: "codex", model: "gpt-5.6" }], reason: "P6 profile pins one reviewed provider; automatic fallback is prohibited.", confidence: "high" },
     "balanced-default-v1": { candidates: [{ engine: "codex", model: "gpt-5.6" }], reason: "P6 profile pins one reviewed provider; automatic fallback is prohibited.", confidence: "high" }
   } };
+}
+
+function executionEnvironmentConfig() {
+  return {
+    schemaVersion: "1.0", profileId: "isolated", kind: "isolated",
+    filesystem: {
+      hostReadDefault: "deny", hostWriteDefault: "deny",
+      mounts: [
+        { purpose: "worktree", access: "read-write" },
+        { purpose: "evidence", access: "read-write" }
+      ]
+    },
+    network: { repositoryProcesses: "deny", adapterControlPlane: "provider-only" },
+    environment: { inheritByDefault: false, allowedVariables: ["CI", "NO_COLOR"] },
+    limits: { maximumDurationSeconds: 2700, maximumOutputBytes: 10485760, maximumProcesses: 64, maximumMemoryBytes: 4294967296, maximumCpuUnits: 2 }
+  };
 }
 
 function reviewConfig(paths: ReturnType<typeof modulePaths>) { return { schemaVersion: "1.0", planner: [process.execPath, paths.plannerCli], worker: [process.execPath, paths.workerCli], control: ["dotnet", paths.controlDll], defaultEngine: "codex" }; }

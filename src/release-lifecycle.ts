@@ -6,7 +6,7 @@ import { fullInstall, type InstallProfile, verifyFilesystemPermissions } from ".
 import { validateConfig } from "./config-lifecycle.js";
 
 const RUNTIME_PATHS = ["dist/src/cli.js", "modules/ai-code-planner/dist/src/cli.js", "modules/ai-code-worker/dist/src/cli.js", "modules/ai-code-review/dist/src/cli.js", "modules/ai-code-docs/dist/src/cli.js", "modules/ai-code-benchmark/dist/src/cli.js", "modules/ai-code-control/tools/ai-code-control/mcp-server/dist/server.js", "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.Cli/AiCodeControl.Cli.csproj", "modules/provenance.json"] as const;
-const UPGRADE_PATHS = [".ai-code-control/config/code-control.json", ".ai-code-control/config/memory-control.json", ".ai-code-control/reports/refactor/current-plan.json", ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".mcp.json", ".claude/settings.json", ".codex/config.toml", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".gitignore"] as const;
+const UPGRADE_PATHS = [".ai-code-control/config/code-control.json", ".ai-code-control/config/memory-control.json", ".ai-code-control/reports/refactor/current-plan.json", ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-worker/execution-environment.example.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".mcp.json", ".claude/settings.json", ".codex/config.toml", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".gitignore"] as const;
 const SHA256 = /^[a-f0-9]{64}$/;
 const UPGRADE_ID = /^upgrade-\d{13}-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 type Status = "PASS" | "BLOCKED";

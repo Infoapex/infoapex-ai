@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const MANAGED = [
   ".infoapex-ai/config.json", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".ai-code-worker/config.json",
-  ".ai-code-worker/routing-policy.json", ".ai-code-review/config.json", ".ai-code-docs/config.json",
+  ".ai-code-worker/routing-policy.json", ".ai-code-worker/execution-environment.example.json", ".ai-code-review/config.json", ".ai-code-docs/config.json",
   ".ai-code-control/config/code-control.json", ".ai-code-control/config/memory-control.json"
 ] as const;
 const VERSIONED = new Set<string>(MANAGED.filter((path) => !path.includes("ai-code-control/config")));

@@ -142,6 +142,7 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
     assert.equal(existsSync(join(repository, "AGENTS.md")), true);
     assert.equal(existsSync(join(repository, "CLAUDE.md")), true);
     assert.equal(existsSync(join(repository, ".ai-code-control", "memory", "PROJECT-STATE.md")), true);
+    assert.equal(existsSync(join(repository, ".ai-code-worker", "execution-environment.example.json")), true);
 
     const worker = JSON.parse(readFileSync(join(repository, ".ai-code-worker", "config.json"), "utf8")) as {
       contextProvider: string;
