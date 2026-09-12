@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { explainConfig } from "./config-lifecycle.js";
+import { atomicWriteJson } from "./state/atomic-file.js";
 
 export interface ProductionPolicy {
   readonly schemaVersion: "1.0";
@@ -26,13 +27,39 @@ export function productionDoctor(repositoryRoot: string): Record<string, unknown
   return { schemaVersion: "1.0", status: findings.length === 0 ? "PASS" : "BLOCKED", policyPath: path, findings };
 }
 
-export function acquireLease(repositoryRoot: string, runId: string): Record<string, unknown> {
+export interface LeaseOptions { readonly staleLeaseMinutes?: number; readonly now?: Date; }
+
+export function acquireLease(repositoryRoot: string, runId: string, options: LeaseOptions = {}): Record<string, unknown> {
   const repo = resolve(repositoryRoot); const doctor = productionDoctor(repo); if (doctor.status !== "PASS") return doctor;
   const path = join(repo, ".infoapex-ai", "runtime", "lease.json"); mkdirSync(dirname(path), { recursive: true });
-  const body = { schemaVersion: "1.0", leaseId: randomUUID(), runId, processId: process.pid, acquiredAt: new Date().toISOString() };
+  const body = { schemaVersion: "1.0", leaseId: randomUUID(), runId, processId: process.pid, acquiredAt: (options.now ?? new Date()).toISOString() };
   // wx provides atomic create: concurrent writers cannot both acquire.
   try { writeFileSync(path, `${JSON.stringify(body, null, 2)}\n`, { encoding: "utf8", flag: "wx" }); return { status: "PASS", path, ...body }; }
   catch { return { schemaVersion: "1.0", status: "BLOCKED", findings: ["Runtime lease is already held."] }; }
+}
+
+/** Recover only a demonstrably stale, parseable lease. The old lease is atomically moved
+ * into bounded local evidence before a new lease is acquired; malformed leases fail closed. */
+export function recoverStaleLease(repositoryRoot: string, runId: string, options: LeaseOptions = {}): Record<string, unknown> {
+  const repo = resolve(repositoryRoot); const policy = readPolicy(repo); if (!policy) return { schemaVersion: "1.0", status: "BLOCKED", code: "POLICY_INVALID" };
+  const path = join(repo, ".infoapex-ai", "runtime", "lease.json");
+  if (!existsSync(path)) return acquireLease(repo, runId, options);
+  let lease: { leaseId?: unknown; runId?: unknown; acquiredAt?: unknown };
+  try { lease = JSON.parse(readFileSync(path, "utf8")) as typeof lease; } catch { return { schemaVersion: "1.0", status: "BLOCKED", code: "LEASE_INVALID", message: "Lease is malformed and was left untouched." }; }
+  if (typeof lease.leaseId !== "string" || typeof lease.runId !== "string" || typeof lease.acquiredAt !== "string" || !Number.isFinite(Date.parse(lease.acquiredAt))) return { schemaVersion: "1.0", status: "BLOCKED", code: "LEASE_INVALID", message: "Lease is malformed and was left untouched." };
+  const limit = (options.staleLeaseMinutes ?? policy.resources.staleLeaseMinutes) * 60_000;
+  if ((options.now ?? new Date()).getTime() - Date.parse(lease.acquiredAt) <= limit) return { schemaVersion: "1.0", status: "BLOCKED", code: "LEASE_ACTIVE", message: "Runtime lease is active; concurrent runs are rejected." };
+  const evidence = join(dirname(path), "recovery", `${lease.leaseId}.stale-lease.json`); mkdirSync(dirname(evidence), { recursive: true });
+  try { renameSync(path, evidence); } catch { return { schemaVersion: "1.0", status: "BLOCKED", code: "LEASE_RECOVERY_RACE", message: "Lease changed while stale recovery was attempted." }; }
+  atomicWriteJson(`${evidence}.decision.json`, { schemaVersion: "1.0", code: "STALE_LEASE_RECOVERED", recoveredAt: (options.now ?? new Date()).toISOString(), priorRunId: lease.runId });
+  return acquireLease(repo, runId, options);
+}
+
+/** A lease can only be released by its owner. A recovery process never removes a newer lease. */
+export function releaseLease(repositoryRoot: string, runId: string): Record<string, unknown> {
+  const path = join(resolve(repositoryRoot), ".infoapex-ai", "runtime", "lease.json"); if (!existsSync(path)) return { schemaVersion: "1.0", status: "PASS", released: false };
+  try { const lease = JSON.parse(readFileSync(path, "utf8")) as { runId?: unknown }; if (lease.runId !== runId) return { schemaVersion: "1.0", status: "BLOCKED", code: "LEASE_NOT_OWNER" }; rmSync(path); return { schemaVersion: "1.0", status: "PASS", released: true }; }
+  catch { return { schemaVersion: "1.0", status: "BLOCKED", code: "LEASE_INVALID" }; }
 }
 
 export function diagnosticsBundle(repositoryRoot: string, outputPath?: string): Record<string, unknown> {
@@ -65,6 +92,7 @@ export function retention(repositoryRoot: string, dryRun = true): Record<string,
 }
 
 function hash(value: string | Buffer): string { return createHash("sha256").update(value).digest("hex"); }
+function readPolicy(repo: string): ProductionPolicy | null { try { return JSON.parse(readFileSync(join(repo, ".infoapex-ai", "production-policy.json"), "utf8")) as ProductionPolicy; } catch { return null; } }
 function isInside(root: string, path: string): boolean { const rel = relative(resolve(root), resolve(path)); return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); }
 function safeExistingPath(repo: string, path: string): boolean { try { return isInside(repo, realPath(path)); } catch { return false; } }
 function safeExistingParent(repo: string, path: string): boolean { const parent = dirname(path); return existsSync(parent) ? safeExistingPath(repo, parent) : safeExistingParent(repo, parent); }
