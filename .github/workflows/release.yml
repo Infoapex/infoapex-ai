@@ -58,6 +58,9 @@ jobs:
       - name: Smoke only the committed release artifact
         run: node scripts/release-smoke-test.mjs --zip "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip"
 
+      - name: Require a proven OS-isolated execution backend
+        run: node scripts/isolation-preflight.mjs
+
       - name: Require explicit solo-maintainer public-release decision
         run: node scripts/public-release-preflight.mjs --candidate "$GITHUB_REF_NAME" --zip "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip" --sbom "dist-release/infoapex-ai-${GITHUB_REF_NAME}.cdx.json" --policy-manifest "dist-release/infoapex-ai-${GITHUB_REF_NAME}.policy.json"
 

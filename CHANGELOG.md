@@ -23,3 +23,5 @@
   automatically.
 - Release artifacts now include a deterministic committed-policy manifest; the public
   workflow validates and attests it separately from the ZIP and SBOM.
+- Stable-release preflight now requires a concrete OS-isolated execution boundary;
+  policy-visible isolation warnings can no longer be promoted to `v1.0.0`.

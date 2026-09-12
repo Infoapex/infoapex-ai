@@ -23,7 +23,8 @@ The public workflow enforces that decision through a committed, schema-shaped
 `validation/p6/solo-go-no-go.json` file. Before the workflow can attest or publish a
 stable tag, `node scripts/public-release-preflight.mjs` verifies the exact package
 version, tag target, artifact checksum/provenance/SBOM, committed-policy manifest,
-and release workflow guard. The public workflow attests that policy manifest
+release workflow guard, and proven OS-isolated execution backend. The public workflow
+also runs `node scripts/isolation-preflight.mjs` directly and attests that policy manifest
 separately from the ZIP and SBOM.
 The preflight itself never publishes anything. Start from
 `validation/p6/solo-go-no-go.example.json`; replace it only after the maintainer has

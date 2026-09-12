@@ -49,6 +49,7 @@
     "release:build-zip": "node scripts/build-release-zip.mjs",
     "release:sbom": "node scripts/generate-sbom.mjs",
     "release:policy-manifest": "node scripts/generate-policy-manifest.mjs",
+    "release:isolation-preflight": "node scripts/isolation-preflight.mjs",
     "release:package-check": "node scripts/check-npm-package.mjs",
     "release:package-smoke": "node scripts/package-smoke-test.mjs",
     "p6:verify": "node scripts/verify-p6.mjs",

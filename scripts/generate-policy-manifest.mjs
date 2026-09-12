@@ -13,6 +13,7 @@ const commit = git(["rev-parse", "HEAD^{commit}"]).trim();
 const policyFiles = [
   ".github/workflows/release.yml",
   "docs/P6-THREAT-MODEL.md",
+  "scripts/isolation-preflight.mjs",
   "modules/ai-code-worker/schemas/execution-environment.schema.json",
   "modules/ai-code-worker/templates/project/.ai-code-worker/execution-environment.example.json",
   "src/production.ts",

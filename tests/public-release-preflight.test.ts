@@ -36,4 +36,5 @@ test("public preflight remains fail-closed during local preparation", () => {
   assert.equal(result.report.publicationAllowed, false);
   assert.equal(result.report.checks.find((check) => check.id === "tag-boundary")?.status, "SKIPPED");
   assert.equal(result.report.checks.find((check) => check.id === "maintainer-go")?.status, "BLOCKED");
+  assert.equal(result.report.checks.find((check) => check.id === "isolation-backend")?.status, "BLOCKED");
 });

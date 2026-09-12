@@ -155,7 +155,9 @@ export function defaultCodexConfig(): CodexCliAdapterConfig {
     // are the fail-closed compatibility gate; projects may still opt into an explicit
     // testedVersionRanges override when they need a narrower policy.
     requiresCapabilitySmokeTest: true,
-    sandboxMode: "danger-full-access"
+    // The stable profile must never widen the provider sandbox by default. A
+    // local pilot may opt into a broader mode explicitly and must record it.
+    sandboxMode: "workspace-write"
   };
 }
 

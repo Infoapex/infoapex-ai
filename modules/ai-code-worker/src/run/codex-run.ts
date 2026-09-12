@@ -812,10 +812,10 @@ interface RunManifestTask extends ManifestTask {
 export function codexConfig(overrides: Partial<CodexCliAdapterConfig> = {}): CodexCliAdapterConfig {
   return {
     requiresCapabilitySmokeTest: true,
-    // Local Windows pilot note: codex-cli 0.146.0-alpha.3.1 currently reports
-    // workspace-write as read-only for exec file writes. The worker still enforces
-    // allowedPaths/forbiddenPaths before creating the worker-owned commit.
-    sandboxMode: "danger-full-access",
+    // Stable default: the provider itself must remain workspace-scoped. A broader
+    // local pilot mode is an explicit project/CLI override, never an implicit
+    // production fallback.
+    sandboxMode: "workspace-write",
     ...overrides
   };
 }

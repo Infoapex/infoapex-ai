@@ -85,6 +85,13 @@ const workflowValid = releaseWorkflow.includes("actions/attest@v4") &&
   releaseWorkflow.includes("public-release-preflight");
 check("publication-workflow", workflowValid, "the public workflow must attest, verify the tag, require public visibility, and call this guard");
 
+const isolation = runIsolationPreflight();
+check(
+  "isolation-backend",
+  isolation?.status === "PASS" && isolation.code === "ISOLATION_BACKEND_PROVEN",
+  "a stable release requires a proven OS-isolated execution backend"
+);
+
 const allChecksPass = checks.every((entry) => entry.status === "PASS" || entry.status === "SKIPPED");
 const tagSatisfied = !requireTag || checks.some((entry) => entry.id === "tag-boundary" && entry.status === "PASS");
 const status = requireTag && allChecksPass && tagSatisfied;
@@ -120,4 +127,17 @@ function isSafeManifestPath(value) {
 function hashCommittedFile(commit, path) {
   try { return createHash("sha256").update(execFileSync("git", ["show", `${commit}:${path}`], { cwd: root })).digest("hex"); }
   catch { return null; }
+}
+function runIsolationPreflight() {
+  try {
+    const output = execFileSync(process.execPath, [join(root, "scripts/isolation-preflight.mjs")], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+    return JSON.parse(output);
+  } catch (error) {
+    const output = error?.stdout?.toString?.() ?? "";
+    try { return JSON.parse(output); } catch { return null; }
+  }
 }
