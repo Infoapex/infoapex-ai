@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "gates": [
+    {
+      "id": "root-tests",
+      "description": "Run the repository test suite with the checked-in dependency runtime.",
+      "workingDirectory": ".",
+      "executable": "npm",
+      "args": ["test"],
+      "timeoutSeconds": 900,
+      "allowedEnvironmentVariables": ["PATH", "SystemRoot", "ComSpec", "TEMP", "TMP"],
+      "linkedDirectories": [
+        {
+          "fromRepository": "node_modules",
+          "toWorktree": "node_modules"
+        }
+      ]
+    },
+    {
+      "id": "generic-boundary",
+      "description": "Verify the generic module boundary contract.",
+      "workingDirectory": ".",
+      "executable": "npm",
+      "args": ["run", "check:generic-boundary"],
+      "timeoutSeconds": 120,
+      "allowedEnvironmentVariables": ["PATH", "SystemRoot", "ComSpec", "TEMP", "TMP"],
+      "linkedDirectories": [
+        {
+          "fromRepository": "node_modules",
+          "toWorktree": "node_modules"
+        }
+      ]
+    }
+  ]
+}
