@@ -1,6 +1,7 @@
 import AdmZip from "adm-zip";
-import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync, realpathSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync, existsSync, writeFileSync, realpathSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +33,8 @@ try {
     ? resolve(root, explicitZip)
     : buildZip();
 
+  step("verify committed artifact provenance", () => verifyArtifactProvenance(zipPath));
+
   step("extract ZIP into a clean directory", () => {
     const zip = new AdmZip(zipPath);
     zip.extractAllTo(extractedRoot, true);
@@ -42,8 +45,10 @@ try {
     }
   });
 
-  step("npm run setup (npm ci across root + all 6 modules, no dev cache)", () => {
-    run(npm, ["run", "setup"], extractedRoot);
+  step("npm ci --ignore-scripts across root + all modules", () => {
+    for (const directory of [".", "modules/ai-code-planner", "modules/ai-code-worker", "modules/ai-code-review", "modules/ai-code-docs", "modules/ai-code-benchmark", "modules/ai-code-control/tools/ai-code-control/mcp-server"]) {
+      run(npm, ["ci", "--ignore-scripts"], join(extractedRoot, directory));
+    }
   });
 
   step("npm run build (root + all 6 modules)", () => {
@@ -131,6 +136,21 @@ function buildZip() {
   }
   const built = JSON.parse(result.stdout);
   return built.zipPath;
+}
+
+function verifyArtifactProvenance(zipPath) {
+  if (!existsSync(zipPath)) throw new Error("Release artifact is missing.");
+  const manifestPath = `${zipPath}.manifest.json`;
+  const checksumPath = `${zipPath}.sha256`;
+  if (!existsSync(manifestPath) || !existsSync(checksumPath)) {
+    throw new Error("Release artifact is missing its provenance manifest or SHA-256 sidecar.");
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const actualSha256 = createHash("sha256").update(readFileSync(zipPath)).digest("hex");
+  const declaredChecksum = readFileSync(checksumPath, "utf8").trim().split(/\s+/)[0];
+  if (!/^[0-9a-f]{40}$/i.test(manifest.commit) || manifest.sha256 !== actualSha256 || declaredChecksum !== actualSha256) {
+    throw new Error("Release artifact provenance does not match the candidate ZIP.");
+  }
 }
 
 function step(name, fn) {

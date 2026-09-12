@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -21,10 +21,21 @@ try {
   const tarball = resolve(packRoot, packed.filename);
   if (!existsSync(tarball)) throw new Error(`npm pack reported a missing artefact: ${tarball}`);
 
-  execFileSync(npm, ["install", tarball, "--ignore-scripts", "--no-save", "--package-lock=false", "--prefix", installRoot], npmOptions);
+  // Installation is offline as well as startup: an undeclared runtime download
+  // cannot be hidden by a developer's network connection.
+  execFileSync(npm, ["install", tarball, "--ignore-scripts", "--no-save", "--package-lock=false", "--offline", "--prefix", installRoot], npmOptions);
   const packageRoot = join(installRoot, "node_modules", "@infoapex", "infoapex-ai");
   const cli = join(packageRoot, "dist", "src", "cli.js");
   if (!existsSync(cli)) throw new Error("Installed package is missing dist/src/cli.js.");
+  const installedPackage = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
+  if (installedPackage.name !== "@infoapex/infoapex-ai" || installedPackage.version !== packed.version) {
+    throw new Error("Installed package identity does not match the packed artifact.");
+  }
+  const provenance = JSON.parse(readFileSync(join(packageRoot, "modules", "provenance.json"), "utf8"));
+  if (typeof provenance.schemaVersion !== "string" || !Array.isArray(provenance.modules) || provenance.modules.length === 0 ||
+    !provenance.modules.every((module) => typeof module.name === "string" && /^[0-9a-f]{40}$/i.test(module.sourceCommit))) {
+    throw new Error("Installed package has invalid module provenance.");
+  }
 
   const help = runNode(cli, ["help"]);
   if (!help.includes("infoapex-ai - local governance layer")) throw new Error("Installed root CLI did not return its help contract.");
@@ -46,7 +57,7 @@ try {
     version: packed.version,
     tarballBytes: packed.size,
     target: targetRoot,
-    exercised: ["root help", "root status", "root init", "benchmark help"]
+    exercised: ["package identity", "module provenance", "root help (offline)", "root status (offline)", "root init (offline)", "benchmark help (offline)"]
   }, null, 2));
 } finally {
   rmSync(workspace, { recursive: true, force: true });

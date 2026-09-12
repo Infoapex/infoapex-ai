@@ -13,6 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [22, 24]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Infoapex AI bundle
@@ -21,7 +22,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
 
       - name: Set up .NET
@@ -29,8 +30,20 @@ jobs:
         with:
           dotnet-version: 9.x
 
-      - name: Install bundle dependencies
-        run: npm run setup
+      - name: Bootstrap root dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Verify declared runtime and provider capability before execution
+        run: node scripts/compatibility-check.mjs --runtime "${{ matrix.node }}.0.0" --provider fake --provider-version 1.0.0 --require-provider-capability
+
+      - name: Bootstrap module dependencies without lifecycle scripts
+        run: |
+          npm ci --prefix modules/ai-code-planner --ignore-scripts
+          npm ci --prefix modules/ai-code-worker --ignore-scripts
+          npm ci --prefix modules/ai-code-review --ignore-scripts
+          npm ci --prefix modules/ai-code-docs --ignore-scripts
+          npm ci --prefix modules/ai-code-benchmark --ignore-scripts
+          npm ci --prefix modules/ai-code-control/tools/ai-code-control/mcp-server --ignore-scripts
 
       - name: Validate Infoapex AI boundary and installer
         run: |
@@ -70,8 +83,10 @@ jobs:
           dotnet test modules/ai-code-control/tools/ai-code-control/AiCodeControl.sln --nologo
           npm run build --prefix modules/ai-code-control/tools/ai-code-control/mcp-server
 
-      - name: P3 release smoke test (git-archive ZIP -> clean extract -> setup/build/test -> all gates -> installer both modes)
-        run: npm run release:smoke-test
+      - name: P3 release smoke test (committed ZIP -> clean extract -> setup/build/test -> installer both modes)
+        run: |
+          npm run release:build-zip -- --ref "${{ github.sha }}" --out dist-release/compatibility-candidate.zip
+          node scripts/release-smoke-test.mjs --zip dist-release/compatibility-candidate.zip
 
       - name: P6 core-local contract, security, operations and compatibility gate
         run: |

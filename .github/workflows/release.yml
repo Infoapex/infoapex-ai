@@ -25,20 +25,37 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.x
 
+      - name: Bootstrap root dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Bootstrap module dependencies without lifecycle scripts
+        run: |
+          npm ci --prefix modules/ai-code-planner --ignore-scripts
+          npm ci --prefix modules/ai-code-worker --ignore-scripts
+          npm ci --prefix modules/ai-code-review --ignore-scripts
+          npm ci --prefix modules/ai-code-docs --ignore-scripts
+          npm ci --prefix modules/ai-code-benchmark --ignore-scripts
+          npm ci --prefix modules/ai-code-control/tools/ai-code-control/mcp-server --ignore-scripts
+
+      - name: Verify declared runtime and provider capability before release work
+        run: node scripts/compatibility-check.mjs --runtime 24.0.0 --provider fake --provider-version 1.0.0 --require-provider-capability
+
       - name: Build and verify release candidate
         run: |
-          npm run setup
           npm run build
           npm run p6:verify
           npm run release:build-zip -- --ref "$GITHUB_SHA" --out "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip"
           npm run release:sbom -- --out "dist-release/infoapex-ai-${GITHUB_REF_NAME}.cdx.json"
+
+      - name: Smoke only the committed release artifact
+        run: node scripts/release-smoke-test.mjs --zip "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip"
 
       - name: Attest release provenance
         uses: actions/attest@v4

@@ -128,6 +128,34 @@ test("appends --json to forwarded args when the caller did not already pass it, 
   }
 });
 
+test("preserves spaces, Unicode, quotes, and JSON event arguments across the process boundary", () => {
+  const { bundleRoot, module } = bundleWithFixtureCli(
+    `console.log(JSON.stringify({ status: "PASS", argv: process.argv.slice(3) }));`
+  );
+  try {
+    const event = '{"type":"task.completed","message":"München \\"quoted\\""}';
+    const pathWithSpaces = "C:\\repo with spaces\\Δ";
+    const envelope = delegate({ command: "run", module, subcommand: "go", bundleRoot, args: ["--repo", pathWithSpaces, "--event", event] });
+    assert.deepEqual((envelope.body as { argv: string[] }).argv, ["--repo", pathWithSpaces, "--event", event, "--json"]);
+    assert.equal(envelope.status, "PASS");
+  } finally {
+    rmSync(bundleRoot, { recursive: true, force: true });
+  }
+});
+
+test("malformed event output is a stable blocked diagnostic rather than permissive parsing", () => {
+  const { bundleRoot, module } = bundleWithFixtureCli(
+    `console.log('{"type":"event"} trailing-data'); process.exitCode = 2;`
+  );
+  try {
+    const envelope = delegate({ command: "run", module, subcommand: "go", bundleRoot, args: [] });
+    assert.equal(envelope.status, "BLOCKED");
+    assert.equal((envelope.body as { findings: readonly { code: string }[] }).findings[0]!.code, "NON_JSON_OUTPUT");
+  } finally {
+    rmSync(bundleRoot, { recursive: true, force: true });
+  }
+});
+
 test("null is a valid parsed JSON body, distinct from a parse failure", () => {
   const { bundleRoot, module } = bundleWithFixtureCli(`console.log("null"); process.exitCode = 0;`);
   try {
