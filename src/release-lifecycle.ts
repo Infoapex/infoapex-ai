@@ -2,7 +2,7 @@ import { accessSync, constants, copyFileSync, existsSync, lstatSync, mkdirSync, 
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fullInstall, type InstallProfile } from "./full-install.js";
+import { fullInstall, type InstallProfile, verifyFilesystemPermissions } from "./full-install.js";
 import { validateConfig } from "./config-lifecycle.js";
 
 const RUNTIME_PATHS = ["dist/src/cli.js", "modules/ai-code-planner/dist/src/cli.js", "modules/ai-code-worker/dist/src/cli.js", "modules/ai-code-review/dist/src/cli.js", "modules/ai-code-docs/dist/src/cli.js", "modules/ai-code-benchmark/dist/src/cli.js", "modules/ai-code-control/tools/ai-code-control/mcp-server/dist/server.js", "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.Cli/AiCodeControl.Cli.csproj", "modules/provenance.json"] as const;
@@ -37,6 +37,7 @@ export function checkInstall(repositoryRoot: string, bundleRoot: string, require
     workerConfig?.adapters?.codex?.model === "gpt-5.6" && workerConfig?.adapters?.codex?.reasoningEffort === "high" &&
     Array.isArray(workerConfig?.adapters?.aiCodeControl?.baseArgs);
   checks.push({ id: "explicit-provider-policy", status: providerPolicy ? "PASS" : "BLOCKED", detail: providerPolicy ? "Codex gpt-5.6/high is explicit; no automatic engine fallback is configured." : "Worker context/provider policy is incomplete or stale; rerun full init with --repair after review." });
+  checks.push(...verifyFilesystemPermissions(roots.repo, roots.bundle).checks);
   const missing = RUNTIME_PATHS.filter((path) => !safeExists(roots.bundle, path));
   checks.push({ id: "bundle-runtime", status: missing.length === 0 ? "PASS" : "BLOCKED", detail: missing.length === 0 ? "All root, module, control, and provenance runtime entries exist." : `Missing or unsafe bundle entries: ${missing.join(", ")}` });
   return { status: checks.every((check) => check.status === "PASS") ? "PASS" : "BLOCKED", profile: profile?.profile ?? null, checks };

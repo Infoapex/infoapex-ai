@@ -25,6 +25,13 @@ provider de coding. Dacă verificarea eșuează, comanda returnează `BLOCKED`; 
 un succes intermediar care să ascundă o instalare incompletă. Pentru un target deja
 configurat, `--repair` este necesar înainte de înlocuirea fișierelor managed diferite.
 
+`preflight` și `install --check` includ verificările `repository-filesystem-access` și
+`bundle-read-access`. Acestea testează accesul efectiv al utilizatorului curent la
+starea installerului și la runtime-urile modulelor. Installerul nu acordă ACL-uri
+Windows și nu ridică privilegii; dacă un check este `BLOCKED`, administratorul
+repository-ului trebuie să corecteze ACL-ul sau să mute proiectul într-o locație
+accesibilă, apoi să ruleze din nou verificarea.
+
 Pentru primul run, folosește motorul determinist `fake` și un plan acceptat, revizuit de
 operator. Acest pas verifică wiring-ul și gate-urile, nu calitatea unui provider:
 

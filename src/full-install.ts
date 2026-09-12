@@ -155,6 +155,49 @@ export interface PreflightResult {
   readonly checks: readonly { readonly id: string; readonly status: "PASS" | "BLOCKED"; readonly detail: string }[];
 }
 
+export interface FilesystemPermissionsResult {
+  readonly status: "PASS" | "BLOCKED";
+  readonly checks: readonly { readonly id: string; readonly status: "PASS" | "BLOCKED"; readonly detail: string }[];
+}
+
+/** Verify effective access without changing ACLs on a consumer repository. */
+export function verifyFilesystemPermissions(repositoryRoot: string, bundleRoot: string): FilesystemPermissionsResult {
+  const repo = resolve(repositoryRoot);
+  const bundle = resolve(bundleRoot);
+  const checks: { id: string; status: "PASS" | "BLOCKED"; detail: string }[] = [];
+  const managedDirectories = [
+    repo,
+    join(repo, ".infoapex-ai"),
+    join(repo, ".ai-code-control"),
+    join(repo, ".ai-code-worker"),
+    join(repo, ".ai-code-review"),
+    join(repo, ".ai-code-docs")
+  ];
+  const missing = managedDirectories.filter((path) => !existsSync(path));
+  const inaccessible = managedDirectories.filter((path) => existsSync(path) && !hasAccess(path, constants.R_OK | constants.W_OK));
+  checks.push({
+    id: "repository-filesystem-access",
+    status: missing.length === 0 && inaccessible.length === 0 ? "PASS" : "BLOCKED",
+    detail: missing.length === 0 && inaccessible.length === 0
+      ? "Current user can read and write the repository and installer-managed state directories."
+      : `Missing: ${missing.map((path) => relative(repo, path) || ".").join(", ") || "none"}; inaccessible: ${inaccessible.map((path) => relative(repo, path) || ".").join(", ") || "none"}.`
+  });
+  const runtime = [
+    "dist/src/cli.js",
+    "modules/ai-code-worker/dist/src/cli.js",
+    "modules/ai-code-review/dist/src/cli.js",
+    "modules/ai-code-docs/dist/src/cli.js",
+    "modules/ai-code-control/tools/ai-code-control/mcp-server/dist/server.js"
+  ];
+  const unreadable = runtime.filter((path) => !existsSync(join(bundle, path)) || !hasAccess(join(bundle, path), constants.R_OK));
+  checks.push({
+    id: "bundle-read-access",
+    status: unreadable.length === 0 ? "PASS" : "BLOCKED",
+    detail: unreadable.length === 0 ? "Current user can read every installed module runtime entry." : `Unreadable or missing bundle entries: ${unreadable.join(", ")}`
+  });
+  return { status: checks.every((check) => check.status === "PASS") ? "PASS" : "BLOCKED", checks };
+}
+
 /** Strict readiness gate: no provider is invoked; all module/process wiring is. */
 export function preflight(repositoryRoot: string, bundleRoot: string): PreflightResult {
   const repo = resolve(repositoryRoot);
@@ -189,6 +232,8 @@ export function preflight(repositoryRoot: string, bundleRoot: string): Preflight
   } catch {
     checks.push({ id: "explicit-provider-policy", status: "BLOCKED", detail: "Worker config is invalid JSON." });
   }
+
+  checks.push(...verifyFilesystemPermissions(repo, bundle).checks);
 
   const paths = modulePaths(bundle);
   const commands: readonly { readonly id: string; readonly executable: string; readonly args: readonly string[]; readonly timeoutMs?: number }[] = [
@@ -390,6 +435,10 @@ function hasCommittedGitHead(path: string): boolean {
 }
 function isWritableDirectory(path: string): boolean {
   try { accessSync(path, constants.W_OK); return true; }
+  catch { return false; }
+}
+function hasAccess(path: string, mode: number): boolean {
+  try { accessSync(path, mode); return true; }
   catch { return false; }
 }
 function installerPath(root: string, value: string): string | null { return containedNonSymlinkPath(root, value); }

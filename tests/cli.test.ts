@@ -132,10 +132,12 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
     initializeGit(repository);
     const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "dotnet-nextjs", "--backend-dir", "server", "--frontend-dir", "client", "--ml-dir", "data", "--verify"]);
     assert.equal(init.status, 0, init.stderr || init.stdout);
-    const body = JSON.parse(init.stdout) as { status: string; profile: string; created: readonly string[]; postInstallVerification?: { status: string } };
+    const body = JSON.parse(init.stdout) as { status: string; profile: string; created: readonly string[]; postInstallVerification?: { status: string; checks: readonly { id: string; status: string }[] } };
     assert.equal(body.status, "DONE");
     assert.equal(body.profile, "dotnet-nextjs");
     assert.equal(body.postInstallVerification?.status, "PASS");
+    assert.equal(body.postInstallVerification?.checks.find((check) => check.id === "repository-filesystem-access")?.status, "PASS");
+    assert.equal(body.postInstallVerification?.checks.find((check) => check.id === "bundle-read-access")?.status, "PASS");
     assert.ok(body.created.includes("TODO.md"));
     assert.equal(existsSync(join(repository, "AGENTS.md")), true);
     assert.equal(existsSync(join(repository, "CLAUDE.md")), true);

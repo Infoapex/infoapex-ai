@@ -18,3 +18,6 @@
 - Full installation now supports `--verify` for an immediate no-provider preflight,
   blocks partial bootstrap state on invalid targets, and requires `--repair` before
   replacing a differing bootstrap file.
+- Installation readiness now reports effective repository write access and bundle
+  runtime read access in both `preflight` and `install --check`; no ACLs are widened
+  automatically.

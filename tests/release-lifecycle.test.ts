@@ -24,6 +24,8 @@ test("release checks reject invalid profiles and mismatched or unsafe bundle roo
   const unrelatedBundle = mkdtempSync(join(tmpdir(), "apex-unrelated-bundle-"));
   try {
     assert.equal(checkInstall(repository, process.cwd()).status, "PASS");
+    assert.equal(checkInstall(repository, process.cwd()).checks.find((check) => check.id === "repository-filesystem-access")?.status, "PASS");
+    assert.equal(checkInstall(repository, process.cwd()).checks.find((check) => check.id === "bundle-read-access")?.status, "PASS");
     assert.equal(checkInstall(repository, unrelatedBundle).status, "BLOCKED");
     writeFileSync(join(repository, ".infoapex-ai", "install-profile.json"), JSON.stringify({ schemaVersion: "2.0", profile: "generic" }));
     assert.equal(checkInstall(repository, process.cwd()).status, "BLOCKED");
