@@ -12,8 +12,10 @@ const sbomRelative = `dist-release/infoapex-ai-${candidate}.cdx.json`;
 const zipPath = join(root, zipRelative);
 const checks = [];
 const policy = JSON.parse(readFileSync(join(root, "validation/p6/solo-release-policy.json"), "utf8"));
+const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 
 function check(id, pass, detail = null) { checks.push({ id, status: pass ? "PASS" : "BLOCKED", ...(detail === null ? {} : { detail }) }); }
+check("package-version", packageJson.version === candidate.replace(/^v/, ""), `package version must match ${candidate}`);
 check("tracked-tree-clean", exec(["diff", "--quiet", "HEAD", "--"], root), "tracked files are committed; untracked local state is excluded by git archive");
 step("npm-test", "npm", ["test"]);
 step("p6-verify", "npm", ["run", "p6:verify"]);

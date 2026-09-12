@@ -12,9 +12,20 @@ CycloneDX SBOM, and clean-install smoke testing:
 node scripts/solo-release-audit.mjs --candidate v1.0.0-rc.1-internal
 ```
 
+The internal candidate uses package version `1.0.0-rc.1-internal`. The stable
+package version `1.0.0` is reserved for the separately guarded public tag.
+
 The command never tags, pushes, deploys, publishes, uploads, or changes release-gate
 statuses. Its result is `SOLO_INTERNAL_RC_READY` with `publicationAllowed: false`.
 The maintainer must make an explicit Go/No-Go decision before any public release.
+
+The public workflow enforces that decision through a committed, schema-shaped
+`validation/p6/solo-go-no-go.json` file. Before the workflow can attest or publish a
+stable tag, `node scripts/public-release-preflight.mjs` verifies the exact package
+version, tag target, artifact checksum/provenance/SBOM, and release workflow guard.
+The preflight itself never publishes anything. Start from
+`validation/p6/solo-go-no-go.example.json`; replace it only after the maintainer has
+reviewed rollback, known limitations, license, and the chosen publication channel.
 
 The 3-repository/2-team/30-day consumer pilot and independent audit are not blockers
 for this profile's internal RC or first public release. They remain recommended after

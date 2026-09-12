@@ -12,3 +12,6 @@
   pilot contract that remains NOT_STARTED until real consumer evidence exists.
 - P6.8 local RC audit/evidence index and fail-closed GA decision package; publication is
   intentionally disabled until external pilot, audit, and owner sign-offs exist.
+- Solo-maintainer public-release preflight now requires an explicit committed Go/No-Go
+  decision and verifies the tagged artifact, checksum, provenance, SBOM, and signed
+  release workflow before any publication step.

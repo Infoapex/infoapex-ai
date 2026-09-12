@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "profile": "solo-maintainer",
+  "candidate": "v1.0.0",
+  "decision": "NO_GO",
+  "owner": "REPLACE_WITH_MAINTAINER_NAME",
+  "decidedAt": "2026-09-12T00:00:00Z",
+  "rationale": "Template only. Replace this file with an explicit maintainer decision before publication.",
+  "acknowledgements": {
+    "localAuditPassed": true,
+    "rollbackVerified": true,
+    "knownLimitationsReviewed": true,
+    "licenseReviewed": true,
+    "publicationChannel": "github-release"
+  }
+}

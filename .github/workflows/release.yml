@@ -57,6 +57,9 @@ jobs:
       - name: Smoke only the committed release artifact
         run: node scripts/release-smoke-test.mjs --zip "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip"
 
+      - name: Require explicit solo-maintainer public-release decision
+        run: node scripts/public-release-preflight.mjs --candidate "$GITHUB_REF_NAME" --zip "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip" --sbom "dist-release/infoapex-ai-${GITHUB_REF_NAME}.cdx.json"
+
       - name: Attest release provenance
         uses: actions/attest@v4
         with:

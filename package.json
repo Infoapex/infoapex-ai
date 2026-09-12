@@ -1,6 +1,6 @@
 {
   "name": "@infoapex/infoapex-ai",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1-internal",
   "private": true,
   "type": "module",
   "files": [
@@ -52,7 +52,8 @@
     "release:package-smoke": "node scripts/package-smoke-test.mjs",
     "p6:verify": "node scripts/verify-p6.mjs",
     "p6:pilot:validate": "node scripts/validate-p6-pilot.mjs",
-    "release:smoke-test": "node scripts/release-smoke-test.mjs"
+    "release:smoke-test": "node scripts/release-smoke-test.mjs",
+    "release:public-preflight": "node scripts/public-release-preflight.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",

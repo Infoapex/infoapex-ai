@@ -3,12 +3,16 @@
 ## P6 readiness update — 2026-09-12
 
 P6.1–P6.8 local implementation and deterministic verification are available on the
-current branch. This remains a pre-release: the consumer pilot is preregistered but
-`NOT_STARTED`, and the local RC audit returns `INCONCLUSIVE` with `NO_PUBLICATION`.
+current branch. The package version is `1.0.0-rc.1-internal`; this is an internal
+release candidate, not the public `v1.0.0`. The consumer pilot is preregistered but
+`NOT_STARTED`, and the strict enterprise audit remains `INCONCLUSIVE` with
+`NO_PUBLICATION`.
 
-Known release blockers are the real consumer pilot, independent security/recovery/
-supply-chain audit, signed owner go/no-go, and a protected tag/publication workflow.
-Use `node scripts/rc-audit.mjs` to reproduce the local audit and see the missing evidence.
+The solo profile does not require the enterprise pilot for this internal RC. Public
+release still requires the explicit committed maintainer decision described in
+`docs/P6-SOLO-PROFILE.md`, plus a protected tag and the signed publication workflow.
+Use `node scripts/solo-release-audit.mjs --candidate v1.0.0-rc.1-internal` for the
+local audit and `node scripts/public-release-preflight.mjs` for the final guard.
 
 ## v0.1.0 (pre-release, private) — 2026-09-02
 

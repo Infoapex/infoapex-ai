@@ -18,7 +18,7 @@ for (const path of required) check(`file:${path}`, existsSync(join(root, path)),
 let pkg = null;
 try { pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")); check("package-json", true, `version ${pkg.version}`); }
 catch { check("package-json", false, "package.json is invalid"); }
-check("candidate-version", pkg?.version === "0.1.0", "GA version is not claimed by the local pre-release audit");
+check("candidate-version", typeof pkg?.version === "string" && pkg.version !== "1.0.0", "GA version is not claimed by the local pre-release audit");
 
 try {
   const gates = JSON.parse(readFileSync(join(root, "validation/p6/release-gates.json"), "utf8"));

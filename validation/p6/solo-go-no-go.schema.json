@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "profile",
+    "candidate",
+    "decision",
+    "owner",
+    "decidedAt",
+    "rationale",
+    "acknowledgements"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "profile": { "const": "solo-maintainer" },
+    "candidate": { "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "decision": { "enum": ["GO", "NO_GO"] },
+    "owner": { "type": "string", "minLength": 1 },
+    "decidedAt": { "type": "string", "format": "date-time" },
+    "rationale": { "type": "string", "minLength": 1 },
+    "acknowledgements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "localAuditPassed",
+        "rollbackVerified",
+        "knownLimitationsReviewed",
+        "licenseReviewed",
+        "publicationChannel"
+      ],
+      "properties": {
+        "localAuditPassed": { "const": true },
+        "rollbackVerified": { "const": true },
+        "knownLimitationsReviewed": { "const": true },
+        "licenseReviewed": { "const": true },
+        "publicationChannel": { "const": "github-release" }
+      }
+    }
+  }
+}
