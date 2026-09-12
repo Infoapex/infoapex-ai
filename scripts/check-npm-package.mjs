@@ -11,9 +11,17 @@ const raw = execFileSync(npm, ["pack", "--dry-run", "--json", "--ignore-scripts"
 });
 const result = JSON.parse(raw)[0];
 const files = result.files.map((entry) => entry.path.replaceAll("\\", "/"));
-const trackedOrIgnored = new Set(execFileSync("git", ["ls-files", "--others", "--exclude-standard"], {
-  cwd: root, encoding: "utf8", windowsHide: true, shell: process.platform === "win32"
-}).split(/\r?\n/).filter(Boolean).map((path) => path.replaceAll("\\", "/")));
+let localUntracked = [];
+try {
+  localUntracked = execFileSync("git", ["ls-files", "--others", "--exclude-standard"], {
+    cwd: root, encoding: "utf8", windowsHide: true, shell: process.platform === "win32"
+  }).split(/\r?\n/).filter(Boolean).map((path) => path.replaceAll("\\", "/"));
+} catch {
+  // A release ZIP deliberately has no .git directory. In that environment there
+  // is no checkout-local set to compare; package inclusion is checked directly
+  // from npm's dry-run file list below.
+}
+const trackedOrIgnored = new Set(localUntracked);
 
 const required = [
   "dist/src/cli.js",

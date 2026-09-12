@@ -47,11 +47,12 @@ const result = {
   code: localPass ? "RC_LOCAL_AUDIT_PASS_EXTERNAL_EVIDENCE_MISSING" : "RC_LOCAL_AUDIT_BLOCKED",
   releaseAction: "NO_PUBLICATION",
   commit: git(["rev-parse", "HEAD"]),
-  commitSha256: createHash("sha256").update(git(["rev-parse", "HEAD"]).trim()).digest("hex"),
+  commitSha256: commitDigest(),
   localChecks: checks,
   missingExternalEvidence: ["consumer-pilot", "independent-security-audit", "owner-go-no-go", "signed-tag-and-publication"]
 };
 console.log(JSON.stringify(result, null, 2));
 process.exitCode = localPass ? 0 : 2;
 
-function git(args) { return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim(); }
+function git(args) { try { return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim(); } catch { return null; } }
+function commitDigest() { const commit = git(["rev-parse", "HEAD"]); return commit ? createHash("sha256").update(commit).digest("hex") : null; }
