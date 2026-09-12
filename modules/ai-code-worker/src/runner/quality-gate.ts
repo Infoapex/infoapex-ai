@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { redactText } from "./redaction.js";
 import { needsShellWrapper } from "../engines/spawn-shell.js";
+import type { EnvironmentCommand, EnvironmentRunResult } from "../execution/environment.js";
 
 export interface CommandSpec {
   readonly id: string;
@@ -117,8 +118,17 @@ export function runQualityGate(command: CommandSpec): Promise<QualityGateResult>
   });
 }
 
-export function runQualityGateSync(command: CommandSpec): QualityGateResult {
+export interface QualityGateExecutionEnvironment {
+  readonly profile: unknown;
+  readonly runWithProfileSync: (profile: unknown, command: EnvironmentCommand) => EnvironmentRunResult;
+}
+
+export function runQualityGateSync(command: CommandSpec, executionEnvironment?: QualityGateExecutionEnvironment): QualityGateResult {
   const startedAt = Date.now();
+  if (executionEnvironment) {
+    const result = executionEnvironment.runWithProfileSync(executionEnvironment.profile, command);
+    return qualityGateResultFromEnvironment(command, result, startedAt);
+  }
   const env = runtimeEnvironment(command.env);
   const executable = resolveCommandShim(command.executable, env);
   const result = spawnSync(executable, command.args, {
@@ -147,6 +157,28 @@ export function runQualityGateSync(command: CommandSpec): QualityGateResult {
     durationMs: Date.now() - startedAt,
     timedOut,
     outputTruncated: output.length > command.maximumOutputBytes,
+    redacted: redacted.redacted,
+    outputSha256: redacted.sha256,
+    failureClass
+  };
+}
+
+function qualityGateResultFromEnvironment(command: CommandSpec, result: EnvironmentRunResult, startedAt: number): QualityGateResult {
+  const output = Buffer.from(`${result.stdout}${result.stderr}`, "utf8");
+  const redacted = redactText(output.subarray(0, command.maximumOutputBytes).toString("utf8"));
+  const failureClass = result.timedOut || result.error || result.status === null
+    ? "infrastructure"
+    : result.status === 0
+      ? null
+      : "deterministic";
+  return {
+    id: command.id,
+    executable: command.executable,
+    args: command.args,
+    exitCode: result.status,
+    durationMs: Date.now() - startedAt,
+    timedOut: result.timedOut,
+    outputTruncated: result.outputTruncated || output.length > command.maximumOutputBytes,
     redacted: redacted.redacted,
     outputSha256: redacted.sha256,
     failureClass

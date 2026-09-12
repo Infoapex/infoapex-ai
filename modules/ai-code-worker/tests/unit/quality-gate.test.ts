@@ -71,6 +71,31 @@ describe("quality gate runner", () => {
     assert.equal(result.failureClass, null);
   });
 
+  it("routes a gate through the selected execution environment and preserves bounded evidence", () => {
+    let captured: unknown = null;
+    const result = runQualityGateSync({
+      id: "isolated-gate",
+      executable: "node",
+      args: ["-e", "process.exit(0)"],
+      cwd: process.cwd(),
+      timeoutMs: 5000,
+      maximumOutputBytes: 1024,
+      linkedDirectories: [{ from: "C:\\cache", to: `${process.cwd()}\\node_modules` }]
+    }, {
+      profile: { profileId: "isolated" },
+      runWithProfileSync: (_profile, command) => {
+        captured = command;
+        return { status: 0, stdout: "ok", stderr: "", timedOut: false, outputTruncated: false, error: null };
+      }
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.failureClass, null);
+    assert.equal(result.outputTruncated, false);
+    assert.equal((captured as { executable: string }).executable, "node");
+    assert.equal((captured as { linkedDirectories: readonly unknown[] }).linkedDirectories.length, 1);
+  });
+
   it("resolves a bare Windows command name to its PATH shim", () => {
     if (process.platform !== "win32") return;
 

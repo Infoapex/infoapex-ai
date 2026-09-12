@@ -7,7 +7,7 @@ import {
   type UsageCheckpointTaskRisk
 } from "../benchmark/usage-checkpoint.js";
 import { loadProjectConfig, type ProjectConfig } from "../config/project-config.js";
-import { runCompile, type CompileReport } from "../compile/compile.js";
+import { loadExecutionProfile, runCompile, type CompileReport } from "../compile/compile.js";
 import { ClaudeCliAdapter, type ClaudeCliAdapterConfig } from "../engines/claude-cli.js";
 import type { EngineUsage } from "../engines/engine-event.js";
 import { createWorkerCommit } from "../git/commit.js";
@@ -30,6 +30,7 @@ import { resolveQualityGate } from "../runner/quality-gate-config.js";
 import { runQualityGateSync, toEvidenceCommand, type QualityGateResult } from "../runner/quality-gate.js";
 import { buildCoverageReview } from "../review/coverage-review.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
+import { resolveExecutionEnvironment } from "../execution/environment.js";
 import { buildTaskInputSnapshot, type SnapshotManifest } from "../snapshots/task-input-snapshot.js";
 import { buildSemanticTaskInputs, type SemanticTaskInputs } from "../snapshots/semantic-task-inputs.js";
 import { runIndependentReviewAndRepair, type IndependentReviewer } from "./independent-review-repair.js";
@@ -1188,6 +1189,23 @@ function runGates(input: {
   readonly finding: ClaudeRunFinding | null;
 } {
   const results: QualityGateResult[] = [];
+  const executionProfile = loadExecutionProfile(input.repositoryRoot);
+  const executionEnvironment = resolveExecutionEnvironment(executionProfile);
+  const environmentReport = executionEnvironment.doctor(executionProfile);
+  if (!environmentReport.supported) {
+    return {
+      status: "BLOCKED",
+      results,
+      finding: {
+        severity: "blocker",
+        code: "ENVIRONMENT_UNAVAILABLE",
+        message: "The configured execution environment is unavailable for quality gates."
+      }
+    };
+  }
+  const isolatedRunner = executionEnvironment.runWithProfileSync
+    ? { profile: executionProfile, runWithProfileSync: executionEnvironment.runWithProfileSync.bind(executionEnvironment) }
+    : undefined;
 
   for (const gate of input.gates) {
     const resolved = resolveQualityGate({
@@ -1218,7 +1236,7 @@ function runGates(input: {
       payload: { gateId: resolved.command.id, taskId: input.taskId, scope: input.scope }
     });
 
-    const result = runQualityGateSync(resolved.command);
+    const result = runQualityGateSync(resolved.command, isolatedRunner);
     results.push(result);
 
     input.eventLog.append({

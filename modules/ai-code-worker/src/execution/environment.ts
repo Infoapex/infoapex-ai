@@ -32,6 +32,7 @@ export interface EnvironmentCapabilityReport {
 
 export interface ExecutionEnvironment {
   doctor(profile: unknown): EnvironmentCapabilityReport;
+  readonly runWithProfileSync?: (profile: unknown, command: EnvironmentCommand) => EnvironmentRunResult;
 }
 
 export interface EnvironmentCommand {
@@ -42,6 +43,10 @@ export interface EnvironmentCommand {
   readonly maximumOutputBytes: number;
   readonly input?: string;
   readonly env?: Readonly<Record<string, string>>;
+  readonly linkedDirectories?: readonly {
+    readonly from: string;
+    readonly to: string;
+  }[];
 }
 
 export interface EnvironmentRunResult {
@@ -174,6 +179,10 @@ export class DockerExecutionEnvironment implements ExecutionEnvironment {
   }
 
   async runWithProfile(profile: unknown, command: EnvironmentCommand): Promise<EnvironmentRunResult> {
+    return this.runWithProfileSync(profile, command);
+  }
+
+  runWithProfileSync(profile: unknown, command: EnvironmentCommand): EnvironmentRunResult {
     const report = this.doctor(profile);
     if (!report.supported) {
       return unavailableResult(report.warnings.join(" ") || "Docker isolated backend is unavailable.");
@@ -267,7 +276,7 @@ const requiredCapabilities: readonly EnvironmentCapability[] = [
 export function resolveExecutionEnvironment(
   profile: unknown,
   registry = SchemaRegistry.load()
-): LocalIsolatedExecutionEnvironment | DockerExecutionEnvironment | FakeExecutionEnvironment {
+): ExecutionEnvironment {
   registry.assertValid("execution-environment.schema.json", profile);
   return (profile as EnvironmentProfileView).backend?.type === "docker"
     ? new DockerExecutionEnvironment(registry)
@@ -405,12 +414,25 @@ function dockerArgs(view: EnvironmentProfileView, command: EnvironmentCommand, m
     if (!allowedVariables.has(name)) throw new Error(`Docker environment variable '${name}' is not allowlisted by the execution profile.`);
     return ["-e", `${name}=${value}`];
   });
+  const linkedMounts = (command.linkedDirectories ?? []).map((link) => {
+    const source = resolve(link.from);
+    const target = resolve(link.to);
+    const targetRelative = relative(root, target);
+    if (targetRelative === ".." || targetRelative.startsWith(`..${sep}`) || isAbsolute(targetRelative)) {
+      throw new Error("Docker linked directory target must be inside the mounted worktree.");
+    }
+    if (source === root || !isAbsolute(source)) {
+      throw new Error("Docker linked directory source must be an absolute path outside the worktree.");
+    }
+    const containerTarget = targetRelative === "" ? "/workspace" : `/workspace/${targetRelative.split(sep).join("/")}`;
+    return ["-v", `${source}:${containerTarget}:ro`];
+  }).flat();
   return [
     "run", "--rm", "--init", "--network", "none", "--read-only", "--cap-drop", "ALL",
     "--security-opt", "no-new-privileges", "--pids-limit", String(view.limits.maximumProcesses),
     ...(view.limits.maximumMemoryBytes ? ["--memory", String(view.limits.maximumMemoryBytes)] : []),
     ...(view.limits.maximumCpuUnits ? ["--cpus", String(view.limits.maximumCpuUnits)] : []),
-    "--tmpfs", "/tmp:rw,nosuid,nodev", "-v", `${root}:/workspace:rw`, "-w", containerCwd,
+    "--tmpfs", "/tmp:rw,nosuid,nodev", "-v", `${root}:/workspace:rw`, ...linkedMounts, "-w", containerCwd,
     ...envArgs, `${backend.image}@${backend.imageDigest}`, command.executable, ...mappedArgs
   ];
 }

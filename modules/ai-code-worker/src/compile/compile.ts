@@ -268,7 +268,7 @@ function buildRunIntent(input: {
   };
 }
 
-function loadExecutionProfile(worktreeRoot: string): unknown {
+export function loadExecutionProfile(worktreeRoot: string): unknown {
   const localPath = join(worktreeRoot, ".ai-code-worker", "execution-environment.example.json");
   const fallbackPath = join(packageRoot(), "templates", "project", ".ai-code-worker", "execution-environment.example.json");
 
