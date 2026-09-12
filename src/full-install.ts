@@ -1,5 +1,7 @@
-import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { defaultProductionPolicy } from "./production.js";
 
@@ -396,24 +398,49 @@ function json(value: unknown): string { return `${JSON.stringify(value, null, 2)
 function writeText(path: string, value: string): void { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, value, "utf8"); }
 function run(executable: string, args: readonly string[], cwd: string, timeoutMs = 120_000): ProcessResult { const result = spawnSync(executable, args, { cwd, encoding: "utf8", windowsHide: true, timeout: timeoutMs }); return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? (result.error?.message ?? "") }; }
 function runControlBuild(project: string, cwd: string): ProcessResult {
-  let result = run("dotnet", ["build", project, "--nologo"], cwd);
-  // Full-install checks can run in parallel across test workers or automation
-  // processes against the same extracted bundle. MSBuild's generated
-  // `*.FileListAbsolute.txt` is not concurrency-safe and reports MSB3491 while
-  // the other build is finishing. Windows antivirus and the Roslyn build server
-  // can produce the equivalent CS2012 lock while the output is being scanned.
-  // Retry only these known transient file-lock collisions; all other build
-  // failures remain fail-closed and are returned immediately.
-  for (let attempt = 0; attempt < 5 && isTransientMsbuildFileLock(result); attempt += 1) {
-    sleepSync(500);
-    result = run("dotnet", ["build", project, "--nologo"], cwd);
+  const lock = acquireBuildLock(project);
+  if (!lock) return { exitCode: 1, stdout: "", stderr: "Timed out waiting for the shared ai-code-control build lock." };
+  try {
+    let result = run("dotnet", ["build", project, "--nologo"], cwd);
+    // Full-install checks can run in parallel across test workers or automation
+    // processes against the same extracted bundle. MSBuild's generated
+    // `*.FileListAbsolute.txt` and apphost are not concurrency-safe. Serialize
+    // the build across processes; retries remain for antivirus/compiler locks.
+    for (let attempt = 0; attempt < 5 && isTransientMsbuildFileLock(result); attempt += 1) {
+      sleepSync(500);
+      result = run("dotnet", ["build", project, "--nologo"], cwd);
+    }
+    return result;
+  } finally {
+    releaseBuildLock(lock);
   }
-  return result;
+}
+
+interface BuildLock { readonly path: string; readonly handle: number; }
+
+function acquireBuildLock(project: string): BuildLock | null {
+  const path = join(tmpdir(), `infoapex-ai-control-build-${createHash("sha256").update(resolve(project)).digest("hex").slice(0, 24)}.lock`);
+  const deadline = Date.now() + 20 * 60_000;
+  while (Date.now() < deadline) {
+    try {
+      const handle = openSync(path, "wx");
+      return { path, handle };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") return null;
+      sleepSync(250);
+    }
+  }
+  return null;
+}
+
+function releaseBuildLock(lock: BuildLock): void {
+  closeSync(lock.handle);
+  try { unlinkSync(lock.path); } catch { /* another process may have recovered a stale lock */ }
 }
 
 function isTransientMsbuildFileLock(result: ProcessResult): boolean {
   const output = `${result.stdout}\n${result.stderr}`;
-  return result.exitCode !== 0 && /MSB3491|FileListAbsolute\.txt|CS2012|being used by another process|file may be locked/i.test(output);
+  return result.exitCode !== 0 && /MSB3030|MSB3491|FileListAbsolute\.txt|apphost\.exe|CS2012|being used by another process|file may be locked/i.test(output);
 }
 
 function sleepSync(milliseconds: number): void {
