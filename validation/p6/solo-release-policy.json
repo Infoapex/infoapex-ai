@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "profile": "solo-maintainer",
+  "candidateClass": "internal-rc",
+  "requiredLocalChecks": [
+    "npm test",
+    "p6:verify",
+    "upgrade-rollback-tests",
+    "reproducible-release-zip",
+    "sha256-provenance",
+    "cyclonedx-sbom",
+    "clean-install-smoke"
+  ],
+  "notRequiredForInternalRc": [
+    "consumer-pilot",
+    "three-consumer-repositories",
+    "two-independent-teams",
+    "thirty-day-adoption-window",
+    "independent-audit"
+  ],
+  "publicationBoundary": {
+    "automaticPublication": false,
+    "maintainerGoNoGoRequired": true,
+    "protectedTagRequired": true,
+    "publicReleaseWorkflowRequired": true
+  },
+  "postReleaseRecommended": [
+    "collect opt-in user feedback",
+    "monitor the first 30 days",
+    "invite independent security review",
+    "run an adoption pilot when multiple consumers exist"
+  ]
+}

@@ -9,6 +9,13 @@ The expected local result is `INCONCLUSIVE` with code
 checks passed; it is not a production approval. The audit never creates a tag, pushes,
 deploys, uploads, or publishes.
 
-The candidate is still `0.1.0` pre-release. A `v1.0.0-rc.1` or `v1.0.0` requires a clean
-commit, reproducible artifact, checksum, provenance, SBOM, signed owner decisions, and
-the external evidence listed in `validation/p6/evidence-index.json`.
+The default audit is the strict multi-consumer/enterprise profile. For the solo
+maintainer release track, run `node scripts/solo-release-audit.mjs`: it produces an
+internal candidate only after the local test, rollback, package, provenance, SBOM and
+clean-install gates pass. It does not create a tag or publish anything.
+
+The solo profile does not require the 3-repository/2-team/30-day pilot or an independent
+audit before an internal RC or first public release. Those are recommended post-release
+evidence for a solo project and remain mandatory for enterprise adoption claims. A
+maintainer Go/No-Go, protected tag and public release workflow are still required before
+publication. The candidate stays pre-release until that decision is made.
