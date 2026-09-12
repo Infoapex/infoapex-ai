@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "pilotId": "p6-consumer-adoption-v1",
+  "status": "NOT_STARTED",
+  "verdict": null,
+  "frozenAt": "2026-09-12T00:00:00Z",
+  "scope": {
+    "consumerRepositories": 3,
+    "independentUsersOrTeams": 2,
+    "boundedTasks": 60,
+    "pairedEvaluationTasks": 20,
+    "minimumCalendarDays": 30
+  },
+  "requiredScenarios": ["upgrade", "rollback", "incident-drill", "restore"],
+  "acceptance": {
+    "validTaskCorrectOrPolicyRejectedPercentMin": 90,
+    "scopeVerificationPercent": 100,
+    "criticalIncidentsMax": 0,
+    "scopeEscapesMax": 0,
+    "secretLeaksMax": 0,
+    "unplannedManualInterventionPercentMax": 20,
+    "upgradeRollbackRestorePercent": 100,
+    "quickstartUnaidedPercentMin": 80
+  },
+  "privacy": {
+    "rawConversations": "forbidden",
+    "providerOutput": "excluded",
+    "secrets": "forbidden",
+    "automaticUpload": false,
+    "sanitizationRequired": true
+  },
+  "stopConditions": ["scope-escape", "secret-leak", "destructive-recovery", "critical-policy-violation"],
+  "evidence": [],
+  "notes": "No live consumer evidence is asserted by this preregistration. NOT_STARTED must remain until the first approved checkpoint."
+}
