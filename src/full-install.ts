@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { defaultProductionPolicy } from "./production.js";
@@ -46,6 +46,8 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   const findings: string[] = [];
   if (!isRealDirectory(repo)) findings.push("Repository root must exist and must not be a symbolic link.");
   if (!isRealDirectory(bundle)) findings.push("Bundle root must exist and must not be a symbolic link.");
+  if (isRealDirectory(repo) && !hasCommittedGitHead(repo)) findings.push("Repository root must be a Git repository with an initial commit before full installation.");
+  if (isRealDirectory(repo) && !isWritableDirectory(repo)) findings.push("Repository root is not writable by the current user; full installation cannot create its managed files.");
   if (options.profile !== "generic" && options.profile !== "dotnet-nextjs") findings.push("Install profile is unsupported.");
   const layoutValues = [options.layout?.backendDir, options.layout?.frontendDir, ...(options.layout?.mlDir === null ? [] : [options.layout?.mlDir])];
   for (const value of layoutValues) {
@@ -380,6 +382,14 @@ function isSafeRelativePath(value: unknown): value is string {
 }
 function isRealDirectory(path: string): boolean {
   try { const stat = lstatSync(path); return stat.isDirectory() && !stat.isSymbolicLink(); }
+  catch { return false; }
+}
+function hasCommittedGitHead(path: string): boolean {
+  const result = spawnSync("git", ["-C", path, "rev-parse", "--verify", "HEAD"], { encoding: "utf8", windowsHide: true });
+  return result.status === 0;
+}
+function isWritableDirectory(path: string): boolean {
+  try { accessSync(path, constants.W_OK); return true; }
   catch { return false; }
 }
 function installerPath(root: string, value: string): string | null { return containedNonSymlinkPath(root, value); }

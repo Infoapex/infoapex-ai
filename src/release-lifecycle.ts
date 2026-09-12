@@ -1,4 +1,5 @@
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { accessSync, constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fullInstall, type InstallProfile } from "./full-install.js";
@@ -20,6 +21,10 @@ export function checkInstall(repositoryRoot: string, bundleRoot: string, require
   const roots = checkedRoots(repositoryRoot, bundleRoot);
   if ("error" in roots) return blockedCheck(roots.error);
   const checks: { id: string; status: Status; detail: string }[] = [];
+  const gitReady = hasCommittedGitHead(roots.repo);
+  const writable = isWritableDirectory(roots.repo);
+  checks.push({ id: "git-repository", status: gitReady ? "PASS" : "BLOCKED", detail: gitReady ? "Repository has a committed Git HEAD." : "Repository must have a Git repository with an initial commit." });
+  checks.push({ id: "repository-write-access", status: writable ? "PASS" : "BLOCKED", detail: writable ? "Current user can write installer-managed files." : "Current user cannot write installer-managed files in the repository." });
   const profile = readProfile(roots.repo, checks);
   if (profile && requireCurrentBundle) {
     const matches = normalizePath(profile.bundleRoot) === normalizePath(roots.bundle);
@@ -27,6 +32,11 @@ export function checkInstall(repositoryRoot: string, bundleRoot: string, require
   }
   const config = validateConfig(roots.repo);
   checks.push({ id: "managed-config", status: config.status === "PASS" ? "PASS" : "BLOCKED", detail: config.status === "PASS" ? "All installer-owned configuration validates." : "Installer-owned configuration is missing or invalid." });
+  const workerConfig = safeReadJson(roots.repo, ".ai-code-worker/config.json");
+  const providerPolicy = workerConfig?.contextProvider === "ai-code-control" && workerConfig?.contextPackage?.mode === "observe" &&
+    workerConfig?.adapters?.codex?.model === "gpt-5.6" && workerConfig?.adapters?.codex?.reasoningEffort === "high" &&
+    Array.isArray(workerConfig?.adapters?.aiCodeControl?.baseArgs);
+  checks.push({ id: "explicit-provider-policy", status: providerPolicy ? "PASS" : "BLOCKED", detail: providerPolicy ? "Codex gpt-5.6/high is explicit; no automatic engine fallback is configured." : "Worker context/provider policy is incomplete or stale; rerun full init with --repair after review." });
   const missing = RUNTIME_PATHS.filter((path) => !safeExists(roots.bundle, path));
   checks.push({ id: "bundle-runtime", status: missing.length === 0 ? "PASS" : "BLOCKED", detail: missing.length === 0 ? "All root, module, control, and provenance runtime entries exist." : `Missing or unsafe bundle entries: ${missing.join(", ")}` });
   return { status: checks.every((check) => check.status === "PASS") ? "PASS" : "BLOCKED", profile: profile?.profile ?? null, checks };
@@ -142,3 +152,7 @@ function digestFile(path: string): string { return createHash("sha256").update(r
 function inside(root: string, target: string): boolean { const rel = relative(resolve(root), resolve(target)); return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); }
 function blockedCheck(detail: string): LifecycleCheck { return { status: "BLOCKED", profile: null, checks: [{ id: "root-path", status: "BLOCKED", detail }] }; }
 function blocked(mode: string, code: string, message: string, upgradeId?: string): Record<string, unknown> { return { schemaVersion: "1.0", status: "BLOCKED", code, mode, ...(upgradeId ? { upgradeId } : {}), message }; }
+
+function hasCommittedGitHead(path: string): boolean { const result = spawnSync("git", ["-C", path, "rev-parse", "--verify", "HEAD"], { encoding: "utf8", windowsHide: true }); return result.status === 0; }
+function isWritableDirectory(path: string): boolean { try { accessSync(path, constants.W_OK); return true; } catch { return false; } }
+function safeReadJson(root: string, path: string): Record<string, any> | null { const candidate = safePath(root, path); if (!candidate || !existsSync(candidate)) return null; try { return JSON.parse(readFileSync(candidate, "utf8")) as Record<string, any>; } catch { return null; } }

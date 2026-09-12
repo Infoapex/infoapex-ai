@@ -260,6 +260,11 @@ regulile de sincronizare sunt în [`docs/MODULE-PROVENANCE.md`](docs/MODULE-PROV
 
 **1. Inițializează bootstrap-ul în proiectul țintă**
 
+Pentru profilul `--full`, proiectul țintă trebuie să fie un repository Git cu cel puțin
+un commit, iar contul care rulează comanda trebuie să poată scrie în el. Installerul
+configurează wiring-ul modulelor și directoarele sale gestionate; nu modifică ACL-uri și
+nu instalează runtime-urile Node/.NET/Python sau CLI-urile Codex/Claude.
+
 ```bash
 npx --package . infoapex-ai init --repo /cale/catre/proiect --mode integrated --full --profile dotnet-nextjs --backend-dir backend --frontend-dir frontend --ml-dir ml
 npx --package . infoapex-ai status --repo /cale/catre/proiect

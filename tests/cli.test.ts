@@ -21,6 +21,12 @@ function runCli(repositoryPath: string, args: string[]): { status: number; stdou
   }
 }
 
+function initializeGit(repositoryPath: string): void {
+  execFileSync("git", ["init", "--initial-branch", "main"], { cwd: repositoryPath, stdio: "ignore" });
+  execFileSync("git", ["-c", "user.name=Infoapex Test", "-c", "user.email=infoapex-test@example.invalid", "add", "."], { cwd: repositoryPath, stdio: "ignore" });
+  execFileSync("git", ["-c", "user.name=Infoapex Test", "-c", "user.email=infoapex-test@example.invalid", "commit", "-m", "initial consumer repository"], { cwd: repositoryPath, stdio: "ignore" });
+}
+
 test("installer keeps independent mode isolated and exposes status", () => {
   const repository = mkdtempSync(join(tmpdir(), "apex-cli-independent-"));
   try {
@@ -122,6 +128,7 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
     writeFileSync(join(repository, "server", "Product.Api", "Product.Api.csproj"), '<Project Sdk="Microsoft.NET.Sdk.Web" />');
     writeFileSync(join(repository, "server", "Product.Api.Tests", "Product.Api.Tests.csproj"), '<Project Sdk="Microsoft.NET.Sdk" />');
     writeFileSync(join(repository, "client", "package.json"), JSON.stringify({ scripts: { build: "next build", typecheck: "tsc --noEmit" } }));
+    initializeGit(repository);
     const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "dotnet-nextjs", "--backend-dir", "server", "--frontend-dir", "client", "--ml-dir", "data"]);
     assert.equal(init.status, 0, init.stderr);
     const body = JSON.parse(init.stdout) as { status: string; profile: string; created: readonly string[] };

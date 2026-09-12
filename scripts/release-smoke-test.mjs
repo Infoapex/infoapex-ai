@@ -15,7 +15,8 @@ import { fileURLToPath } from "node:url";
 // value-gate (planner+worker),
 // pilot:icm-graph (planner+worker+control), review-gate (planner+worker+review), docs-gate
 // (planner+worker+review+docs), plus the root installer's own init/status/handoff in both
-// independent and integrated mode against a disposable target directory.
+// independent and integrated mode against disposable target directories. The full installer
+// is also exercised from the ZIP, including a real Git target and the no-provider preflight.
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -85,6 +86,7 @@ try {
 
   const targetIndependent = mkdtempSync(join(workspace, "target-independent-"));
   const targetIntegrated = mkdtempSync(join(workspace, "target-integrated-"));
+  const targetFullInstall = mkdtempSync(join(workspace, "target-full-install-"));
   const rootCli = join(extractedRoot, "dist", "src", "cli.js");
 
   step("root installer: init + status in independent mode", () => {
@@ -102,6 +104,16 @@ try {
     runJson(process.execPath, [rootCli, "handoff", "--repo", targetIntegrated, "--direction", "worker-to-planner", "--run-id", "smoke-run", "--payload", "payload.json"], extractedRoot);
     const status = runJson(process.execPath, [rootCli, "status", "--repo", targetIntegrated], extractedRoot);
     if (status.config?.mode !== "integrated") throw new Error(`status did not report integrated mode: ${JSON.stringify(status)}`);
+  });
+
+  step("root installer: full generic profile + install check + no-provider preflight", () => {
+    initializeGitRepository(targetFullInstall);
+    const init = runJson(process.execPath, [rootCli, "init", "--repo", targetFullInstall, "--mode", "integrated", "--full", "--profile", "generic"], extractedRoot);
+    if (init.status !== "DONE" || init.profile !== "generic") throw new Error(`full install did not complete: ${JSON.stringify(init)}`);
+    const install = runJson(process.execPath, [rootCli, "install", "--check", "--repo", targetFullInstall], extractedRoot);
+    if (install.status !== "PASS") throw new Error(`install check did not pass: ${JSON.stringify(install)}`);
+    const preflight = runJson(process.execPath, [rootCli, "preflight", "--repo", targetFullInstall], extractedRoot);
+    if (preflight.status !== "PASS") throw new Error(`full install preflight did not pass: ${JSON.stringify(preflight)}`);
   });
 
   const failed = steps.filter((entry) => entry.status !== "PASS");
@@ -151,6 +163,15 @@ function verifyArtifactProvenance(zipPath) {
   if (!/^[0-9a-f]{40}$/i.test(manifest.commit) || manifest.sha256 !== actualSha256 || declaredChecksum !== actualSha256) {
     throw new Error("Release artifact provenance does not match the candidate ZIP.");
   }
+}
+
+function initializeGitRepository(repository) {
+  writeFileSync(join(repository, "README.md"), "# Disposable Infoapex consumer\n", "utf8");
+  run("git", ["init", "--initial-branch", "main"], repository);
+  run("git", ["config", "user.name", "Infoapex Release Smoke"], repository);
+  run("git", ["config", "user.email", "release-smoke@example.invalid"], repository);
+  run("git", ["add", "."], repository);
+  run("git", ["commit", "-m", "initial consumer repository"], repository);
 }
 
 function step(name, fn) {

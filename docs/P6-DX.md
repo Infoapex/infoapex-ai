@@ -6,6 +6,12 @@ consumator. Profilul implicit `core-local` nu face upload, nu păstrează conver
 
 ## Quickstart local, fără provider
 
+`--full` trebuie rulat într-un repository Git care are deja cel puțin un commit, iar
+utilizatorul curent trebuie să aibă drept de scriere în repository. Installerul creează
+și validează fișierele de configurare ale modulelor, dar nu acordă ACL-uri Windows și nu
+instalează Node.js, .NET, Python, Codex sau Claude. Aceste dependențe și politica de
+permisiuni a motorului rămân responsabilitatea mediului de execuție.
+
 Din root-ul bundle-ului construit:
 
 ```bash

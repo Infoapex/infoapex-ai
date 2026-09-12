@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -10,6 +11,9 @@ function createRepository(): string {
   const repository = mkdtempSync(join(tmpdir(), "apex-release-lifecycle-"));
   mkdirSync(join(repository, ".infoapex-ai"), { recursive: true });
   writeFileSync(join(repository, ".infoapex-ai", "config.json"), JSON.stringify({ schemaVersion: "1.0", mode: "integrated", handoffRoot: ".infoapex-ai/runs", planner: { enabled: true }, worker: { enabled: true } }));
+  execFileSync("git", ["init", "--initial-branch", "main"], { cwd: repository, stdio: "ignore" });
+  execFileSync("git", ["-c", "user.name=Infoapex Test", "-c", "user.email=infoapex-test@example.invalid", "add", "."], { cwd: repository, stdio: "ignore" });
+  execFileSync("git", ["-c", "user.name=Infoapex Test", "-c", "user.email=infoapex-test@example.invalid", "commit", "-m", "initial consumer repository"], { cwd: repository, stdio: "ignore" });
   const installed = fullInstall({ repositoryRoot: repository, bundleRoot: process.cwd(), profile: "generic", layout: { backendDir: "backend", frontendDir: "frontend", mlDir: "ml" }, repair: false });
   assert.equal(installed.status, "DONE", JSON.stringify(installed));
   return repository;
@@ -25,6 +29,29 @@ test("release checks reject invalid profiles and mismatched or unsafe bundle roo
     assert.equal(checkInstall(repository, process.cwd()).status, "BLOCKED");
     assert.equal(checkInstall(join(repository, "..", "missing"), process.cwd()).status, "BLOCKED");
   } finally { rmSync(repository, { recursive: true, force: true }); rmSync(unrelatedBundle, { recursive: true, force: true }); }
+});
+
+test("full installer blocks a non-Git target before writing managed files", () => {
+  const repository = mkdtempSync(join(tmpdir(), "apex-release-non-git-"));
+  try {
+    const result = fullInstall({ repositoryRoot: repository, bundleRoot: process.cwd(), profile: "generic", layout: { backendDir: "backend", frontendDir: "frontend", mlDir: "ml" }, repair: false });
+    assert.equal(result.status, "BLOCKED");
+    assert.match(result.findings.join(" "), /Git repository with an initial commit/);
+    assert.equal(existsSync(join(repository, ".ai-code-worker", "config.json")), false);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test("install check rejects a stale provider policy before a run", () => {
+  const repository = createRepository();
+  try {
+    const workerConfig = join(repository, ".ai-code-worker", "config.json");
+    const config = JSON.parse(readFileSync(workerConfig, "utf8")) as { adapters: { codex: { model: string } } };
+    config.adapters.codex.model = "gpt-5.6-terra";
+    writeFileSync(workerConfig, JSON.stringify(config));
+    const result = checkInstall(repository, process.cwd());
+    assert.equal(result.status, "BLOCKED");
+    assert.equal(result.checks.find((check) => check.id === "explicit-provider-policy")?.status, "BLOCKED");
+  } finally { rmSync(repository, { recursive: true, force: true }); }
 });
 
 test("upgrade dry-runs are stable and rollback refuses malformed journals and changed targets", () => {
