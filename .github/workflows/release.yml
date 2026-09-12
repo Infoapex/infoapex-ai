@@ -53,12 +53,13 @@ jobs:
           npm run p6:verify
           npm run release:build-zip -- --ref "$GITHUB_SHA" --out "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip"
           npm run release:sbom -- --out "dist-release/infoapex-ai-${GITHUB_REF_NAME}.cdx.json"
+          npm run release:policy-manifest -- --out "dist-release/infoapex-ai-${GITHUB_REF_NAME}.policy.json"
 
       - name: Smoke only the committed release artifact
         run: node scripts/release-smoke-test.mjs --zip "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip"
 
       - name: Require explicit solo-maintainer public-release decision
-        run: node scripts/public-release-preflight.mjs --candidate "$GITHUB_REF_NAME" --zip "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip" --sbom "dist-release/infoapex-ai-${GITHUB_REF_NAME}.cdx.json"
+        run: node scripts/public-release-preflight.mjs --candidate "$GITHUB_REF_NAME" --zip "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip" --sbom "dist-release/infoapex-ai-${GITHUB_REF_NAME}.cdx.json" --policy-manifest "dist-release/infoapex-ai-${GITHUB_REF_NAME}.policy.json"
 
       - name: Attest release provenance
         uses: actions/attest@v4
@@ -71,6 +72,11 @@ jobs:
           subject-path: dist-release/infoapex-ai-${{ github.ref_name }}.zip
           sbom-path: dist-release/infoapex-ai-${{ github.ref_name }}.cdx.json
 
+      - name: Attest release policy manifest
+        uses: actions/attest@v4
+        with:
+          subject-path: dist-release/infoapex-ai-${{ github.ref_name }}.policy.json
+
       - name: Publish immutable release assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -80,4 +86,5 @@ jobs:
             "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip.sha256" \
             "dist-release/infoapex-ai-${GITHUB_REF_NAME}.zip.manifest.json" \
             "dist-release/infoapex-ai-${GITHUB_REF_NAME}.cdx.json" \
+            "dist-release/infoapex-ai-${GITHUB_REF_NAME}.policy.json" \
             --verify-tag --generate-notes

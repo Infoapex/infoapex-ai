@@ -9,6 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const candidate = option("--candidate") ?? "v1.0.0-rc.1-internal";
 const zipRelative = `dist-release/infoapex-ai-${candidate}.zip`;
 const sbomRelative = `dist-release/infoapex-ai-${candidate}.cdx.json`;
+const policyManifestRelative = `dist-release/infoapex-ai-${candidate}.policy.json`;
 const zipPath = join(root, zipRelative);
 const checks = [];
 const policy = JSON.parse(readFileSync(join(root, "validation/p6/solo-release-policy.json"), "utf8"));
@@ -22,6 +23,7 @@ step("p6-verify", "npm", ["run", "p6:verify"]);
 step("upgrade-rollback-tests", process.execPath, ["--test", "dist/tests/release-lifecycle.test.js", "dist/tests/config-lifecycle.test.js"]);
 step("reproducible-release-zip", "npm", ["run", "release:build-zip", "--", "--ref", "HEAD", "--allow-dirty", "--out", zipRelative]);
 step("cyclonedx-sbom", "npm", ["run", "release:sbom", "--", "--out", sbomRelative]);
+step("policy-manifest", "npm", ["run", "release:policy-manifest", "--", "--out", policyManifestRelative]);
 step("clean-install-smoke", process.execPath, ["scripts/release-smoke-test.mjs", "--zip", zipRelative]);
 verifyArtifacts();
 
@@ -36,7 +38,7 @@ const result = {
   publicationAllowed: false,
   externalPilot: "OPTIONAL_POST_RELEASE",
   checks,
-  artifacts: blocked.length === 0 ? { zip: zipRelative, sbom: sbomRelative, checksum: `${zipRelative}.sha256`, provenance: `${zipRelative}.manifest.json` } : null,
+  artifacts: blocked.length === 0 ? { zip: zipRelative, sbom: sbomRelative, policyManifest: policyManifestRelative, checksum: `${zipRelative}.sha256`, provenance: `${zipRelative}.manifest.json` } : null,
   maintainerDecision: "REQUIRED_BEFORE_PUBLICATION",
   commit: git(["rev-parse", "HEAD"]),
   commitSha256: createHash("sha256").update(git(["rev-parse", "HEAD"]).trim()).digest("hex")
@@ -50,15 +52,17 @@ function step(id, command, args) {
   checks.push({ id, status, durationMs: Date.now() - startedAt });
 }
 function verifyArtifacts() {
-  const files = [zipPath, `${zipPath}.sha256`, `${zipPath}.manifest.json`, join(root, sbomRelative)];
+  const files = [zipPath, `${zipPath}.sha256`, `${zipPath}.manifest.json`, join(root, sbomRelative), join(root, policyManifestRelative)];
   const present = files.every(existsSync);
-  if (!present) { checks.push({ id: "artifact-metadata", status: "BLOCKED", detail: "candidate artifact, checksum, provenance, and SBOM must all exist" }); return; }
+  if (!present) { checks.push({ id: "artifact-metadata", status: "BLOCKED", detail: "candidate artifact, checksum, provenance, SBOM, and policy manifest must all exist" }); return; }
   try {
     const actual = createHash("sha256").update(readFileSync(zipPath)).digest("hex");
     const declared = readFileSync(`${zipPath}.sha256`, "utf8").trim().split(/\s+/)[0];
     const manifest = JSON.parse(readFileSync(`${zipPath}.manifest.json`, "utf8"));
     const sbom = JSON.parse(readFileSync(join(root, sbomRelative), "utf8"));
-    const pass = actual === declared && manifest.sha256 === actual && sbom.bomFormat === "CycloneDX" && Array.isArray(sbom.components) && sbom.components.length > 0;
+    const policyManifest = JSON.parse(readFileSync(join(root, policyManifestRelative), "utf8"));
+    const policyPass = policyManifest.kind === "infoapex-ai-policy-manifest" && policyManifest.commit === manifest.commit && Array.isArray(policyManifest.files) && policyManifest.files.length > 0 && new Set(policyManifest.files.map((entry) => entry?.path)).size === policyManifest.files.length && policyManifest.files.every((entry) => safeManifestPath(entry?.path) && /^[0-9a-f]{64}$/.test(entry.sha256) && hashCommittedFile(manifest.commit, entry.path) === entry.sha256);
+    const pass = actual === declared && manifest.sha256 === actual && sbom.bomFormat === "CycloneDX" && Array.isArray(sbom.components) && sbom.components.length > 0 && policyPass;
     checks.push({ id: "artifact-metadata", status: pass ? "PASS" : "BLOCKED", detail: pass ? "checksum, provenance, and SBOM match the candidate" : "artifact metadata mismatch" });
   } catch (error) { checks.push({ id: "artifact-metadata", status: "BLOCKED", detail: String(error) }); }
 }
@@ -70,3 +74,5 @@ function run(command, args) {
 function exec(args, cwd) { try { execFileSync("git", args, { cwd, stdio: "ignore" }); return true; } catch { return false; } }
 function git(args) { return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim(); }
 function option(name) { const index = process.argv.indexOf(name); return index >= 0 ? process.argv[index + 1] ?? null : null; }
+function safeManifestPath(value) { return typeof value === "string" && value.length > 0 && !value.includes("\\") && !value.split("/").some((part) => part === "" || part === "." || part === ".."); }
+function hashCommittedFile(commit, path) { try { return createHash("sha256").update(execFileSync("git", ["show", `${commit}:${path}`], { cwd: root })).digest("hex"); } catch { return null; } }

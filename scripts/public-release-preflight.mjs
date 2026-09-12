@@ -12,6 +12,7 @@ const candidate = option("--candidate") ?? "v1.0.0";
 const decisionRelative = option("--decision") ?? "validation/p6/solo-go-no-go.json";
 const zipRelative = option("--zip") ?? `dist-release/infoapex-ai-${candidate}.zip`;
 const sbomRelative = option("--sbom") ?? `dist-release/infoapex-ai-${candidate}.cdx.json`;
+const policyManifestRelative = option("--policy-manifest") ?? `dist-release/infoapex-ai-${candidate}.policy.json`;
 const requireTag = !process.argv.includes("--skip-tag-check");
 const checks = [];
 
@@ -43,6 +44,7 @@ check("maintainer-go", decisionValid && existsSync(decisionPath), "an explicit, 
 
 const zipPath = safePath(zipRelative);
 const sbomPath = safePath(sbomRelative);
+const policyManifestPath = safePath(policyManifestRelative);
 const checksumPath = `${zipPath}.sha256`;
 const manifestPath = `${zipPath}.manifest.json`;
 const artifactFilesPresent = [zipPath, sbomPath, checksumPath, manifestPath].every(existsSync);
@@ -58,6 +60,19 @@ if (artifactFilesPresent) {
     check("artifact-integrity", actualSha === declaredSha && provenanceMatches && sbomValid, "checksum, provenance, and SBOM must match the tagged commit");
   } catch (error) {
     check("artifact-integrity", false, error instanceof Error ? error.message : String(error));
+  }
+}
+const policyManifestPresent = existsSync(policyManifestPath);
+check("policy-manifest-presence", policyManifestPresent, "a committed-policy manifest is required");
+if (policyManifestPresent) {
+  try {
+    const policyManifest = JSON.parse(readFileSync(policyManifestPath, "utf8"));
+    const paths = Array.isArray(policyManifest.files) ? policyManifest.files : [];
+    const validShape = policyManifest.schemaVersion === "1.0" && policyManifest.kind === "infoapex-ai-policy-manifest" && policyManifest.commit === head && paths.length > 0 && new Set(paths.map((entry) => entry?.path)).size === paths.length;
+    const hashesMatch = validShape && paths.every((entry) => isSafeManifestPath(entry?.path) && /^[0-9a-f]{64}$/.test(entry.sha256) && hashCommittedFile(head, entry.path) === entry.sha256);
+    check("policy-manifest-integrity", hashesMatch, "policy manifest must hash the exact committed policy blobs");
+  } catch (error) {
+    check("policy-manifest-integrity", false, error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -99,3 +114,10 @@ function readJson(value) { try { return JSON.parse(readFileSync(safePath(value),
 function readText(value) { try { return readFileSync(safePath(value), "utf8"); } catch { return ""; } }
 function git(args) { try { return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return null; } }
 function gitOk(args) { return git(args) !== null; }
+function isSafeManifestPath(value) {
+  return typeof value === "string" && value.length > 0 && !value.includes("\\") && !value.split("/").some((part) => part === "" || part === "." || part === "..");
+}
+function hashCommittedFile(commit, path) {
+  try { return createHash("sha256").update(execFileSync("git", ["show", `${commit}:${path}`], { cwd: root })).digest("hex"); }
+  catch { return null; }
+}

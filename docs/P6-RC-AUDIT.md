@@ -11,8 +11,9 @@ deploys, uploads, or publishes.
 
 The default audit is the strict multi-consumer/enterprise profile. For the solo
 maintainer release track, run `node scripts/solo-release-audit.mjs`: it produces an
-internal candidate only after the local test, rollback, package, provenance, SBOM and
-clean-install gates pass. It does not create a tag or publish anything.
+internal candidate only after the local test, rollback, package, provenance, SBOM,
+policy-manifest, and clean-install gates pass. It does not create a tag or publish
+anything.
 
 The solo profile does not require the 3-repository/2-team/30-day pilot or an independent
 audit before an internal RC or first public release. Those are recommended post-release

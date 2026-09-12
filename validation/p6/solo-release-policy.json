@@ -8,6 +8,7 @@
     "upgrade-rollback-tests",
     "reproducible-release-zip",
     "sha256-provenance",
+    "policy-manifest",
     "cyclonedx-sbom",
     "clean-install-smoke"
   ],

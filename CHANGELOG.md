@@ -21,3 +21,5 @@
 - Installation readiness now reports effective repository write access and bundle
   runtime read access in both `preflight` and `install --check`; no ACLs are widened
   automatically.
+- Release artifacts now include a deterministic committed-policy manifest; the public
+  workflow validates and attests it separately from the ZIP and SBOM.

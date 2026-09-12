@@ -6,7 +6,7 @@ research.
 
 An internal RC is accepted when the committed tree passes the full local test suite,
 P6 gates, upgrade/rollback tests, reproducible ZIP creation, checksum/provenance,
-CycloneDX SBOM, and clean-install smoke testing:
+committed-policy manifest, CycloneDX SBOM, and clean-install smoke testing:
 
 ```text
 node scripts/solo-release-audit.mjs --candidate v1.0.0-rc.1-internal
@@ -22,7 +22,9 @@ The maintainer must make an explicit Go/No-Go decision before any public release
 The public workflow enforces that decision through a committed, schema-shaped
 `validation/p6/solo-go-no-go.json` file. Before the workflow can attest or publish a
 stable tag, `node scripts/public-release-preflight.mjs` verifies the exact package
-version, tag target, artifact checksum/provenance/SBOM, and release workflow guard.
+version, tag target, artifact checksum/provenance/SBOM, committed-policy manifest,
+and release workflow guard. The public workflow attests that policy manifest
+separately from the ZIP and SBOM.
 The preflight itself never publishes anything. Start from
 `validation/p6/solo-go-no-go.example.json`; replace it only after the maintainer has
 reviewed rollback, known limitations, license, and the chosen publication channel.
