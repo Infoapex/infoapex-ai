@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -72,13 +72,13 @@ check("publication-workflow", workflowValid, "the public workflow must attest, v
 
 const allChecksPass = checks.every((entry) => entry.status === "PASS" || entry.status === "SKIPPED");
 const tagSatisfied = !requireTag || checks.some((entry) => entry.id === "tag-boundary" && entry.status === "PASS");
-const status = allChecksPass && tagSatisfied;
+const status = requireTag && allChecksPass && tagSatisfied;
 const result = {
   schemaVersion: "1.0",
   profile: "solo-maintainer",
   candidate,
   status: status ? "PASS" : "BLOCKED",
-  code: status ? "PUBLIC_RELEASE_READY" : "PUBLIC_RELEASE_BLOCKED",
+  code: status ? "PUBLIC_RELEASE_READY" : (!requireTag && allChecksPass ? "PUBLIC_RELEASE_PREPARED_NO_TAG" : "PUBLIC_RELEASE_BLOCKED"),
   publicationAllowed: status,
   checks,
   commit: head,
