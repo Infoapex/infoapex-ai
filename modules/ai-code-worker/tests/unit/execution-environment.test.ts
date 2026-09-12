@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { FakeExecutionEnvironment, LocalIsolatedExecutionEnvironment } from "../../src/execution/environment.js";
+import { DockerExecutionEnvironment, FakeExecutionEnvironment, LocalIsolatedExecutionEnvironment } from "../../src/execution/environment.js";
 import { canonicalJson, sha256 } from "../../src/manifest/normalize.js";
 import type { JsonValue } from "../../src/schema/json-schema.js";
 
@@ -53,6 +53,7 @@ describe("fake execution environment", () => {
     const report = environment.doctor(profile);
 
     assert.equal(report.backend, "local-isolated");
+    assert.equal(report.securityBoundary, "host-process");
     assert.equal(report.supported, true);
     assert.equal(report.missingCapabilities.length, 0);
 
@@ -67,6 +68,50 @@ describe("fake execution environment", () => {
 
     assert.equal(result.status, 0);
     assert.equal(result.stdout, "clean");
+  });
+
+  it("proves the Docker backend with a pinned image and denies host/network access", async () => {
+    const profile = readJson("templates/project/.ai-code-worker/execution-environment.example.json") as Record<string, unknown>;
+    const pinned = {
+      ...profile,
+      backend: {
+        type: "docker",
+        image: "node:22-alpine",
+        imageDigest: "sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32"
+      }
+    };
+    const environment = new DockerExecutionEnvironment();
+    const report = environment.doctor(pinned);
+
+    if (report.backend === "docker" && report.supported) {
+      assert.equal(report.securityBoundary, "os-isolated");
+      assert.deepEqual(report.missingCapabilities, []);
+      const result = await environment.runWithProfile(pinned, {
+        executable: "node",
+        args: ["-e", "process.stdout.write(process.env.CI === 'true' && !process.env.SECRET_TOKEN ? 'clean' : 'leaked')"],
+        cwd: process.cwd(),
+        timeoutMs: 10_000,
+        maximumOutputBytes: 1024,
+        env: { CI: "true" }
+      });
+      assert.equal(result.status, 0);
+      assert.equal(result.stdout, "clean");
+
+      const rejected = await environment.runWithProfile(pinned, {
+        executable: "node",
+        args: ["-e", "process.stdout.write('must-not-run')"],
+        cwd: process.cwd(),
+        timeoutMs: 10_000,
+        maximumOutputBytes: 1024,
+        env: { SECRET_TOKEN: "must-not-cross" }
+      });
+      assert.equal(rejected.status, null);
+      assert.match(rejected.stderr, /not allowlisted/);
+    } else {
+      // CI hosts without Docker must remain fail-closed rather than weakening
+      // the contract to make the test green.
+      assert.equal(report.supported, false);
+    }
   });
 });
 

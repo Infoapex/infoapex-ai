@@ -24,6 +24,22 @@
     "kind": {
       "enum": ["isolated", "trusted-local"]
     },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "image", "imageDigest"],
+      "properties": {
+        "type": { "const": "docker" },
+        "image": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*(?::[A-Za-z0-9._-]+)?$"
+        },
+        "imageDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
     "filesystem": {
       "type": "object",
       "additionalProperties": false,

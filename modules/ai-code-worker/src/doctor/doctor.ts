@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadProjectConfig, type ProjectConfig } from "../config/project-config.js";
 import { ClaudeCliAdapter, type ClaudeCliAdapterConfig, type ClaudeDoctorReport } from "../engines/claude-cli.js";
 import { CodexCliAdapter, type CodexCliAdapterConfig, type CodexDoctorReport } from "../engines/codex-cli.js";
-import { LocalIsolatedExecutionEnvironment, type EnvironmentCapabilityReport } from "../execution/environment.js";
+import { resolveExecutionEnvironment, type EnvironmentCapabilityReport } from "../execution/environment.js";
 import { gitPreflight, type GitPreflightResult } from "../git/preflight.js";
 import { evaluateSyncRootPolicy, type SyncRootPolicyResult } from "../git/sync-root.js";
 import { resolveStateRoot, type ResolvedStateRoot } from "../state/state-root.js";
@@ -75,7 +75,7 @@ export function runDoctor(options: DoctorOptions): DoctorReport {
     maximumParallelWriters,
     policy: syncRootPolicy
   });
-  const executionEnvironment = executionProfile ? new LocalIsolatedExecutionEnvironment().doctor(executionProfile) : null;
+  const executionEnvironment = executionProfile ? resolveExecutionEnvironment(executionProfile).doctor(executionProfile) : null;
   const engineDoctor = options.engine === "codex"
     ? new CodexCliAdapter({
         ...defaultCodexConfig(),
