@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { defaultProductionPolicy } from "./production.js";
 
 /** Technology profiles, never consumer-project names. */
@@ -44,11 +44,20 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   const updated: string[] = [];
   const skipped: string[] = [];
   const findings: string[] = [];
-  for (const value of [options.layout.backendDir, options.layout.frontendDir, ...(options.layout.mlDir ? [options.layout.mlDir] : [])]) {
+  if (!isRealDirectory(repo)) findings.push("Repository root must exist and must not be a symbolic link.");
+  if (!isRealDirectory(bundle)) findings.push("Bundle root must exist and must not be a symbolic link.");
+  if (options.profile !== "generic" && options.profile !== "dotnet-nextjs") findings.push("Install profile is unsupported.");
+  const layoutValues = [options.layout?.backendDir, options.layout?.frontendDir, ...(options.layout?.mlDir === null ? [] : [options.layout?.mlDir])];
+  for (const value of layoutValues) {
     if (!isSafeRelativePath(value)) findings.push(`Unsafe project layout path '${value}'. Use a repository-relative path without '..'.`);
   }
+  // No write helper is created until every caller-controlled boundary is valid.
+  // This prevents a malformed profile from causing even installer-owned files to
+  // be read or written through an unintended root.
+  if (findings.length > 0) return { status: "BLOCKED", profile: options.profile, created, updated, skipped, findings };
   const writeManaged = (relative: string, value: string): void => {
-    const path = join(repo, relative);
+    const path = installerPath(repo, relative);
+    if (!path) { findings.push(`Unsafe installer-owned path '${relative}'.`); return; }
     if (!existsSync(path)) {
       writeText(path, value);
       created.push(relative);
@@ -67,7 +76,8 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
     updated.push(relative);
   };
   const writeSeed = (relative: string, value: string): void => {
-    const path = join(repo, relative);
+    const path = installerPath(repo, relative);
+    if (!path) { findings.push(`Unsafe installer-owned path '${relative}'.`); return; }
     if (existsSync(path)) {
       skipped.push(relative);
       return;
@@ -77,6 +87,10 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   };
 
   const paths = modulePaths(bundle);
+  for (const path of [paths.plannerCli, paths.workerCli, paths.reviewCli, paths.docsCli, paths.controlProject, paths.controlMcp]) {
+    if (!bundlePath(bundle, relative(bundle, path).replaceAll("\\", "/"))) findings.push(`Unsafe bundle runtime path '${path}'.`);
+  }
+  if (findings.length > 0) return { status: "BLOCKED", profile: options.profile, created, updated, skipped, findings };
   writeManaged(".ai-code-control/config/code-control.json", json(controlConfig(repo, options.profile, options.layout)));
   writeManaged(".ai-code-control/config/memory-control.json", json(memoryConfig()));
   writeManaged(".ai-code-control/reports/refactor/current-plan.json", json(refactorPlan(options.profile)));
@@ -106,7 +120,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
     contextProvider: { kind: "ai-code-control", mode: "observe" }
   }));
   writeManaged(".infoapex-ai/production-policy.json", json(defaultProductionPolicy()));
-  ensureRuntimeGitignore(repo, created, updated, skipped);
+  ensureRuntimeGitignore(repo, created, updated, skipped, findings);
 
   // Build the C# CLI once, then invoke its DLL directly. `dotnet run` in every
   // doctor/provider call was both slow and capable of leaving compiler children
@@ -308,9 +322,10 @@ function isTestProject(path: string): boolean { return /(?:\.tests?|test)\.cspro
 function commandLabel(path: string): string { return basename(path, ".csproj").replace(/[^a-zA-Z0-9_.-]/g, "-"); }
 function quoteCommandPath(value: string): string { return `"${value.replaceAll("\\", "/").replaceAll('"', '\\"')}"`; }
 
-function ensureRuntimeGitignore(repo: string, created: string[], updated: string[], skipped: string[]): void {
+function ensureRuntimeGitignore(repo: string, created: string[], updated: string[], skipped: string[], findings: string[]): void {
   const relativePath = ".gitignore";
-  const path = join(repo, relativePath);
+  const path = installerPath(repo, relativePath);
+  if (!path) { findings.push("Unsafe installer-owned path '.gitignore'."); return; }
   const marker = "# Infoapex AI local runtime (managed)";
   const entries = [".ai-code-control/db/", ".ai-code-control/reports/tool.log", ".infoapex-ai/backups/", ".infoapex-ai/diagnostics/", ".infoapex-ai/runs/"];
   const current = existsSync(path) ? readFileSync(path, "utf8") : "";
@@ -359,4 +374,26 @@ function sleepSync(milliseconds: number): void {
   Atomics.wait(shared, 0, 0, milliseconds);
 }
 function boundedFailure(result: ProcessResult): string { return (result.stderr || result.stdout || `exit ${result.exitCode}`).trim().replace(/\s+/g, " ").slice(-1000); }
-function isSafeRelativePath(value: string): boolean { return value.length > 0 && !value.includes("..") && !value.startsWith("/") && !/^[a-zA-Z]:/.test(value) && !value.includes("\\"); }
+function isSafeRelativePath(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && !value.includes("\0") && !value.startsWith("/") && !/^[a-zA-Z]:/.test(value) && !value.includes("\\") &&
+    !value.split("/").some((part) => part === "" || part === "." || part === "..");
+}
+function isRealDirectory(path: string): boolean {
+  try { const stat = lstatSync(path); return stat.isDirectory() && !stat.isSymbolicLink(); }
+  catch { return false; }
+}
+function installerPath(root: string, value: string): string | null { return containedNonSymlinkPath(root, value); }
+function bundlePath(root: string, value: string): string | null { return containedNonSymlinkPath(root, value); }
+function containedNonSymlinkPath(root: string, value: string): string | null {
+  if (!isSafeRelativePath(value)) return null;
+  const candidate = resolve(root, value);
+  const rel = relative(resolve(root), candidate);
+  if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+  let current = root;
+  for (const part of value.split("/")) {
+    current = join(current, part);
+    if (!existsSync(current)) continue;
+    try { if (lstatSync(current).isSymbolicLink()) return null; } catch { return null; }
+  }
+  return candidate;
+}

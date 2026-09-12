@@ -6,32 +6,64 @@ import { test } from "node:test";
 import { fullInstall } from "../src/full-install.js";
 import { checkInstall, rollbackRelease, upgrade } from "../src/release-lifecycle.js";
 
-test("full installation can be checked, upgraded, and rolled back from a verified release journal", () => {
+function createRepository(): string {
   const repository = mkdtempSync(join(tmpdir(), "apex-release-lifecycle-"));
-  try {
-    mkdirSync(join(repository, ".infoapex-ai"), { recursive: true });
-    writeFileSync(join(repository, ".infoapex-ai", "config.json"), JSON.stringify({ schemaVersion: "1.0", mode: "integrated", handoffRoot: ".infoapex-ai/runs", planner: { enabled: true }, worker: { enabled: true } }));
-    const installed = fullInstall({
-      repositoryRoot: repository,
-      bundleRoot: process.cwd(),
-      profile: "generic",
-      layout: { backendDir: "backend", frontendDir: "frontend", mlDir: "ml" },
-      repair: false
-    });
-    assert.equal(installed.status, "DONE", JSON.stringify(installed));
-    assert.equal(checkInstall(repository, process.cwd()).status, "PASS");
+  mkdirSync(join(repository, ".infoapex-ai"), { recursive: true });
+  writeFileSync(join(repository, ".infoapex-ai", "config.json"), JSON.stringify({ schemaVersion: "1.0", mode: "integrated", handoffRoot: ".infoapex-ai/runs", planner: { enabled: true }, worker: { enabled: true } }));
+  const installed = fullInstall({ repositoryRoot: repository, bundleRoot: process.cwd(), profile: "generic", layout: { backendDir: "backend", frontendDir: "frontend", mlDir: "ml" }, repair: false });
+  assert.equal(installed.status, "DONE", JSON.stringify(installed));
+  return repository;
+}
 
-    const before = readFileSync(join(repository, ".ai-code-worker", "config.json"), "utf8");
+test("release checks reject invalid profiles and mismatched or unsafe bundle roots", () => {
+  const repository = createRepository();
+  const unrelatedBundle = mkdtempSync(join(tmpdir(), "apex-unrelated-bundle-"));
+  try {
+    assert.equal(checkInstall(repository, process.cwd()).status, "PASS");
+    assert.equal(checkInstall(repository, unrelatedBundle).status, "BLOCKED");
+    writeFileSync(join(repository, ".infoapex-ai", "install-profile.json"), JSON.stringify({ schemaVersion: "2.0", profile: "generic" }));
+    assert.equal(checkInstall(repository, process.cwd()).status, "BLOCKED");
+    assert.equal(checkInstall(join(repository, "..", "missing"), process.cwd()).status, "BLOCKED");
+  } finally { rmSync(repository, { recursive: true, force: true }); rmSync(unrelatedBundle, { recursive: true, force: true }); }
+});
+
+test("upgrade dry-runs are stable and rollback refuses malformed journals and changed targets", () => {
+  const repository = createRepository();
+  try {
     const result = upgrade(repository, process.cwd());
     assert.equal(result.status, "PASS", JSON.stringify(result));
-    const journalPath = String(result.journalPath);
-    assert.equal(existsSync(journalPath), true);
+    const firstDryRun = rollbackRelease(repository, null, true);
+    const secondDryRun = rollbackRelease(repository, null, true);
+    assert.deepEqual(secondDryRun, firstDryRun, "dry-run must not mutate its journal");
 
-    writeFileSync(join(repository, ".ai-code-worker", "config.json"), JSON.stringify({ schemaVersion: "1.0", changedByTest: true }));
+    const workerConfig = join(repository, ".ai-code-worker", "config.json");
+    const before = readFileSync(workerConfig, "utf8");
+    writeFileSync(workerConfig, JSON.stringify({ schemaVersion: "1.0", changedByTest: true }));
+    const refused = rollbackRelease(repository, null, false);
+    assert.equal(refused.status, "BLOCKED", JSON.stringify(refused));
+    assert.equal(refused.code, "TARGET_CHANGED");
+    assert.match(readFileSync(workerConfig, "utf8"), /changedByTest/);
+
+    writeFileSync(workerConfig, before);
     const rollback = rollbackRelease(repository, null, false);
     assert.equal(rollback.status, "PASS", JSON.stringify(rollback));
-    assert.equal(readFileSync(join(repository, ".ai-code-worker", "config.json"), "utf8"), before);
-  } finally {
-    rmSync(repository, { recursive: true, force: true });
-  }
+    assert.equal(rollbackRelease(repository, null, true).code, "ROLLBACK_ALREADY_APPLIED");
+
+    const malformedId = "upgrade-1234567890123-00000000-0000-0000-0000-000000000000";
+    const releases = join(repository, ".infoapex-ai", "releases");
+    mkdirSync(releases, { recursive: true });
+    writeFileSync(join(releases, `${malformedId}.json`), "{not-json");
+    const malformed = rollbackRelease(repository, malformedId, true);
+    assert.equal(malformed.status, "BLOCKED");
+    assert.equal(malformed.code, "JOURNAL_INVALID");
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test("full install validates caller-controlled paths before creating installer state", () => {
+  const repository = mkdtempSync(join(tmpdir(), "apex-release-layout-"));
+  try {
+    const result = fullInstall({ repositoryRoot: repository, bundleRoot: process.cwd(), profile: "generic", layout: { backendDir: "../outside", frontendDir: "frontend", mlDir: null }, repair: false });
+    assert.equal(result.status, "BLOCKED");
+    assert.equal(existsSync(join(repository, ".infoapex-ai", "install-profile.json")), false);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
 });

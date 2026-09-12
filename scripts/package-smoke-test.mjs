@@ -53,5 +53,13 @@ try {
 }
 
 function runNode(entry, args) {
-  return execFileSync(process.execPath, [entry, ...args], { cwd: root, encoding: "utf8", windowsHide: true }).trim();
+  // The installed artefact owns both the executable and module resolution.
+  // Running from the disposable target makes an accidental source-checkout
+  // import fail rather than being masked by this repository's dependencies.
+  return execFileSync(process.execPath, [entry, ...args], {
+    cwd: targetRoot,
+    encoding: "utf8",
+    windowsHide: true,
+    env: { ...process.env, npm_config_offline: "true" }
+  }).trim();
 }
