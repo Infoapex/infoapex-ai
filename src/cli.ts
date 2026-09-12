@@ -7,7 +7,7 @@ import { delegate, type RootEnvelope } from "./delegate.js";
 import { fullInstall, preflight, type InstallProfile } from "./full-install.js";
 import { explainConfig, migrate, rollbackConfig, validateConfig } from "./config-lifecycle.js";
 import { checkInstall, rollbackRelease, upgrade } from "./release-lifecycle.js";
-import { acquireLease, diagnosticsBundle, productionDoctor, retention } from "./production.js";
+import { acquireLease, diagnosticsBundle, productionDoctor, productionHealth, retention } from "./production.js";
 import { MODULE_REGISTRY, modulesForCommand, moduleSubcommand, type RootCommand } from "./registry.js";
 
 interface CommandHelp {
@@ -30,8 +30,8 @@ const COMMAND_HELP: Readonly<Record<string, CommandHelp>> = {
   config: { usage: "infoapex-ai config <validate|explain> --repo <path>", summary: "Validate or explain installer-owned configuration without changing it.", delegatesTo: null },
   migrate: { usage: "infoapex-ai migrate <--check|--dry-run|--apply> --repo <path>", summary: "Validate, back up, and journal an idempotent configuration migration.", delegatesTo: null },
   rollback: { usage: "infoapex-ai rollback --repo <path> [--migration config-v1] [--release [--upgrade-id <id>]] [--dry-run]", summary: "Restore a verified configuration migration or release-upgrade backup.", delegatesTo: null },
-  production: { usage: "infoapex-ai production <doctor|lease|retention> --repo <path>", summary: "Verify production policy, acquire an atomic lease, or inventory retention expiry.", delegatesTo: null },
-  diagnostics: { usage: "infoapex-ai diagnostics bundle --repo <path> [--out <relative-path>]", summary: "Create a local redacted support bundle without source or secrets.", delegatesTo: null },
+  production: { usage: "infoapex-ai production <doctor|health|lease|retention> --repo <path> [--apply]", summary: "Report bounded local health, verify policy, acquire one lease, or inspect/apply evidence retention.", delegatesTo: null },
+  diagnostics: { usage: "infoapex-ai diagnostics bundle --repo <path> [--out <relative-path>]", summary: "Explicitly create a local, redacted, size-bounded support bundle; it is never uploaded.", delegatesTo: null },
   status: { usage: "infoapex-ai status --repo <path>", summary: "Report this repository's integration mode and each vendored module's pinned commit. Not run state - see 'resume' for that.", delegatesTo: null },
   handoff: { usage: "infoapex-ai handoff --repo <path> --direction <planner-to-worker|worker-to-planner> --run-id <id> --payload <json>", summary: "Publish a versioned handoff file between planner and worker (integrated mode only).", delegatesTo: null },
   doctor: { usage: "infoapex-ai doctor --repo <path> [module flags...]", summary: "Aggregate: run doctor on every module present (ai-code-worker, ai-code-review, ai-code-docs) and report the worst status.", delegatesTo: "ai-code-worker, ai-code-review, ai-code-docs (doctor)" },
@@ -142,8 +142,8 @@ if (command === "help" || command === "--help" || command === "-h") {
   console.log(JSON.stringify(result, null, 2)); process.exitCode = result.status === "PASS" ? 0 : 2;
 } else if (command === "production") {
   const repo = resolve(option("--repo") ?? process.cwd()); const subcommand = args[1];
-  const result = subcommand === "doctor" ? productionDoctor(repo) : subcommand === "lease" ? acquireLease(repo, option("--run-id") ?? randomUUID()) : subcommand === "retention" ? retention(repo, true) : null;
-  if (!result) fail("Usage: infoapex-ai production <doctor|lease|retention> --repo <path>");
+  const result = subcommand === "doctor" ? productionDoctor(repo) : subcommand === "health" ? productionHealth(repo) : subcommand === "lease" ? acquireLease(repo, option("--run-id") ?? randomUUID()) : subcommand === "retention" ? retention(repo, args.includes("--apply") ? false : true) : null;
+  if (!result) fail("Usage: infoapex-ai production <doctor|health|lease|retention> --repo <path> [--apply]");
   console.log(JSON.stringify(result, null, 2)); process.exitCode = result.status === "PASS" ? 0 : 2;
 } else if (command === "diagnostics") {
   if (args[1] !== "bundle") fail("Usage: infoapex-ai diagnostics bundle --repo <path> [--out <relative-path>]");
