@@ -565,22 +565,31 @@ interface CodexTokenCountEvent {
   };
 }
 
-// codex exec --json emits event_msg/token_count lines with a "total_token_usage" that is
-// already cumulative for the whole invocation (confirmed against a live rollout, see
-// docs/HANDOFF-BENCHMARK-TOOL-AND-PHASE-4.md) - the LAST such event is the final total,
-// no summing across events needed. cached_input_tokens is a subset of input_tokens (same
-// convention as OpenAI's Responses API usage object, not an additional amount), so it is
-// subtracted out to get the uncached count. cache_write_input_tokens was confirmed present
-// in a real CLI 0.147.0 rollout on 2026-09-02 (P2-B live run) - an earlier sanitized
-// fixture captured before that date did not have the field, which is why this was
-// previously treated as never-surfaced; that was a stale assumption, not a current CLI
-// limitation, so it is now read like any other real field. A dollar cost is still not
-// surfaced anywhere in the stream for a ChatGPT-subscription-authenticated account
-// (confirmed live: the same rollout's `rate_limits.credits` reports `has_credits: false`,
-// `balance: "0"` - there is no dollar ledger to report from in this billing mode, only a
-// rate-limit percentage, a different unit than EngineUsage) - costUsd stays null rather
-// than guessed.
-export const CODEX_USAGE_PARSER_VERSION = "codex-token-count.v1";
+interface CodexTurnCompletedEvent {
+  readonly type?: string;
+  readonly usage?: CodexTurnUsage;
+  /** Kept for compatibility with wrappers that envelope the exec event. */
+  readonly payload?: {
+    readonly usage?: CodexTurnUsage;
+  };
+}
+
+interface CodexTurnUsage {
+  readonly input_tokens?: unknown;
+  readonly cached_input_tokens?: unknown;
+  readonly cache_write_input_tokens?: unknown;
+  readonly output_tokens?: unknown;
+}
+
+// Codex has emitted usage through two JSONL shapes in supported CLI versions:
+// older versions emit event_msg/token_count with a cumulative total_token_usage,
+// while current `codex exec --json` emits turn.completed.usage. Prefer the former
+// when present because it is an invocation-wide cumulative total; otherwise sum the
+// per-turn usage records. cached_input_tokens is a subset of input_tokens, so it is
+// subtracted out to get the uncached count. A dollar cost is not surfaced for a
+// ChatGPT-subscription-authenticated account, so costUsd remains null rather than
+// being guessed.
+export const CODEX_USAGE_PARSER_VERSION = "codex-jsonl-usage.v2";
 
 export function parseCodexUsage(stdout: unknown): EngineUsage {
   if (typeof stdout !== "string") {
@@ -588,6 +597,7 @@ export function parseCodexUsage(stdout: unknown): EngineUsage {
   }
 
   let lastTotal: { input_tokens?: unknown; cached_input_tokens?: unknown; cache_write_input_tokens?: unknown; output_tokens?: unknown } | null = null;
+  const turnUsages: CodexTurnUsage[] = [];
 
   for (const line of stdout.split("\n")) {
     const trimmed = line.trim();
@@ -596,7 +606,7 @@ export function parseCodexUsage(stdout: unknown): EngineUsage {
       continue;
     }
 
-    let event: CodexTokenCountEvent;
+    let event: CodexTokenCountEvent & CodexTurnCompletedEvent;
     try {
       event = JSON.parse(trimmed) as CodexTokenCountEvent;
     } catch {
@@ -606,22 +616,61 @@ export function parseCodexUsage(stdout: unknown): EngineUsage {
     if (event.type === "event_msg" && event.payload?.type === "token_count" && event.payload.info?.total_token_usage) {
       lastTotal = event.payload.info.total_token_usage;
     }
+
+    if (event.type === "turn.completed") {
+      const usage = event.usage ?? event.payload?.usage;
+      if (usage) {
+        turnUsages.push(usage);
+      }
+    }
   }
 
-  if (!lastTotal) {
+  if (lastTotal) {
+    return usageFromTokenCount(lastTotal);
+  }
+
+  if (turnUsages.length === 0) {
     return unknownUsage();
   }
 
-  const inputTokens = readNumber(lastTotal.input_tokens);
-  const cachedTokens = readNumber(lastTotal.cached_input_tokens);
+  return turnUsages.reduce((total, usage) => addUsage(total, usageFromTurnCompleted(usage)), unknownUsage());
+}
+
+function usageFromTokenCount(total: {
+  readonly input_tokens?: unknown;
+  readonly cached_input_tokens?: unknown;
+  readonly cache_write_input_tokens?: unknown;
+  readonly output_tokens?: unknown;
+}): EngineUsage {
+  return usageFromTurnCompleted(total);
+}
+
+function usageFromTurnCompleted(usage: CodexTurnUsage): EngineUsage {
+  const inputTokens = readNumber(usage.input_tokens);
+  const cachedTokens = readNumber(usage.cached_input_tokens);
 
   return {
     inputUncachedTokens: inputTokens === null ? null : Math.max(0, inputTokens - (cachedTokens ?? 0)),
     cacheReadTokens: cachedTokens,
-    cacheWriteTokens: readNumber(lastTotal.cache_write_input_tokens),
-    outputTokens: readNumber(lastTotal.output_tokens),
+    cacheWriteTokens: readNumber(usage.cache_write_input_tokens),
+    outputTokens: readNumber(usage.output_tokens),
     costUsd: null
   };
+}
+
+function addUsage(left: EngineUsage, right: EngineUsage): EngineUsage {
+  return {
+    inputUncachedTokens: addNullable(left.inputUncachedTokens, right.inputUncachedTokens),
+    cacheReadTokens: addNullable(left.cacheReadTokens, right.cacheReadTokens),
+    cacheWriteTokens: addNullable(left.cacheWriteTokens, right.cacheWriteTokens),
+    outputTokens: addNullable(left.outputTokens, right.outputTokens),
+    costUsd: addNullable(left.costUsd, right.costUsd)
+  };
+}
+
+function addNullable(left: number | null, right: number | null): number | null {
+  if (right === null) return left;
+  return (left ?? 0) + right;
 }
 
 function readNumber(value: unknown): number | null {

@@ -12,7 +12,7 @@
         "The verified Windows host uses the documented windows.sandbox=unelevated fallback because its elevated sandbox setup fails to launch child commands; danger-full-access is not used.",
         "The adapter intentionally keeps user config/rules loading. On CLI 0.147.0, --ignore-user-config caused the generated managed permission profile to become read-only despite a later --sandbox workspace-write flag.",
         "The codex binary is not always a global PATH install - on at least one verified machine it ships bundled inside the VS Code openai.chatgpt extension.",
-        "Usage is read from the token_count event's total_token_usage in the --json JSONL stream (cumulative, not per-turn) - see src/engines/codex-cli.ts parseCodexUsage()."
+        "Usage is read from event_msg/token_count total_token_usage when present, or turn.completed.usage on current codex exec --json streams; cumulative totals are preferred and per-turn records are summed - see src/engines/codex-cli.ts parseCodexUsage()."
       ]
     },
     {

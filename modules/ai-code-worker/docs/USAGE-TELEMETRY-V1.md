@@ -27,7 +27,8 @@ This distinction covers retries, fallback and resume:
 Current sanitized parser fixtures are:
 
 - `tests/fixtures/engine-usage/codex-rollout-token-count.sample.jsonl` for
-  `codex-token-count.v1`;
+  `codex-jsonl-usage.v2` (the parser accepts both the legacy cumulative
+  `event_msg/token_count` shape and the current `turn.completed.usage` shape);
 - `tests/fixtures/engine-usage/claude-output-format-json.sample.json` for
   `claude-result.v1`.
 

@@ -8,7 +8,7 @@ import {
 } from "../benchmark/usage-checkpoint.js";
 import { loadProjectConfig, type ProjectConfig } from "../config/project-config.js";
 import { runCompile, type CompileReport } from "../compile/compile.js";
-import { CodexCliAdapter, type CodexCliAdapterConfig } from "../engines/codex-cli.js";
+import { CODEX_USAGE_PARSER_VERSION, CodexCliAdapter, type CodexCliAdapterConfig } from "../engines/codex-cli.js";
 import type { EngineUsage } from "../engines/engine-event.js";
 import { createWorkerCommit } from "../git/commit.js";
 import { currentHead, git } from "../git/diff.js";
@@ -1338,7 +1338,7 @@ function usageSamplesFromAttempts(attempts: readonly { readonly candidate: { rea
       seriesId: `task:${taskId}:attempt:${index + 1}`,
       sequence: 1,
       provider: attempt.candidate.engine,
-      parserVersion: `${attempt.candidate.engine}.cli.v1`,
+      parserVersion: attempt.candidate.engine === "codex" ? CODEX_USAGE_PARSER_VERSION : `${attempt.candidate.engine}.cli.v1`,
       accountingMode: "incremental" as const,
       usage: attempt.execution.usage
     }));

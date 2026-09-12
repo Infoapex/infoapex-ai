@@ -24,7 +24,7 @@ describe("codex cli adapter", () => {
   it("parses the sanitized cumulative token fixture with a versioned parser", () => {
     const usage = parseCodexUsage(readFileSync("tests/fixtures/engine-usage/codex-rollout-token-count.sample.jsonl", "utf8"));
 
-    assert.equal(CODEX_USAGE_PARSER_VERSION, "codex-token-count.v1");
+    assert.equal(CODEX_USAGE_PARSER_VERSION, "codex-jsonl-usage.v2");
     assert.deepEqual(usage, {
       inputUncachedTokens: 12221,
       cacheReadTokens: 71200,
@@ -243,6 +243,67 @@ describe("codex cli adapter", () => {
       cacheReadTokens: 4200,
       cacheWriteTokens: null,
       outputTokens: 340,
+      costUsd: null
+    });
+  });
+
+  it("parses current Codex turn.completed usage when token_count is absent", () => {
+    const usage = parseCodexUsage([
+      JSON.stringify({ type: "thread.started", thread_id: "thread-current" }),
+      JSON.stringify({ type: "turn.started" }),
+      JSON.stringify({
+        type: "turn.completed",
+        usage: {
+          input_tokens: 15051,
+          cached_input_tokens: 5888,
+          cache_write_input_tokens: 0,
+          output_tokens: 5,
+          reasoning_output_tokens: 0
+        }
+      })
+    ].join("\n"));
+
+    assert.deepEqual(usage, {
+      inputUncachedTokens: 15051 - 5888,
+      cacheReadTokens: 5888,
+      cacheWriteTokens: 0,
+      outputTokens: 5,
+      costUsd: null
+    });
+  });
+
+  it("sums multiple turn.completed usage records without double-counting token_count totals", () => {
+    const usage = parseCodexUsage([
+      JSON.stringify({ type: "turn.completed", usage: { input_tokens: 100, cached_input_tokens: 40, output_tokens: 10 } }),
+      JSON.stringify({ type: "turn.completed", usage: { input_tokens: 80, cached_input_tokens: 20, output_tokens: 5 } })
+    ].join("\n"));
+
+    assert.deepEqual(usage, {
+      inputUncachedTokens: 60 + 60,
+      cacheReadTokens: 60,
+      cacheWriteTokens: null,
+      outputTokens: 15,
+      costUsd: null
+    });
+  });
+
+  it("prefers cumulative token_count totals when both usage shapes are present", () => {
+    const usage = parseCodexUsage([
+      JSON.stringify({ type: "turn.completed", usage: { input_tokens: 100, cached_input_tokens: 40, output_tokens: 10 } }),
+      JSON.stringify({
+        type: "event_msg",
+        payload: {
+          type: "token_count",
+          info: { total_token_usage: { input_tokens: 120, cached_input_tokens: 50, output_tokens: 12 } }
+        }
+      })
+    ].join("\n"));
+
+    assert.deepEqual(usage, {
+      inputUncachedTokens: 70,
+      cacheReadTokens: 50,
+      cacheWriteTokens: null,
+      outputTokens: 12,
       costUsd: null
     });
   });
