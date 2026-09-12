@@ -130,8 +130,9 @@ if (command === "help" || command === "--help" || command === "-h") {
   } else fail("Usage: infoapex-ai config <validate|explain> --repo <path>");
 } else if (command === "migrate") {
   const repo = resolve(option("--repo") ?? process.cwd());
-  const selected = args.includes("--apply") ? "apply" : args.includes("--dry-run") ? "dry-run" : args.includes("--check") ? "check" : null;
-  if (selected === null) fail("Usage: infoapex-ai migrate <--check|--dry-run|--apply> --repo <path>");
+  const modes = ["--check", "--dry-run", "--apply"].filter((flag) => args.includes(flag));
+  if (modes.length !== 1) fail("Usage: infoapex-ai migrate <--check|--dry-run|--apply> --repo <path>");
+  const selected = modes[0] === "--apply" ? "apply" : modes[0] === "--dry-run" ? "dry-run" : "check";
   const result = migrate(repo, selected); console.log(JSON.stringify(result, null, 2)); process.exitCode = result.status === "PASS" ? 0 : 2;
 } else if (command === "rollback") {
   const repo = resolve(option("--repo") ?? process.cwd());
