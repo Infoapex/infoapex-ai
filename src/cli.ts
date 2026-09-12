@@ -24,7 +24,7 @@ interface CommandHelp {
  *  restated here: they are the target module's contract, and an incomplete invocation
  *  already surfaces that module's own usage message inside the BLOCKED envelope. */
 const COMMAND_HELP: Readonly<Record<string, CommandHelp>> = {
-  init: { usage: "infoapex-ai init --repo <path> [--mode independent|integrated] [--full --profile generic|dotnet-nextjs] [--backend-dir <dir> --frontend-dir <dir> --ml-dir <dir>] [--repair]", summary: "Bootstrap handoff only, or install a reusable P6 technology profile with --full.", delegatesTo: null },
+  init: { usage: "infoapex-ai init --repo <path> [--mode independent|integrated] [--full --profile generic|dotnet-nextjs] [--backend-dir <dir> --frontend-dir <dir> --ml-dir <dir>] [--repair] [--verify]", summary: "Bootstrap handoff only, or install a reusable P6 technology profile with --full; --verify runs the no-provider readiness gate after installation.", delegatesTo: null },
   install: { usage: "infoapex-ai install --check --repo <path>", summary: "Check an existing full installation and the active bundle without changing it.", delegatesTo: null },
   upgrade: { usage: "infoapex-ai upgrade [--check] --repo <path>", summary: "Back up installer-owned files and retarget a full installation to this bundle.", delegatesTo: null },
   preflight: { usage: "infoapex-ai preflight --repo <path>", summary: "Run the strict no-provider readiness gate for a full installation.", delegatesTo: null },
@@ -84,7 +84,6 @@ if (command === "help" || command === "--help" || command === "-h") {
   }
   const apexRoot = join(repo, ".infoapex-ai");
   const handoffRoot = join(apexRoot, "runs");
-  mkdirSync(handoffRoot, { recursive: true });
   const config = {
     schemaVersion: "1.0",
     mode,
@@ -92,17 +91,28 @@ if (command === "help" || command === "--help" || command === "-h") {
     planner: { enabled: mode === "integrated" },
     worker: { enabled: mode === "integrated" }
   };
-  writeJson(join(apexRoot, "config.json"), config);
-  writeText(join(apexRoot, "README.md"), "# infoapex-ai integration\n\nMode: " + mode + "\n\nManaged by infoapex-ai init. The modules remain independently runnable.\n");
-  if (args.includes("--full")) {
+  const repair = args.includes("--repair");
+  const bootstrapConflict = existingBootstrapConflict(apexRoot, config, mode, repair);
+  if (bootstrapConflict !== null) {
+    console.log(JSON.stringify({ status: "BLOCKED", mode, created: [], updated: [], skipped: [], findings: [bootstrapConflict], configPath: join(apexRoot, "config.json"), handoffRoot }, null, 2));
+    process.exitCode = 2;
+  } else if (args.includes("--full")) {
     const profile = option("--profile") ?? "generic";
     if (profile !== "generic" && profile !== "dotnet-nextjs") {
       fail("--profile must be generic or dotnet-nextjs");
     }
-    const result = fullInstall({ repositoryRoot: repo, bundleRoot: bundleRoot(), profile: profile as InstallProfile, repair: args.includes("--repair"), layout: { backendDir: option("--backend-dir") ?? "backend", frontendDir: option("--frontend-dir") ?? "frontend", mlDir: option("--ml-dir") ?? "ml" } });
-    console.log(JSON.stringify({ ...result, mode, configPath: join(apexRoot, "config.json"), handoffRoot }, null, 2));
-    process.exitCode = result.status === "DONE" ? 0 : 2;
+    const result = fullInstall({ repositoryRoot: repo, bundleRoot: bundleRoot(), profile: profile as InstallProfile, repair, layout: { backendDir: option("--backend-dir") ?? "backend", frontendDir: option("--frontend-dir") ?? "frontend", mlDir: option("--ml-dir") ?? "ml" } });
+    if (result.status === "DONE") {
+      mkdirSync(handoffRoot, { recursive: true });
+      writeBootstrap(apexRoot, config, mode, repair);
+    }
+    const verification = result.status === "DONE" && args.includes("--verify") ? preflight(repo, bundleRoot()) : null;
+    const finalStatus = verification?.status === "BLOCKED" ? "BLOCKED" : result.status;
+    console.log(JSON.stringify({ ...result, status: finalStatus, mode, configPath: join(apexRoot, "config.json"), handoffRoot, ...(verification === null ? {} : { postInstallVerification: verification }) }, null, 2));
+    process.exitCode = finalStatus === "DONE" ? 0 : 2;
   } else {
+    mkdirSync(handoffRoot, { recursive: true });
+    writeBootstrap(apexRoot, config, mode, repair);
     console.log(JSON.stringify({ status: "DONE", mode, configPath: join(apexRoot, "config.json"), handoffRoot }, null, 2));
     process.exitCode = 0;
   }
@@ -378,6 +388,35 @@ function writeText(path: string, value: string): void {
 function relativePath(from: string, to: string): string {
   const value = resolve(to).replace(resolve(from), "").replaceAll("\\", "/");
   return value.startsWith("/") ? value.slice(1) : value;
+}
+
+function existingBootstrapConflict(apexRoot: string, config: unknown, mode: string, repair: boolean): string | null {
+  if (repair) return null;
+  const expectedFiles = [
+    ["config.json", `${JSON.stringify(config, null, 2)}\n`],
+    ["README.md", bootstrapReadme(mode)]
+  ] as const;
+  for (const [name, expected] of expectedFiles) {
+    const path = join(apexRoot, name);
+    if (!existsSync(path)) continue;
+    try {
+      if (readFileSync(path, "utf8") !== expected) return `.infoapex-ai/${name} differs from the requested bootstrap; rerun full init with --repair after reviewing it.`;
+    } catch {
+      return `.infoapex-ai/${name} is unreadable; rerun full init with --repair after reviewing it.`;
+    }
+  }
+  return null;
+}
+
+function writeBootstrap(apexRoot: string, config: unknown, mode: string, repair: boolean): void {
+  for (const [name, value] of [["config.json", `${JSON.stringify(config, null, 2)}\n`], ["README.md", bootstrapReadme(mode)]] as const) {
+    const path = join(apexRoot, name);
+    if (repair || !existsSync(path)) writeText(path, value);
+  }
+}
+
+function bootstrapReadme(mode: string): string {
+  return `# infoapex-ai integration\n\nMode: ${mode}\n\nManaged by infoapex-ai init. The modules remain independently runnable.\n`;
 }
 
 function fail(message: string): never {

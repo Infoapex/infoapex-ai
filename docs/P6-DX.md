@@ -17,9 +17,13 @@ Din root-ul bundle-ului construit:
 ```bash
 npm ci --ignore-scripts
 npm run build
-node dist/src/cli.js init --repo /cale/catre/proiect --mode integrated --full --profile generic
-node dist/src/cli.js preflight --repo /cale/catre/proiect
+node dist/src/cli.js init --repo /cale/catre/proiect --mode integrated --full --profile generic --verify
 ```
+
+`--verify` rulează imediat după instalare gate-ul `preflight`, fără să invoce un
+provider de coding. Dacă verificarea eșuează, comanda returnează `BLOCKED`; nu există
+un succes intermediar care să ascundă o instalare incompletă. Pentru un target deja
+configurat, `--repair` este necesar înainte de înlocuirea fișierelor managed diferite.
 
 Pentru primul run, folosește motorul determinist `fake` și un plan acceptat, revizuit de
 operator. Acest pas verifică wiring-ul și gate-urile, nu calitatea unui provider:

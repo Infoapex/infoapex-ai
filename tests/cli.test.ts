@@ -125,15 +125,17 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
     mkdirSync(join(repository, "server", "Product.Api.Tests"), { recursive: true });
     mkdirSync(join(repository, "client"), { recursive: true });
     mkdirSync(join(repository, "data"), { recursive: true });
-    writeFileSync(join(repository, "server", "Product.Api", "Product.Api.csproj"), '<Project Sdk="Microsoft.NET.Sdk.Web" />');
-    writeFileSync(join(repository, "server", "Product.Api.Tests", "Product.Api.Tests.csproj"), '<Project Sdk="Microsoft.NET.Sdk" />');
-    writeFileSync(join(repository, "client", "package.json"), JSON.stringify({ scripts: { build: "next build", typecheck: "tsc --noEmit" } }));
+    writeFileSync(join(repository, "server", "Product.Api", "Product.Api.csproj"), '<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup><TargetFramework>net9.0</TargetFramework></PropertyGroup></Project>');
+    writeFileSync(join(repository, "server", "Product.Api.Tests", "Product.Api.Tests.csproj"), '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net9.0</TargetFramework></PropertyGroup></Project>');
+    writeFileSync(join(repository, "server", "Product.Api", "Program.cs"), 'System.Console.WriteLine("ok");\n');
+    writeFileSync(join(repository, "client", "package.json"), JSON.stringify({ scripts: { build: "node -e \"process.exit(0)\"", typecheck: "node -e \"process.exit(0)\"" } }));
     initializeGit(repository);
-    const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "dotnet-nextjs", "--backend-dir", "server", "--frontend-dir", "client", "--ml-dir", "data"]);
-    assert.equal(init.status, 0, init.stderr);
-    const body = JSON.parse(init.stdout) as { status: string; profile: string; created: readonly string[] };
+    const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "dotnet-nextjs", "--backend-dir", "server", "--frontend-dir", "client", "--ml-dir", "data", "--verify"]);
+    assert.equal(init.status, 0, init.stderr || init.stdout);
+    const body = JSON.parse(init.stdout) as { status: string; profile: string; created: readonly string[]; postInstallVerification?: { status: string } };
     assert.equal(body.status, "DONE");
     assert.equal(body.profile, "dotnet-nextjs");
+    assert.equal(body.postInstallVerification?.status, "PASS");
     assert.ok(body.created.includes("TODO.md"));
     assert.equal(existsSync(join(repository, "AGENTS.md")), true);
     assert.equal(existsSync(join(repository, "CLAUDE.md")), true);
@@ -162,6 +164,20 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
     assert.equal(existsSync(join(repository, ".claude", "settings.json")), true);
     assert.match(readFileSync(join(repository, ".codex", "config.toml"), "utf8"), /\[mcp_servers\.ai-code-control\]/);
     assert.match(readFileSync(join(repository, ".gitignore"), "utf8"), /\.infoapex-ai\/runs\//);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("full CLI install blocks before creating partial bootstrap state", () => {
+  const repository = mkdtempSync(join(tmpdir(), "apex-cli-full-no-git-"));
+  try {
+    const result = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "generic"]);
+    assert.equal(result.status, 2, result.stderr);
+    const body = JSON.parse(result.stdout) as { status: string; findings: readonly string[] };
+    assert.equal(body.status, "BLOCKED");
+    assert.match(body.findings.join(" "), /Git repository with an initial commit/);
+    assert.equal(existsSync(join(repository, ".infoapex-ai")), false);
   } finally {
     rmSync(repository, { recursive: true, force: true });
   }

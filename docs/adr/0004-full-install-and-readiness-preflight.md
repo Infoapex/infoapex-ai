@@ -45,6 +45,9 @@ A full install:
    repository and bundle paths;
 8. adds only a bounded managed block for local runtime state to `.gitignore`;
 9. requires `--repair` before replacing a differing installer-owned configuration.
+10. validates the repository and bootstrap conflict before creating state; after a
+    successful full install, optional `--verify` runs the no-provider `preflight` and
+    returns `BLOCKED` if the installed wiring is not ready.
 
 `preflight` invokes no coding provider. It verifies files and provenance, provider
 policy, control health/brief, application build/test commands, and worker/review/docs
