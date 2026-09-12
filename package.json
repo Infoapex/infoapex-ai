@@ -51,6 +51,7 @@
     "release:package-check": "node scripts/check-npm-package.mjs",
     "release:package-smoke": "node scripts/package-smoke-test.mjs",
     "p6:verify": "node scripts/verify-p6.mjs",
+    "p6:pilot:validate": "node scripts/validate-p6-pilot.mjs",
     "release:smoke-test": "node scripts/release-smoke-test.mjs"
   },
   "dependencies": {

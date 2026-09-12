@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://infoapex.invalid/schemas/p6-pilot-evidence-1.0.json",
+  "title": "P6 consumer pilot evidence",
+  "type": "object",
+  "required": ["schemaVersion", "pilotId", "status", "verdict", "repositories", "observations", "checkpoints", "scenarios", "privacy", "stopConditions"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "pilotId": { "const": "p6-consumer-adoption-v1" },
+    "status": { "enum": ["NOT_STARTED", "IN_PROGRESS", "PASS", "REJECT", "INCONCLUSIVE"] },
+    "verdict": { "type": ["string", "null"], "enum": ["PASS", "REJECT", "INCONCLUSIVE", null] },
+    "repositories": { "type": "array", "items": { "$ref": "#/$defs/repository" } },
+    "observations": { "type": "array", "items": { "$ref": "#/$defs/observation" } },
+    "checkpoints": { "type": "object", "required": ["firstAt", "lastAt"], "properties": { "firstAt": { "type": "string", "format": "date-time" }, "lastAt": { "type": "string", "format": "date-time" } }, "additionalProperties": false },
+    "scenarios": { "type": "object", "required": ["upgrade", "rollback", "incidentDrill", "restore"], "properties": { "upgrade": { "type": "boolean" }, "rollback": { "type": "boolean" }, "incidentDrill": { "type": "boolean" }, "restore": { "type": "boolean" } }, "additionalProperties": false },
+    "quickstartUnaidedPercent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "privacy": { "type": "object", "required": ["rawConversations", "providerOutput", "secrets", "automaticUpload", "sanitized"], "properties": { "rawConversations": { "const": false }, "providerOutput": { "const": false }, "secrets": { "const": false }, "automaticUpload": { "const": false }, "sanitized": { "const": true } }, "additionalProperties": false },
+    "stopConditions": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "repository": { "type": "object", "required": ["path", "repositoryId", "fixture", "independentFromImplementer", "team"], "properties": { "path": { "type": "string", "minLength": 1 }, "repositoryId": { "type": "string", "minLength": 1 }, "fixture": { "const": false }, "independentFromImplementer": { "const": true }, "team": { "type": "string", "minLength": 1 } }, "additionalProperties": false },
+    "observation": { "type": "object", "required": ["taskId", "repositoryId", "bounded", "scopeVerified", "outcome", "paired", "manualIntervention", "secretLeak", "scopeEscape", "criticalIncident"], "properties": { "taskId": { "type": "string", "minLength": 1 }, "repositoryId": { "type": "string", "minLength": 1 }, "bounded": { "const": true }, "scopeVerified": { "const": true }, "outcome": { "enum": ["COMPLETED_CORRECTLY", "POLICY_REJECTED", "FAILED"] }, "paired": { "type": "boolean" }, "manualIntervention": { "type": "boolean" }, "secretLeak": { "const": false }, "scopeEscape": { "const": false }, "criticalIncident": { "const": false } }, "additionalProperties": false }
+  }
+}

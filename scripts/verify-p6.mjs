@@ -1,12 +1,14 @@
 import Ajv2020 from "ajv/dist/2020.js";
+import addFormats from "ajv-formats";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, ".."); const checks = [];
-check("governance-files", ["SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md", ".github/CODEOWNERS", "docs/P6-DATA-CLASSIFICATION.md", "docs/P6-THREAT-MODEL.md", "docs/P6-OPERATIONS.md", "docs/P6-SUPPORT-POLICY.md"].every((path) => existsSync(join(root, path))));
-try { const schema = JSON.parse(readFileSync(join(root, "validation/p6/release-gates.schema.json"))); const value = JSON.parse(readFileSync(join(root, "validation/p6/release-gates.json"))); const validate = new Ajv2020({ strict: false }).compile(schema); check("release-gate-contract", validate(value), validate.errors ?? null); } catch (error) { check("release-gate-contract", false, String(error)); }
+check("governance-files", ["SECURITY.md", "CONTRIBUTING.md", "CHANGELOG.md", ".github/CODEOWNERS", "docs/P6-DATA-CLASSIFICATION.md", "docs/P6-THREAT-MODEL.md", "docs/P6-OPERATIONS.md", "docs/P6-SUPPORT-POLICY.md", "docs/P6-PILOT-VALIDATOR.md"].every((path) => existsSync(join(root, path))));
+try { const schema = JSON.parse(readFileSync(join(root, "validation/p6/release-gates.schema.json"))); const value = JSON.parse(readFileSync(join(root, "validation/p6/release-gates.json"))); const ajv = new Ajv2020({ strict: false }); addFormats(ajv); const validate = ajv.compile(schema); check("release-gate-contract", validate(value), validate.errors ?? null); } catch (error) { check("release-gate-contract", false, String(error)); }
+try { const schema = JSON.parse(readFileSync(join(root, "validation/p6/pilot-evidence.schema.json"))); const ajv = new Ajv2020({ strict: false }); addFormats(ajv); ajv.compile(schema); check("pilot-evidence-contract", true); } catch (error) { check("pilot-evidence-contract", false, String(error)); }
 try { const registry = JSON.parse(readFileSync(join(root, "validation/p6/contracts.json"))); check("contract-version-registry", registry.schemaVersion === "1.0" && registry.compatibilityPolicy === "same-major" && registry.contracts.every((item) => item.current === "1.0" && item.supported.includes("1.0"))); } catch (error) { check("contract-version-registry", false, String(error)); }
 try { execFileSync(process.execPath, [join(root, "scripts/generate-sbom.mjs"), "--out", join(root, "dist-release/p6-sbom.cdx.json")], { cwd: root, stdio: "pipe" }); const sbom = JSON.parse(readFileSync(join(root, "dist-release/p6-sbom.cdx.json"))); check("cyclonedx-sbom", sbom.bomFormat === "CycloneDX" && sbom.components.length >= 7); } catch (error) { check("cyclonedx-sbom", false, String(error)); }
 const workflow = readFileSync(join(root, ".github/workflows/ci.yml"), "utf8"); check("platform-matrix", workflow.includes("ubuntu-latest") && workflow.includes("windows-latest") && workflow.includes("macos-latest"));
