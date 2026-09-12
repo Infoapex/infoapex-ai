@@ -243,7 +243,9 @@ describe("claude cli adapter", () => {
       baseArgs: [cli],
       testedVersionRanges: ["2.1.x"],
       requiresCapabilitySmokeTest: false,
-      timeoutMs: 5000
+      // The full multi-file suite starts other fake providers concurrently; keep
+      // this bounded, but leave enough scheduling headroom for Windows CI.
+      timeoutMs: 15_000
     });
     const startedAt = Date.now();
     const [first, second] = await Promise.all([

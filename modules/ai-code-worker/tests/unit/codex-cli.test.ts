@@ -202,7 +202,9 @@ describe("codex cli adapter", () => {
       baseArgs: [cli],
       testedVersionRanges: ["0.146.0-alpha.3.1"],
       requiresCapabilitySmokeTest: false,
-      timeoutMs: 5000
+      // The full multi-file suite starts other fake providers concurrently; keep
+      // this bounded, but leave enough scheduling headroom for Windows CI.
+      timeoutMs: 15_000
     });
     const startedAt = Date.now();
     const [first, second] = await Promise.all([
