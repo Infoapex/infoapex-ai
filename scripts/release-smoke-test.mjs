@@ -16,7 +16,8 @@ import { fileURLToPath } from "node:url";
 // pilot:icm-graph (planner+worker+control), review-gate (planner+worker+review), docs-gate
 // (planner+worker+review+docs), plus the root installer's own init/status/handoff in both
 // independent and integrated mode against disposable target directories. The full installer
-// is also exercised from the ZIP, including a real Git target and the no-provider preflight.
+// is also exercised from the ZIP, including a real Git target, the no-provider preflight,
+// and ownership-safe uninstall with state/evidence preservation.
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -106,7 +107,7 @@ try {
     if (status.config?.mode !== "integrated") throw new Error(`status did not report integrated mode: ${JSON.stringify(status)}`);
   });
 
-  step("root installer: full generic profile + install check + no-provider preflight", () => {
+  step("root installer: full generic profile + install check + no-provider preflight + ownership-safe uninstall", () => {
     initializeGitRepository(targetFullInstall);
     const init = runJson(process.execPath, [rootCli, "init", "--repo", targetFullInstall, "--mode", "integrated", "--full", "--profile", "generic"], extractedRoot);
     if (init.status !== "DONE" || init.profile !== "generic") throw new Error(`full install did not complete: ${JSON.stringify(init)}`);
@@ -114,6 +115,14 @@ try {
     if (install.status !== "PASS") throw new Error(`install check did not pass: ${JSON.stringify(install)}`);
     const preflight = runJson(process.execPath, [rootCli, "preflight", "--repo", targetFullInstall], extractedRoot);
     if (preflight.status !== "PASS") throw new Error(`full install preflight did not pass: ${JSON.stringify(preflight)}`);
+    writeFileSync(join(targetFullInstall, ".ai-code-control", "memory", "DECISIONS.md"), "# preserved state\n", "utf8");
+    writeFileSync(join(targetFullInstall, ".infoapex-ai", "runs", "preserved.json"), "{\"state\":true}\n", "utf8");
+    const dryRun = runJson(process.execPath, [rootCli, "uninstall", "--keep-data", "--dry-run", "--repo", targetFullInstall], extractedRoot);
+    if (dryRun.status !== "PASS" || dryRun.code !== "UNINSTALL_READY") throw new Error(`uninstall dry-run did not pass: ${JSON.stringify(dryRun)}`);
+    const removed = runJson(process.execPath, [rootCli, "uninstall", "--keep-data", "--repo", targetFullInstall], extractedRoot);
+    if (removed.status !== "PASS" || removed.code !== "UNINSTALL_APPLIED") throw new Error(`uninstall did not pass: ${JSON.stringify(removed)}`);
+    if (existsSync(join(targetFullInstall, ".ai-code-worker", "config.json"))) throw new Error("uninstall left installer integration files behind");
+    if (!existsSync(join(targetFullInstall, ".ai-code-control", "memory", "DECISIONS.md")) || !existsSync(join(targetFullInstall, ".infoapex-ai", "runs", "preserved.json"))) throw new Error("uninstall did not preserve state/evidence");
   });
 
   const failed = steps.filter((entry) => entry.status !== "PASS");
