@@ -32,3 +32,5 @@
   failures roll back installer-managed files and preserve the consumer's files.
 - The solo RC audit now includes the offline npm-package smoke test as a separate
   artefact-boundary gate.
+- Release clean-install smoke now exercises the full installer in a repository path
+  containing spaces and Unicode characters.

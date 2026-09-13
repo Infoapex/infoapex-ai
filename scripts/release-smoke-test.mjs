@@ -1,7 +1,7 @@
 import AdmZip from "adm-zip";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, existsSync, writeFileSync, realpathSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync, realpathSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,7 +87,8 @@ try {
 
   const targetIndependent = mkdtempSync(join(workspace, "target-independent-"));
   const targetIntegrated = mkdtempSync(join(workspace, "target-integrated-"));
-  const targetFullInstall = mkdtempSync(join(workspace, "target-full-install-"));
+  const targetFullInstall = join(workspace, "target full-install - Δ");
+  mkdirSync(targetFullInstall, { recursive: true });
   const rootCli = join(extractedRoot, "dist", "src", "cli.js");
 
   step("root installer: init + status in independent mode", () => {
@@ -107,7 +108,7 @@ try {
     if (status.config?.mode !== "integrated") throw new Error(`status did not report integrated mode: ${JSON.stringify(status)}`);
   });
 
-  step("root installer: full generic profile + install check + no-provider preflight + ownership-safe uninstall", () => {
+  step("root installer: full generic profile with spaces/Unicode + install check + no-provider preflight + ownership-safe uninstall", () => {
     initializeGitRepository(targetFullInstall);
     const init = runJson(process.execPath, [rootCli, "init", "--repo", targetFullInstall, "--mode", "integrated", "--full", "--profile", "generic"], extractedRoot);
     if (init.status !== "DONE" || init.profile !== "generic") throw new Error(`full install did not complete: ${JSON.stringify(init)}`);
