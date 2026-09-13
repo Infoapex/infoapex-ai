@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { delegate, type RootEnvelope } from "./delegate.js";
 import { fullInstall, preflight, type InstallProfile } from "./full-install.js";
 import { explainConfig, migrate, rollbackConfig, validateConfig } from "./config-lifecycle.js";
-import { checkInstall, rollbackRelease, upgrade } from "./release-lifecycle.js";
+import { checkInstall, rollbackRelease, uninstall, upgrade } from "./release-lifecycle.js";
 import { acquireLease, diagnosticsBundle, productionDoctor, productionHealth, retention } from "./production.js";
 import { buildEvidenceView } from "./evidence-viewer.js";
 import { MODULE_REGISTRY, modulesForCommand, moduleSubcommand, type RootCommand } from "./registry.js";
@@ -27,6 +27,7 @@ const COMMAND_HELP: Readonly<Record<string, CommandHelp>> = {
   init: { usage: "infoapex-ai init --repo <path> [--mode independent|integrated] [--full --profile generic|dotnet-nextjs] [--backend-dir <dir> --frontend-dir <dir> --ml-dir <dir>] [--execution-profile <file>] [--repair] [--verify]", summary: "Bootstrap handoff only, or install a reusable P6 technology profile with --full; --execution-profile imports a schema-validated provider/isolation profile; --verify runs the no-provider readiness gate after installation.", delegatesTo: null },
   install: { usage: "infoapex-ai install --check --repo <path>", summary: "Check an existing full installation and the active bundle without changing it.", delegatesTo: null },
   upgrade: { usage: "infoapex-ai upgrade [--check] --repo <path>", summary: "Back up installer-owned files and retarget a full installation to this bundle.", delegatesTo: null },
+  uninstall: { usage: "infoapex-ai uninstall --keep-data [--dry-run] --repo <path>", summary: "Remove only proven installer-owned integration files and preserve state, evidence, backups, and project bootstrap.", delegatesTo: null },
   preflight: { usage: "infoapex-ai preflight --repo <path>", summary: "Run the strict no-provider readiness gate for a full installation.", delegatesTo: null },
   config: { usage: "infoapex-ai config <validate|explain> --repo <path>", summary: "Validate or explain installer-owned configuration without changing it.", delegatesTo: null },
   migrate: { usage: "infoapex-ai migrate <--check|--dry-run|--apply> --repo <path>", summary: "Validate, back up, and journal an idempotent configuration migration.", delegatesTo: null },
@@ -130,6 +131,12 @@ if (command === "help" || command === "--help" || command === "-h") {
 } else if (command === "upgrade") {
   const repo = resolve(option("--repo") ?? process.cwd());
   const result = args.includes("--check") ? checkInstall(repo, bundleRoot(), false) : upgrade(repo, bundleRoot());
+  console.log(JSON.stringify(result, null, 2));
+  process.exitCode = result.status === "PASS" ? 0 : 2;
+} else if (command === "uninstall") {
+  if (!args.includes("--keep-data")) fail("Usage: infoapex-ai uninstall --keep-data [--dry-run] --repo <path>");
+  const repo = resolve(option("--repo") ?? process.cwd());
+  const result = uninstall(repo, args.includes("--dry-run"));
   console.log(JSON.stringify(result, null, 2));
   process.exitCode = result.status === "PASS" ? 0 : 2;
 } else if (command === "config") {

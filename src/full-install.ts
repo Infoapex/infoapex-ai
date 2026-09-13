@@ -9,6 +9,25 @@ import addFormatsPlugin from "ajv-formats";
 
 const addFormats = addFormatsPlugin as unknown as (ajv: Ajv2020) => void;
 
+/** Files whose ownership can be proven and therefore safely removed by uninstall. */
+export const INSTALL_OWNERSHIP_PATHS = [
+  ".ai-code-control/config/code-control.json",
+  ".ai-code-control/config/memory-control.json",
+  ".ai-code-control/reports/refactor/current-plan.json",
+  ".ai-code-worker/config.json",
+  ".ai-code-worker/routing-policy.json",
+  ".ai-code-worker/execution-environment.example.json",
+  ".ai-code-worker/README.md",
+  ".ai-code-benchmark/config.json",
+  ".ai-code-review/config.json",
+  ".ai-code-docs/config.json",
+  ".mcp.json",
+  ".claude/settings.json",
+  ".codex/config.toml",
+  ".infoapex-ai/install-profile.json",
+  ".infoapex-ai/production-policy.json"
+] as const;
+
 /** Technology profiles, never consumer-project names. */
 export type InstallProfile = "generic" | "dotnet-nextjs";
 
@@ -33,6 +52,15 @@ export interface FullInstallResult {
   readonly findings: readonly string[];
 }
 
+export interface InstallOwnershipManifest {
+  readonly schemaVersion: "1.0";
+  readonly installer: "@infoapex/infoapex-ai";
+  readonly profile: InstallProfile;
+  readonly bundleRoot: string;
+  readonly layout: FullInstallOptions["layout"];
+  readonly files: readonly { readonly path: typeof INSTALL_OWNERSHIP_PATHS[number]; readonly owned: boolean; readonly sha256: string | null }[];
+}
+
 interface ProcessResult {
   readonly exitCode: number;
   readonly stdout: string;
@@ -52,6 +80,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   const updated: string[] = [];
   const skipped: string[] = [];
   const findings: string[] = [];
+  const previousOwned = readPreviousOwnership(repo);
   let executionProfile: Readonly<Record<string, unknown>> | null = null;
   if (!isRealDirectory(repo)) findings.push("Repository root must exist and must not be a symbolic link.");
   if (!isRealDirectory(bundle)) findings.push("Bundle root must exist and must not be a symbolic link.");
@@ -151,6 +180,45 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   if (findings.length === 0) {
     const init = run("dotnet", [paths.controlDll, "init", "--repo", repo], repo);
     if (init.exitCode !== 0) findings.push(`ai-code-control init failed: ${boundedFailure(init)}`);
+  }
+
+  // Persist ownership only after every installer operation has succeeded. This
+  // lets uninstall remove files created by Infoapex without guessing whether a
+  // pre-existing consumer file was overwritten or merely reused.
+  if (findings.length === 0) {
+    const ownershipPath = installerPath(repo, ".infoapex-ai/install-manifest.json");
+    if (!ownershipPath) {
+      findings.push("Unsafe installer-owned path '.infoapex-ai/install-manifest.json'.");
+    } else {
+      try {
+        const manifest: InstallOwnershipManifest = {
+          schemaVersion: "1.0",
+          installer: "@infoapex/infoapex-ai",
+          profile: options.profile,
+          bundleRoot: bundle.replaceAll("\\", "/"),
+          layout: options.layout,
+          files: INSTALL_OWNERSHIP_PATHS.map((path) => {
+            const target = installerPath(repo, path);
+            const owned = created.includes(path) || previousOwned.has(path);
+            return { path, owned, sha256: target && existsSync(target) ? digestFile(target) : null };
+          })
+        };
+        const value = json(manifest);
+        if (!existsSync(ownershipPath)) {
+          writeText(ownershipPath, value);
+          created.push(".infoapex-ai/install-manifest.json");
+        } else if (readFileSync(ownershipPath, "utf8") === value) {
+          skipped.push(".infoapex-ai/install-manifest.json");
+        } else if (options.repair) {
+          writeText(ownershipPath, value);
+          updated.push(".infoapex-ai/install-manifest.json");
+        } else {
+          findings.push(".infoapex-ai/install-manifest.json differs from the current full-install profile; rerun with --repair after reviewing it.");
+        }
+      } catch {
+        findings.push("Installer ownership manifest could not be written safely.");
+      }
+    }
   }
 
   return {
@@ -535,6 +603,23 @@ function sleepSync(milliseconds: number): void {
   Atomics.wait(shared, 0, 0, milliseconds);
 }
 function boundedFailure(result: ProcessResult): string { return (result.stderr || result.stdout || `exit ${result.exitCode}`).trim().replace(/\s+/g, " ").slice(-1000); }
+function digestFile(path: string): string { return createHash("sha256").update(readFileSync(path)).digest("hex"); }
+function readPreviousOwnership(repo: string): ReadonlySet<string> {
+  const result = new Set<string>();
+  const manifestPath = installerPath(repo, ".infoapex-ai/install-manifest.json");
+  if (!manifestPath || !existsSync(manifestPath)) return result;
+  try {
+    const value = JSON.parse(readFileSync(manifestPath, "utf8")) as { files?: readonly { path?: unknown; owned?: unknown; sha256?: unknown }[] };
+    for (const entry of value.files ?? []) {
+      if (typeof entry.path !== "string" || !INSTALL_OWNERSHIP_PATHS.includes(entry.path as typeof INSTALL_OWNERSHIP_PATHS[number]) || entry.owned !== true || typeof entry.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(entry.sha256)) continue;
+      const target = installerPath(repo, entry.path);
+      if (target && existsSync(target) && !lstatSync(target).isSymbolicLink() && digestFile(target) === entry.sha256) result.add(entry.path);
+    }
+  } catch {
+    // A malformed prior manifest must never establish ownership for uninstall.
+  }
+  return result;
+}
 function isSafeRelativePath(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && !value.includes("\0") && !value.startsWith("/") && !/^[a-zA-Z]:/.test(value) && !value.includes("\\") &&
     !value.split("/").some((part) => part === "" || part === "." || part === "..");

@@ -1,5 +1,17 @@
 # P6 developer quickstart
 
+## Dezinstalarea integrării fără ștergerea datelor
+
+```bash
+node dist/src/cli.js uninstall --keep-data --dry-run --repo /cale/catre/proiect
+node dist/src/cli.js uninstall --keep-data --repo /cale/catre/proiect
+```
+
+Installerul scrie un manifest de ownership după o instalare reușită. Dezinstalarea
+șterge numai fișierele create de installer al căror hash nu s-a schimbat; dacă un
+fișier a fost modificat, operația se blochează pentru review. Memoria, code graph-ul,
+evidence, backup-urile, run-urile, bootstrap-ul proiectului și `.gitignore` rămân păstrate.
+
 Acest ghid este pentru un dezvoltator care folosește Infoapex AI dintr-un repository
 consumator. Profilul implicit `core-local` nu face upload, nu păstrează conversații brute
 și nu activează acțiuni externe.

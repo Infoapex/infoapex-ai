@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { fullInstall } from "../src/full-install.js";
-import { checkInstall, rollbackRelease, upgrade } from "../src/release-lifecycle.js";
+import { checkInstall, rollbackRelease, uninstall, upgrade } from "../src/release-lifecycle.js";
 
 function createRepository(): string {
   const repository = mkdtempSync(join(tmpdir(), "apex-release-lifecycle-"));
@@ -119,6 +119,8 @@ test("upgrade preserves an operator-provisioned execution profile", () => {
     const result = upgrade(repository, process.cwd());
     assert.equal(result.status, "PASS", JSON.stringify(result));
     assert.equal(readFileSync(profilePath, "utf8"), before);
+    const ownership = JSON.parse(readFileSync(join(repository, ".infoapex-ai", "install-manifest.json"), "utf8")) as { files: readonly { path: string; owned: boolean }[] };
+    assert.equal(ownership.files.find((entry) => entry.path === ".ai-code-worker/config.json")?.owned, true);
   } finally { rmSync(repository, { recursive: true, force: true }); }
 });
 
@@ -129,4 +131,40 @@ test("full install validates caller-controlled paths before creating installer s
     assert.equal(result.status, "BLOCKED");
     assert.equal(existsSync(join(repository, ".infoapex-ai", "install-profile.json")), false);
   } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test("uninstall dry-run and apply remove only owned integration while preserving state", () => {
+  const repository = createRepository();
+  try {
+    const state = join(repository, ".ai-code-control", "memory", "DECISIONS.md");
+    const evidence = join(repository, ".infoapex-ai", "diagnostics", "support.json");
+    mkdirSync(join(repository, ".infoapex-ai", "diagnostics"), { recursive: true });
+    writeFileSync(state, "# keep\n", "utf8");
+    writeFileSync(evidence, "{\"redacted\":true}\n", "utf8");
+    const dryRun = uninstall(repository, true) as { status: string; code: string; removable: readonly string[] };
+    assert.equal(dryRun.status, "PASS", JSON.stringify(dryRun));
+    assert.equal(dryRun.code, "UNINSTALL_READY");
+    assert.equal(existsSync(join(repository, ".ai-code-worker", "config.json")), true);
+    const applied = uninstall(repository, false) as { status: string; code: string };
+    assert.equal(applied.status, "PASS", JSON.stringify(applied));
+    assert.equal(applied.code, "UNINSTALL_APPLIED");
+    assert.equal(existsSync(join(repository, ".ai-code-worker", "config.json")), false);
+    assert.equal(existsSync(join(repository, ".infoapex-ai", "install-manifest.json")), false);
+    assert.equal(existsSync(state), true);
+    assert.equal(existsSync(evidence), true);
+    assert.equal(existsSync(join(repository, ".infoapex-ai", "config.json")), true);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test("uninstall refuses changed installer files and missing ownership proof", () => {
+  const repository = createRepository();
+  const noManifest = mkdtempSync(join(tmpdir(), "apex-uninstall-no-manifest-"));
+  try {
+    writeFileSync(join(repository, ".ai-code-worker", "config.json"), "changed\n", "utf8");
+    const changed = uninstall(repository, false) as { status: string; code: string };
+    assert.deepEqual({ status: changed.status, code: changed.code }, { status: "BLOCKED", code: "TARGET_CHANGED" });
+    assert.equal(existsSync(join(repository, ".ai-code-worker", "config.json")), true);
+    const missing = uninstall(noManifest, false) as { status: string; code: string };
+    assert.deepEqual({ status: missing.status, code: missing.code }, { status: "BLOCKED", code: "OWNERSHIP_MANIFEST_MISSING" });
+  } finally { rmSync(repository, { recursive: true, force: true }); rmSync(noManifest, { recursive: true, force: true }); }
 });

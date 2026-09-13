@@ -2,11 +2,11 @@ import { accessSync, constants, copyFileSync, existsSync, lstatSync, mkdirSync, 
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fullInstall, type InstallProfile, verifyFilesystemPermissions } from "./full-install.js";
+import { fullInstall, INSTALL_OWNERSHIP_PATHS, type InstallOwnershipManifest, type InstallProfile, verifyFilesystemPermissions } from "./full-install.js";
 import { validateConfig } from "./config-lifecycle.js";
 
 const RUNTIME_PATHS = ["dist/src/cli.js", "modules/ai-code-planner/dist/src/cli.js", "modules/ai-code-worker/dist/src/cli.js", "modules/ai-code-review/dist/src/cli.js", "modules/ai-code-docs/dist/src/cli.js", "modules/ai-code-benchmark/dist/src/cli.js", "modules/ai-code-control/tools/ai-code-control/mcp-server/dist/server.js", "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.Cli/AiCodeControl.Cli.csproj", "modules/provenance.json"] as const;
-const UPGRADE_PATHS = [".ai-code-control/config/code-control.json", ".ai-code-control/config/memory-control.json", ".ai-code-control/reports/refactor/current-plan.json", ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-worker/execution-environment.example.json", ".ai-code-benchmark/config.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".mcp.json", ".claude/settings.json", ".codex/config.toml", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".gitignore"] as const;
+const UPGRADE_PATHS = [".ai-code-control/config/code-control.json", ".ai-code-control/config/memory-control.json", ".ai-code-control/reports/refactor/current-plan.json", ".ai-code-worker/config.json", ".ai-code-worker/routing-policy.json", ".ai-code-worker/execution-environment.example.json", ".ai-code-worker/README.md", ".ai-code-benchmark/config.json", ".ai-code-review/config.json", ".ai-code-docs/config.json", ".mcp.json", ".claude/settings.json", ".codex/config.toml", ".infoapex-ai/install-profile.json", ".infoapex-ai/production-policy.json", ".infoapex-ai/install-manifest.json", ".gitignore"] as const;
 const SHA256 = /^[a-f0-9]{64}$/;
 const UPGRADE_ID = /^upgrade-\d{13}-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 type Status = "PASS" | "BLOCKED";
@@ -111,6 +111,59 @@ export function rollbackRelease(repositoryRoot: string, upgradeId: string | null
   return { schemaVersion: "1.0", status: "PASS", code: "ROLLBACK_APPLIED", mode, upgradeId: journal.upgradeId, restored: journal.entries.filter((entry) => entry.existed).length };
 }
 
+/**
+ * Remove the installer integration while preserving project state and evidence.
+ * Only files proven as installer-owned at the last successful install are
+ * eligible. Changed files are refused rather than silently deleted.
+ */
+export function uninstall(repositoryRoot: string, dryRun: boolean): Record<string, unknown> {
+  const root = checkedRepository(repositoryRoot);
+  const mode = dryRun ? "dry-run" : "apply";
+  if ("error" in root) return blocked(mode, "REPOSITORY_UNSAFE", root.error);
+  const manifestPath = repoPath(root.repo, ".infoapex-ai/install-manifest.json");
+  if (!manifestPath || !existsSync(manifestPath)) return blocked(mode, "OWNERSHIP_MANIFEST_MISSING", "No successful full-install ownership manifest was found; uninstall is refused to avoid guessing file ownership.");
+  let manifest: InstallOwnershipManifest;
+  try { manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as InstallOwnershipManifest; } catch { return blocked(mode, "OWNERSHIP_MANIFEST_INVALID", "Install ownership manifest is invalid JSON."); }
+  const invalid = validateOwnershipManifest(manifest);
+  if (invalid) return blocked(mode, "OWNERSHIP_MANIFEST_INVALID", invalid);
+  const removable: string[] = [];
+  const preserved: string[] = [
+    ".ai-code-control/memory/",
+    ".ai-code-control/db/",
+    ".ai-code-control/reports/validation/",
+    ".infoapex-ai/backups/",
+    ".infoapex-ai/diagnostics/",
+    ".infoapex-ai/releases/",
+    ".infoapex-ai/runs/",
+    ".infoapex-ai/migrations/",
+    ".gitignore",
+    ".infoapex-ai/config.json",
+    "TODO.md",
+    "AGENTS.md",
+    "CLAUDE.md"
+  ];
+  for (const entry of manifest.files) {
+    if (!entry.owned) continue;
+    const target = repoPath(root.repo, entry.path);
+    if (!target) return blocked(mode, "PATH_UNSAFE", `Ownership path escapes the repository: ${entry.path}`);
+    if (!existsSync(target)) continue;
+    if (lstatSync(target).isSymbolicLink()) return blocked(mode, "SYMLINK_REFUSED", `Refusing to uninstall symbolic-link target ${entry.path}.`);
+    if (entry.sha256 === null || digestFile(target) !== entry.sha256) return blocked(mode, "TARGET_CHANGED", `Refusing to delete changed installer file ${entry.path}.`);
+    removable.push(entry.path);
+  }
+  if (dryRun) return { schemaVersion: "1.0", status: "PASS", code: "UNINSTALL_READY", mode, removable, preserved };
+  try {
+    for (const path of removable) {
+      const target = repoPath(root.repo, path)!;
+      rmSync(target, { force: true });
+    }
+    rmSync(manifestPath, { force: true });
+  } catch (error) {
+    return { schemaVersion: "1.0", status: "BLOCKED", code: "UNINSTALL_PARTIAL", mode, removable, preserved, message: `Uninstall stopped after a filesystem error: ${String(error)}` };
+  }
+  return { schemaVersion: "1.0", status: "PASS", code: "UNINSTALL_APPLIED", mode, removed: removable, preserved };
+}
+
 function readProfile(repo: string, checks: { id: string; status: Status; detail: string }[]): InstallProfileRecord | null {
   const path = repoPath(repo, ".infoapex-ai/install-profile.json");
   if (!path || !existsSync(path)) { checks.push({ id: "install-profile", status: "BLOCKED", detail: "Full install profile is missing or unsafe." }); return null; }
@@ -132,6 +185,17 @@ function validateJournal(repo: string, journal: UpgradeJournal): string | null {
   if (!Array.isArray(journal.entries) || journal.entries.length !== UPGRADE_PATHS.length || new Set(journal.entries.map((entry) => entry?.path)).size !== UPGRADE_PATHS.length) return "Journal entries are incomplete or duplicated.";
   for (const path of UPGRADE_PATHS) { const entry = journal.entries.find((candidate) => candidate?.path === path); if (!entry || !validEntry(entry, journal.status)) return `Journal entry for ${path} is invalid.`; }
   return null;
+}
+function validateOwnershipManifest(manifest: InstallOwnershipManifest): string | null {
+  if (!manifest || typeof manifest !== "object" || manifest.schemaVersion !== "1.0" || manifest.installer !== "@infoapex/infoapex-ai" || (manifest.profile !== "generic" && manifest.profile !== "dotnet-nextjs") || !validAbsolutePath(manifest.bundleRoot)) return "Ownership manifest metadata is invalid.";
+  if (!Array.isArray(manifest.files) || manifest.files.length !== INSTALL_OWNERSHIP_PATHS.length) return "Ownership manifest file inventory is incomplete.";
+  const expected = new Set<string>(INSTALL_OWNERSHIP_PATHS);
+  const actual = new Set<string>();
+  for (const entry of manifest.files) {
+    if (!entry || typeof entry.path !== "string" || !expected.has(entry.path) || actual.has(entry.path) || typeof entry.owned !== "boolean" || (entry.sha256 !== null && (typeof entry.sha256 !== "string" || !SHA256.test(entry.sha256)))) return `Ownership manifest entry is invalid: ${String(entry?.path ?? "unknown")}.`;
+    actual.add(entry.path);
+  }
+  return actual.size === expected.size ? null : "Ownership manifest file inventory is incomplete.";
 }
 function validEntry(entry: JournalEntry, status: UpgradeJournal["status"]): boolean {
   if (!UPGRADE_PATHS.includes(entry.path as typeof UPGRADE_PATHS[number]) || typeof entry.existed !== "boolean") return false;
