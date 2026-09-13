@@ -1,6 +1,7 @@
 import type { ProjectConfig } from "../config/project-config.js";
 import { ClaudeCliAdapter, type ClaudeCliAdapterConfig, type ClaudeExecution } from "../engines/claude-cli.js";
 import { CodexCliAdapter, type CodexCliAdapterConfig, type CodexExecution } from "../engines/codex-cli.js";
+import type { EngineProcessRunner } from "../engines/process-runner.js";
 import type { RoutingCandidate } from "./routing-policy.js";
 
 export type RoutedExecution = ClaudeExecution | CodexExecution;
@@ -43,12 +44,21 @@ export async function executeTaskWithFallback(input: {
   readonly codexOverrides?: Partial<CodexCliAdapterConfig>;
   readonly claudeOverrides?: Partial<ClaudeCliAdapterConfig>;
   readonly adapterFactory?: (candidate: RoutingCandidate) => RoutedAdapter;
+  /** Required by production callers so every provider candidate uses the declared boundary. */
+  readonly providerProcessRunner?: (candidate: RoutingCandidate) => EngineProcessRunner | null;
 }): Promise<RoutedTaskExecution> {
   const attempts: TaskExecutionAttempt[] = [];
 
   for (let index = 0; index < input.candidates.length; index += 1) {
     const candidate = input.candidates[index]!;
-    const adapter = input.adapterFactory?.(candidate) ?? createAdapter(candidate, input.projectConfig, input.codexOverrides, input.claudeOverrides) as unknown as RoutedAdapter;
+    const providerRunner = input.providerProcessRunner?.(candidate) ?? null;
+    if (!input.adapterFactory && input.providerProcessRunner && !providerRunner) {
+      const execution = failedExecution(input.request, candidate, `Provider execution boundary is unavailable for ${candidate.engine}.`);
+      const attempt = { candidate, execution, availabilityFailure: true };
+      attempts.push(attempt);
+      continue;
+    }
+    const adapter = input.adapterFactory?.(candidate) ?? createAdapter(candidate, input.projectConfig, input.codexOverrides, input.claudeOverrides, providerRunner) as unknown as RoutedAdapter;
     const doctor = adapter.doctor();
     if (doctor.status === "BLOCKED") {
       const execution = failedExecution(input.request, candidate, doctor.findings[0]?.message ?? `${candidate.engine} is unavailable.`);
@@ -89,21 +99,24 @@ function createAdapter(
   candidate: RoutingCandidate,
   projectConfig: ProjectConfig | null,
   codexOverrides: Partial<CodexCliAdapterConfig> | undefined,
-  claudeOverrides: Partial<ClaudeCliAdapterConfig> | undefined
+  claudeOverrides: Partial<ClaudeCliAdapterConfig> | undefined,
+  processRunner: EngineProcessRunner | null
 ): ClaudeCliAdapter | CodexCliAdapter {
   if (candidate.engine === "codex") {
     return new CodexCliAdapter({
       requiresCapabilitySmokeTest: true,
       ...codexProjectConfig(projectConfig),
       ...(candidate.model !== null ? { defaultModel: candidate.model } : {}),
-      ...codexOverrides
+      ...codexOverrides,
+      ...(processRunner ? { processRunner } : {})
     });
   }
   return new ClaudeCliAdapter({
     requiresCapabilitySmokeTest: true,
     ...claudeProjectConfig(projectConfig),
     ...(candidate.model !== null ? { defaultModel: candidate.model } : {}),
-    ...claudeOverrides
+    ...claudeOverrides,
+    ...(processRunner ? { processRunner } : {})
   });
 }
 

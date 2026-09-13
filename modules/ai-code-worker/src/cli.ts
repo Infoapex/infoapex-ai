@@ -13,7 +13,7 @@ import {
   type UsageCheckpointTokens,
   type UsagePrediction
 } from "./benchmark/usage-checkpoint.js";
-import { runCompile } from "./compile/compile.js";
+import { loadExecutionProfile, runCompile } from "./compile/compile.js";
 import { AGENTS_MD_BLOCK_VERSION, proposeAgentsMdBlock, writeAgentsMdBlock } from "./config/agents-md-block.js";
 import { initProjectConfig, updateProjectConfig } from "./config/init.js";
 import { installShims } from "./config/shims.js";
@@ -46,6 +46,7 @@ import { findPlannerHandoffRunId, publishWorkerFeedback } from "./integration/ap
 import { runReadOnlyReview } from "./review/review-command.js";
 import { buildSemanticTaskInputsMap, type SemanticTaskDescriptor } from "./snapshots/semantic-task-inputs.js";
 import { detectRunSemanticDrift } from "./snapshots/detect-run-semantic-drift.js";
+import { FakeExecutionEnvironment, resolveExecutionEnvironment } from "./execution/environment.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -334,6 +335,11 @@ if (command === "benchmark") {
   // Codex activity happens to exist on the host machine. Production callers never set
   // this; it exists so --engine codex fixtures (e.g. the P2 pilots) stay hermetic.
   const codexSessionsDir = readOption("--codex-sessions-dir") ?? undefined;
+  // Explicit simulation backend for hermetic contract fixtures only. The
+  // default remains the configured backend; a simulated provider boundary is
+  // never eligible for the public release gate.
+  const executionBackend = readOption("--execution-backend") ?? "auto";
+  const executionEnvironment = executionBackend === "fake" ? new FakeExecutionEnvironment() : undefined;
   const asJson = args.includes("--json");
 
   if (!planPath) {
@@ -358,6 +364,14 @@ if (command === "benchmark") {
       console.log("BLOCKER ENGINE_UNAVAILABLE: Unsupported run engine. Use --engine fake, --engine codex, or --engine claude.");
     }
 
+    process.exitCode = 2;
+  } else if (executionBackend !== "auto" && executionBackend !== "fake") {
+    const report = {
+      status: "BLOCKED",
+      findings: [{ severity: "blocker", code: "EXECUTION_BACKEND_UNAVAILABLE", message: "Unsupported --execution-backend value. Use auto or fake." }]
+    };
+    if (asJson) console.log(JSON.stringify(report, null, 2));
+    else console.log("ai-code-worker run: BLOCKED\nBLOCKER EXECUTION_BACKEND_UNAVAILABLE: Unsupported --execution-backend value. Use auto or fake.");
     process.exitCode = 2;
   } else if (fallbackEngine !== undefined && fallbackEngine !== "codex" && fallbackEngine !== "claude") {
     const report = {
@@ -525,6 +539,19 @@ if (command === "benchmark") {
     const independentReviewBase = readManifestReviewBase(preview.state.manifestPath);
     const repairStateRoot = resolveStateRoot({ repoRoot: repositoryPath, configuredStateRoot: projectConfig?.stateRoot ?? null }).path;
 
+    const providerProcessRunnerFor = (provider: "codex" | "claude") => {
+      try {
+        const profile = loadExecutionProfile(repositoryPath);
+        const environment = executionEnvironment ?? resolveExecutionEnvironment(profile);
+        const report = environment.doctor(profile);
+        return report.providerSupported
+          ? environment.providerProcessRunner?.(profile, provider) ?? null
+          : null;
+      } catch {
+        return null;
+      }
+    };
+
     // Cross-engine review by default when --independent-review is on: the
     // writer's own engine reviewing its own work has the same self-grading
     // problem a human self-review has (see the ai-code-planner design
@@ -559,14 +586,20 @@ if (command === "benchmark") {
             repositoryPath,
             baseCommit: independentReviewBase.baseCommit,
             tasks: independentReviewBase.tasks,
-            config: { ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}) }
+            config: {
+              ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}),
+              processRunner: providerProcessRunnerFor("codex")
+            }
           })
         : reviewEngine === "claude" && independentReviewBase
         ? createClaudeIndependentReviewer({
             repositoryPath,
             baseCommit: independentReviewBase.baseCommit,
             tasks: independentReviewBase.tasks,
-            config: { ...(claudeExecutable !== undefined ? { executable: claudeExecutable } : {}) }
+            config: {
+              ...(claudeExecutable !== undefined ? { executable: claudeExecutable } : {}),
+              processRunner: providerProcessRunnerFor("claude")
+            }
           })
         : null;
 
@@ -582,7 +615,11 @@ if (command === "benchmark") {
                 manifestSha256: preview.manifestSha256 ?? "",
                 baseCommit: repairBaseCommit,
                 projectConfig,
-                adapterConfig: { ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}) },
+                adapterConfig: {
+                  ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}),
+                  ...(providerProcessRunnerFor("codex") ? { processRunner: providerProcessRunnerFor("codex")! } : {})
+                },
+                processRunner: providerProcessRunnerFor("codex"),
                 reviewer: chosenReviewer
               })
           }
@@ -599,7 +636,11 @@ if (command === "benchmark") {
                 manifestSha256: preview.manifestSha256 ?? "",
                 baseCommit: repairBaseCommit,
                 projectConfig,
-                adapterConfig: { ...(claudeExecutable !== undefined ? { executable: claudeExecutable } : {}) },
+                adapterConfig: {
+                  ...(claudeExecutable !== undefined ? { executable: claudeExecutable } : {}),
+                  ...(providerProcessRunnerFor("claude") ? { processRunner: providerProcessRunnerFor("claude")! } : {})
+                },
+                processRunner: providerProcessRunnerFor("claude"),
                 reviewer: chosenReviewer
               })
           }
@@ -657,6 +698,7 @@ if (command === "benchmark") {
           planPath,
           runId,
           ...(codexSessionsDir !== undefined ? { codexSessionsDir } : {}),
+          ...(executionEnvironment ? { executionEnvironment } : {}),
           adapterConfig: {
             ...(codexExecutable !== undefined ? { executable: codexExecutable } : {}),
             ...(codexModel !== undefined ? { defaultModel: codexModel } : {}),
@@ -674,6 +716,7 @@ if (command === "benchmark") {
           repositoryPath,
           planPath,
           runId,
+          ...(executionEnvironment ? { executionEnvironment } : {}),
           adapterConfig: {
             ...(claudeExecutable !== undefined ? { executable: claudeExecutable } : {}),
             ...(claudeModel !== undefined ? { defaultModel: claudeModel } : {}),

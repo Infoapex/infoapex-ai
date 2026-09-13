@@ -13,6 +13,7 @@ const requiredCapabilities = [
   "filesystem-restricted",
   "worktree-write-mount",
   "network-deny-repository-processes",
+  "provider-execution-isolated",
   "environment-scrubbed",
   "process-limits",
   "output-limits",
@@ -41,7 +42,7 @@ if (!existsSync(workerCli)) {
 const environment = report?.executionEnvironment ?? null;
 check(
   "os-isolated-boundary",
-  environment?.supported === true && environment?.securityBoundary === "os-isolated",
+  environment?.supported === true && environment?.providerSupported === true && environment?.securityBoundary === "os-isolated",
   "the selected backend must report an enforced OS-isolated security boundary"
 );
 check(

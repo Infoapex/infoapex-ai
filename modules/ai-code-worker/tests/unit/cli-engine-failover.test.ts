@@ -32,7 +32,7 @@ interface RunCliReport {
 function invokeRunJson(args: readonly string[]): RunCliReport {
   let output: string;
   try {
-    output = execFileSync(process.execPath, [resolve("dist/src/cli.js"), "run", "--json", ...args], {
+    output = execFileSync(process.execPath, [resolve("dist/src/cli.js"), "run", "--json", "--execution-backend", "fake", ...args], {
       cwd: tmpdir(),
       encoding: "utf8"
     });

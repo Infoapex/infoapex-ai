@@ -139,6 +139,22 @@ describe("createClaudeIndependentReviewer", () => {
 });
 
 describe("createCodexIndependentReviewer", () => {
+  it("fails closed when the provider boundary is unavailable", () => {
+    const reviewer = createCodexIndependentReviewer({
+      repositoryPath: ".",
+      baseCommit: "HEAD",
+      tasks: [],
+      config: { processRunner: null },
+      now: () => "2026-08-15T10:00:00Z"
+    });
+
+    const result = reviewer({ runId: "run-1", graphVersion: 1, taskCommits: {} });
+
+    assert.equal(result.verdict, "fail");
+    assert.equal(result.findings[0]?.id, "REV-ENGINE-FAILURE");
+    assert.match(result.findings[0]?.evidence ?? "", /isolated Codex reviewer process runner/);
+  });
+
   it("returns a schema-valid review parsed from the last agent_message JSONL event", () => {
     const cli = fakeCodexCli(
       [

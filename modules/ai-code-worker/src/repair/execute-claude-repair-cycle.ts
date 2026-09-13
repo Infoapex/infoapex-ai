@@ -24,7 +24,8 @@ export function createClaudeRepairExecutor(options: CreateClaudeRepairExecutorOp
   const adapter = new ClaudeCliAdapter(
     claudeConfig({
       ...claudeAdapterConfigFromProject(options.projectConfig ?? null),
-      ...options.adapterConfig
+      ...options.adapterConfig,
+      ...(options.processRunner ? { processRunner: options.processRunner } : {})
     }),
     registry
   );

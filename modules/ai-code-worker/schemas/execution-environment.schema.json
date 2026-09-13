@@ -40,6 +40,16 @@
         }
       }
     },
+    "providerExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["simulated", "isolated-container", "host-process"]
+        }
+      }
+    },
     "filesystem": {
       "type": "object",
       "additionalProperties": false,

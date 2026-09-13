@@ -9,6 +9,7 @@ import { runClaude } from "../../src/run/claude-run.js";
 import { createClaudeRepairExecutor } from "../../src/repair/execute-claude-repair-cycle.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
 import type { IndependentReviewResult } from "../../src/review/independent-review.js";
+import { FakeExecutionEnvironment } from "../../src/execution/environment.js";
 
 const tempRepos: string[] = [];
 const stateRoots: string[] = [];
@@ -162,6 +163,7 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
 
     const report = await runClaude({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       planPath: "Plan/RUN.md",
       runId,
       now: "2026-08-16T09:05:00Z",
@@ -220,6 +222,7 @@ describe("claude run coordinator - real engine repair (todo.md #13, real-engine 
 
     const report = await runClaude({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       planPath: "Plan/RUN.md",
       runId,
       now: "2026-08-16T09:05:00Z",

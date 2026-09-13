@@ -186,6 +186,7 @@ function runTask(repository, task, executables) {
     "--run-id", `p2-b-${task.taskId.toLowerCase()}-${live ? "live" : "fixture"}`,
     "--engine", task.engine, "--fallback-engine", task.fallbackEngine, "--json"
   ];
+  if (fixture) runArgs.push("--execution-backend", "fake");
   if (task.engine === "codex") {
     runArgs.push("--codex-model", provider.model, "--codex-sandbox", "danger-full-access");
     if (executables.codex) runArgs.push("--codex-executable", executables.codex);

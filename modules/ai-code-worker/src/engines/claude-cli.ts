@@ -1,10 +1,11 @@
-import { spawnSync } from "node:child_process";
+import { type SpawnSyncReturns } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import type { AgentExecutionResult } from "./fake-engine.js";
 import { createEngineEvent, validateEngineEventStream, type EngineEvent, type EngineUsage } from "./engine-event.js";
-import { spawnBuffered, type BufferedProcessResult } from "./spawn-buffered.js";
+import { type BufferedProcessResult } from "./spawn-buffered.js";
 import { needsShellWrapper } from "./spawn-shell.js";
+import { localEngineProcessRunner, type EngineProcessRunner } from "./process-runner.js";
 import { versionMatchesAny } from "./version-match.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
 import { discoverEngineExecutable } from "./discover-cli.js";
@@ -51,6 +52,8 @@ export interface ClaudeCliAdapterConfig {
   /** Consecutive identical semantic actions allowed before loop protection stops the CLI. */
   readonly maximumRepeatedProgressEvents?: number;
   readonly maximumOutputBytes?: number;
+  /** Injected by an execution backend; omitted only for local/simulation paths. */
+  readonly processRunner?: EngineProcessRunner;
   /**
    * Opt-in `--bare` mode: skips OAuth/keychain auth and requires ANTHROPIC_API_KEY.
    * Default false, so headless runs authenticate the same way an interactive `claude`
@@ -115,6 +118,7 @@ export class ClaudeCliAdapter {
   private readonly maximumRuntimeMs: number;
   private readonly maximumRepeatedProgressEvents: number;
   private readonly maximumOutputBytes: number;
+  private readonly processRunner: EngineProcessRunner;
 
   constructor(
     private readonly config: ClaudeCliAdapterConfig,
@@ -132,15 +136,13 @@ export class ClaudeCliAdapter {
     this.maximumRuntimeMs = config.maximumRuntimeMs ?? 20 * 60_000;
     this.maximumRepeatedProgressEvents = config.maximumRepeatedProgressEvents ?? 4;
     this.maximumOutputBytes = config.maximumOutputBytes ?? 1024 * 1024;
+    this.processRunner = config.processRunner ?? localEngineProcessRunner;
   }
 
   doctor(): ClaudeDoctorReport {
     const findings: ClaudeFinding[] = [];
-    const versionOutput = spawnSync(this.executable, [...this.baseArgs, "--version"], {
-      encoding: "utf8",
-      timeout: 10_000,
-      windowsHide: true,
-      shell: needsShellWrapper(this.executable)
+    const versionOutput = this.processRunner.runSync(this.executable, [...this.baseArgs, "--version"], {
+      cwd: process.cwd(), timeoutMs: 10_000, maximumOutputBytes: 1_048_576, shell: needsShellWrapper(this.executable)
     });
     const version = versionOutput.status === 0 ? versionOutput.stdout.trim() || versionOutput.stderr.trim() : null;
     const parsedVersion = version ? parseClaudeVersion(version) : null;
@@ -265,13 +267,11 @@ export class ClaudeCliAdapter {
       payload: { sessionId: request.sessionId },
       registry: this.registry
     });
-    const child = spawnSync(invocation.executable, invocation.args, {
+    const child = this.processRunner.runSync(invocation.executable, invocation.args, {
       cwd: request.worktreePath,
       input: invocation.stdin,
-      encoding: "utf8",
-      maxBuffer: this.maximumOutputBytes,
-      timeout: this.timeoutMs,
-      windowsHide: true,
+      timeoutMs: this.timeoutMs,
+      maximumOutputBytes: this.maximumOutputBytes,
       shell: needsShellWrapper(invocation.executable)
     });
     const result = readAgentResult(child, request, this.registry) ?? failedResult(request, childOutputMessage(child));
@@ -329,7 +329,7 @@ export class ClaudeCliAdapter {
       payload: { sessionId: request.sessionId },
       registry: this.registry
     });
-    const child = await spawnBuffered(invocation.executable, invocation.args, {
+    const child = await this.processRunner.runAsync(invocation.executable, invocation.args, {
       cwd: request.worktreePath,
       input: invocation.stdin,
       maximumOutputBytes: this.maximumOutputBytes,
@@ -367,11 +367,8 @@ export class ClaudeCliAdapter {
   }
 
   private smokeTest(findings: ClaudeFinding[]): "PASS" | "BLOCKED" {
-    const smoke = spawnSync(this.executable, [...this.baseArgs, "-p", "--help"], {
-      encoding: "utf8",
-      timeout: 10_000,
-      windowsHide: true,
-      shell: needsShellWrapper(this.executable)
+    const smoke = this.processRunner.runSync(this.executable, [...this.baseArgs, "-p", "--help"], {
+      cwd: process.cwd(), timeoutMs: 10_000, maximumOutputBytes: 1_048_576, shell: needsShellWrapper(this.executable)
     });
     const combined = `${smoke.stdout}\n${smoke.stderr}`;
     const missing = REQUIRED_HELP_CAPABILITIES.filter((capability) => !combined.includes(capability));
@@ -425,7 +422,7 @@ export function parseClaudeVersion(output: string): string | null {
 }
 
 function readAgentResult(
-  child: ReturnType<typeof spawnSync> | BufferedProcessResult,
+  child: SpawnSyncReturns<string> | BufferedProcessResult,
   request: ClaudeStartRequest,
   registry: SchemaRegistry
 ): AgentExecutionResult | null {
@@ -549,7 +546,7 @@ function failedResult(request: ClaudeStartRequest, message: string): AgentExecut
   };
 }
 
-function childOutputMessage(child: ReturnType<typeof spawnSync> | BufferedProcessResult): string {
+function childOutputMessage(child: SpawnSyncReturns<string> | BufferedProcessResult): string {
   // Provider output remains private evidence: it must not become a public
   // worker finding, where it could expose prompt/source/secret fragments.
   const error = child.error as (Error & { readonly code?: string }) | undefined;

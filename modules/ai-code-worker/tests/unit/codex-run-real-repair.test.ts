@@ -9,6 +9,7 @@ import { runCodex } from "../../src/run/codex-run.js";
 import { createCodexRepairExecutor } from "../../src/repair/execute-codex-repair-cycle.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
 import type { IndependentReviewResult } from "../../src/review/independent-review.js";
+import { FakeExecutionEnvironment } from "../../src/execution/environment.js";
 
 /**
  * Lighter than claude-run-real-repair.test.ts: createRealEngineRepairExecutor
@@ -151,6 +152,7 @@ describe("codex run coordinator - real engine repair (todo.md #13, real-engine s
 
     const report = await runCodex({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       planPath: "Plan/RUN.md",
       runId,
       now: "2026-08-16T09:05:00Z",

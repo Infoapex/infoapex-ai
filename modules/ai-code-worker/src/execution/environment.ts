@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalJson, sha256 } from "../manifest/normalize.js";
 import { spawnBuffered } from "../engines/spawn-buffered.js";
+import { localEngineProcessRunner, type EngineProcessRunner } from "../engines/process-runner.js";
 import { SchemaRegistry, type JsonValue } from "../schema/json-schema.js";
 
 export type EnvironmentCapability =
@@ -11,6 +12,7 @@ export type EnvironmentCapability =
   | "worktree-write-mount"
   | "network-deny-repository-processes"
   | "network-provider-only-adapter-control-plane"
+  | "provider-execution-isolated"
   | "environment-scrubbed"
   | "process-limits"
   | "output-limits"
@@ -24,15 +26,20 @@ export interface EnvironmentCapabilityReport {
   readonly securityBoundary: "host-process" | "os-isolated" | "simulated";
   readonly profileSha256: string;
   readonly supported: boolean;
+  /** Whether the provider CLI itself is executed inside the declared boundary. */
+  readonly providerSupported: boolean;
   readonly requestedCapabilities: readonly EnvironmentCapability[];
   readonly capabilities: readonly EnvironmentCapability[];
   readonly missingCapabilities: readonly EnvironmentCapability[];
   readonly warnings: readonly string[];
+  readonly providerWarnings: readonly string[];
 }
 
 export interface ExecutionEnvironment {
   doctor(profile: unknown): EnvironmentCapabilityReport;
   readonly runWithProfileSync?: (profile: unknown, command: EnvironmentCommand) => EnvironmentRunResult;
+  /** Returns the provider process path, or null when the backend cannot isolate it. */
+  readonly providerProcessRunner?: (profile: unknown, provider: "codex" | "claude") => EngineProcessRunner | null;
 }
 
 export interface EnvironmentCommand {
@@ -66,6 +73,7 @@ export class LocalIsolatedExecutionEnvironment implements ExecutionEnvironment {
     const view = profile as EnvironmentProfileView;
     const capabilities = new Set<EnvironmentCapability>();
     const warnings: string[] = [];
+    const providerWarnings: string[] = ["The local backend does not execute Codex/Claude inside an isolated provider boundary."];
 
     if (view.kind !== "isolated") {
       warnings.push("Local isolated backend only supports isolated profiles for autonomous writers.");
@@ -113,9 +121,11 @@ export class LocalIsolatedExecutionEnvironment implements ExecutionEnvironment {
       requestedCapabilities: requiredCapabilities,
       profileSha256: sha256(canonicalJson(profile as JsonValue)),
       supported: view.kind === "isolated" && missingCapabilities.length === 0,
+      providerSupported: false,
       capabilities: [...capabilities].sort(),
       missingCapabilities,
-      warnings
+      warnings,
+      providerWarnings
     };
   }
 
@@ -154,6 +164,7 @@ export class DockerExecutionEnvironment implements ExecutionEnvironment {
     const base = reportBase(profile, view, "docker", "1.0.0", "os-isolated");
     const required = requestedCapabilities(view);
     const warnings: string[] = [];
+    const providerWarnings: string[] = [];
 
     if (view.kind !== "isolated") {
       warnings.push("DockerExecutionEnvironment requires an isolated profile.");
@@ -161,20 +172,33 @@ export class DockerExecutionEnvironment implements ExecutionEnvironment {
     if (view.backend?.type !== "docker") {
       warnings.push("The isolated profile does not declare a pinned Docker backend.");
     }
+    if (view.providerExecution?.mode !== "isolated-container") {
+      providerWarnings.push("Docker provider execution requires an explicit isolated-container provider runner.");
+    } else {
+      // The current Docker implementation routes repository-owned commands,
+      // but the Codex/Claude adapters still spawn on the host. Do not promote
+      // this backend until the provider runner itself is wired and probed.
+      providerWarnings.push("Docker provider execution is not wired to the Codex/Claude adapters.");
+    }
 
     const probe = view.kind === "isolated" && view.backend?.type === "docker"
       ? probeDocker(view)
       : { ok: false, warnings: [] as string[] };
     warnings.push(...probe.warnings);
-    const capabilities = probe.ok && warnings.length === 0 ? required : [];
+    // The generic Docker probe proves only repository-command isolation. The
+    // provider capability stays absent until an actual provider runner is wired.
+    const repositoryCapabilities = required.filter((capability) => capability !== "provider-execution-isolated");
+    const capabilities = probe.ok && warnings.length === 0 ? repositoryCapabilities : [];
 
     return {
       ...base,
       supported: view.kind === "isolated" && probe.ok && warnings.length === 0,
+      providerSupported: false,
       requestedCapabilities: required,
       capabilities,
-      missingCapabilities: required.filter((capability) => !capabilities.includes(capability)),
-      warnings
+      missingCapabilities: repositoryCapabilities.filter((capability) => !capabilities.includes(capability)),
+      warnings,
+      providerWarnings
     };
   }
 
@@ -204,6 +228,7 @@ export class FakeExecutionEnvironment implements ExecutionEnvironment {
     const view = profile as EnvironmentProfileView;
     const capabilities = new Set<EnvironmentCapability>();
     const warnings: string[] = [];
+    const providerWarnings: string[] = [];
 
     if (view.kind === "isolated" && view.filesystem.hostReadDefault === "deny" && view.filesystem.hostWriteDefault === "deny") {
       capabilities.add("filesystem-restricted");
@@ -219,6 +244,15 @@ export class FakeExecutionEnvironment implements ExecutionEnvironment {
 
     if (view.network.adapterControlPlane === "provider-only") {
       capabilities.add("network-provider-only-adapter-control-plane");
+    }
+
+    // This is useful only for deterministic contract tests. The fake backend
+    // must remain visibly simulated and can never satisfy the public release
+    // gate's os-isolated boundary check.
+    if (view.providerExecution?.mode === "simulated") {
+      capabilities.add("provider-execution-isolated");
+    } else {
+      providerWarnings.push("Fake execution requires providerExecution.mode=simulated for the provider contract test.");
     }
 
     if (!view.environment.inheritByDefault) {
@@ -250,19 +284,24 @@ export class FakeExecutionEnvironment implements ExecutionEnvironment {
       requestedCapabilities: requiredCapabilities,
       profileSha256: sha256(canonicalJson(profile as JsonValue)),
       supported: missingCapabilities.length === 0 && view.kind === "isolated",
+      providerSupported: view.kind === "isolated" && view.providerExecution?.mode === "simulated",
       capabilities: [...capabilities].sort(),
       missingCapabilities,
-      warnings
+      warnings,
+      providerWarnings
     };
+  }
+
+  providerProcessRunner(profile: unknown, _provider: "codex" | "claude"): EngineProcessRunner | null {
+    const report = this.doctor(profile);
+    return report.providerSupported ? localEngineProcessRunner : null;
   }
 }
 
-// network-provider-only-adapter-control-plane is intentionally NOT required here.
-// adapterControlPlane has been a required schema field since execution-environment
-// v1 but was never read by either backend, so no existing profile or consumer has
-// ever had to satisfy it. Adding it to requiredCapabilities now would silently flip
-// `supported` from true to false for those profiles. Promote it once policy owners
-// decide that is the intended compatibility break.
+// These are requirements for an autonomous isolated writer, not merely for a
+// repository-owned quality gate. In particular, a provider CLI that is still
+// spawned by the host process cannot be treated as isolated just because its
+// worktree and gates are isolated.
 const requiredCapabilities: readonly EnvironmentCapability[] = [
   "filesystem-restricted",
   "worktree-write-mount",
@@ -290,6 +329,9 @@ interface EnvironmentProfileView {
     readonly type: "docker";
     readonly image: string;
     readonly imageDigest: string;
+  };
+  readonly providerExecution?: {
+    readonly mode: "simulated" | "isolated-container" | "host-process";
   };
   readonly filesystem: {
     readonly hostReadDefault: "deny" | "allow";
@@ -338,6 +380,7 @@ function requestedCapabilities(view: EnvironmentProfileView): readonly Environme
   if (view.filesystem.hostReadDefault === "deny" && view.filesystem.hostWriteDefault === "deny") capabilities.add("filesystem-restricted");
   if (view.filesystem.mounts.some((mount) => mount.purpose === "worktree" && mount.access === "read-write")) capabilities.add("worktree-write-mount");
   if (view.network.repositoryProcesses === "deny") capabilities.add("network-deny-repository-processes");
+  if (view.kind === "isolated") capabilities.add("provider-execution-isolated");
   if (!view.environment.inheritByDefault) capabilities.add("environment-scrubbed");
   if (view.limits.maximumProcesses > 0) capabilities.add("process-limits");
   if (view.limits.maximumOutputBytes > 0) capabilities.add("output-limits");

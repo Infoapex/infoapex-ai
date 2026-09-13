@@ -6,6 +6,7 @@ import { createTaskWorktree } from "../git/worktree.js";
 import { resolveQualityGate } from "../runner/quality-gate-config.js";
 import { runQualityGateSync, type QualityGateResult } from "../runner/quality-gate.js";
 import type { EngineUsage } from "../engines/engine-event.js";
+import type { EngineProcessRunner } from "../engines/process-runner.js";
 import type { AgentExecutionResult } from "../engines/fake-engine.js";
 import { buildRepairPrompt } from "./build-repair-prompt.js";
 import type { RepairCycleExecutionContext, RepairCycleExecutionResult, RepairCycleExecutor, RepairTaskCycleOutcome } from "./repair-cycle.js";
@@ -46,6 +47,8 @@ export interface RealEngineRepairExecutorOptions {
   readonly reviewer: (context: { readonly runId: string; readonly graphVersion: number; readonly taskCommits: Readonly<Record<string, string>> }) => import("../review/independent-review.js").IndependentReviewResult;
   readonly evidenceRoot?: string;
   readonly now?: () => string;
+  /** null explicitly blocks repair when the provider boundary is unavailable. */
+  readonly processRunner?: EngineProcessRunner | null;
 }
 
 /**
@@ -116,6 +119,18 @@ function executeOneRepairTask(input: {
   const { task, options } = input;
   const evidenceRoot = options.evidenceRoot ?? join(options.stateRoot, "runs", options.runId, "repairs", task.id);
   mkdirSync(evidenceRoot, { recursive: true });
+
+  if (options.processRunner === null) {
+    return {
+      taskId: task.id,
+      outcome: "BLOCKED",
+      commit: null,
+      evidenceRef: writeOutcomeEvidence(evidenceRoot, input.cycle, {
+        stage: "provider-boundary",
+        findings: ["The configured execution environment does not provide an isolated repair process runner."]
+      })
+    };
+  }
 
   const promptResult = buildRepairPrompt({ task, findings: input.findings });
   writeFileSync(join(evidenceRoot, `cycle-${input.cycle}-prompt.txt`), promptResult.prompt, "utf8");

@@ -24,7 +24,8 @@ export function createCodexRepairExecutor(options: CreateCodexRepairExecutorOpti
   const adapter = new CodexCliAdapter(
     codexConfig({
       ...codexAdapterConfigFromProject(options.projectConfig ?? null),
-      ...options.adapterConfig
+      ...options.adapterConfig,
+      ...(options.processRunner ? { processRunner: options.processRunner } : {})
     }),
     registry
   );

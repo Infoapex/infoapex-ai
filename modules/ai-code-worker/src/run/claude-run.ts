@@ -30,7 +30,7 @@ import { resolveQualityGate } from "../runner/quality-gate-config.js";
 import { runQualityGateSync, toEvidenceCommand, type QualityGateResult } from "../runner/quality-gate.js";
 import { buildCoverageReview } from "../review/coverage-review.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
-import { resolveExecutionEnvironment, type EnvironmentCapabilityReport } from "../execution/environment.js";
+import { resolveExecutionEnvironment, type EnvironmentCapabilityReport, type ExecutionEnvironment } from "../execution/environment.js";
 import { buildTaskInputSnapshot, type SnapshotManifest } from "../snapshots/task-input-snapshot.js";
 import { buildSemanticTaskInputs, type SemanticTaskInputs } from "../snapshots/semantic-task-inputs.js";
 import { runIndependentReviewAndRepair, type IndependentReviewer } from "./independent-review-repair.js";
@@ -61,6 +61,9 @@ export interface ClaudeRunOptions {
    *  (block immediately on review failure) is unchanged when no provider
    *  is given. */
   readonly independentReview?: ClaudeIndependentReviewIntegration;
+  /** Explicit dependency injection for deterministic contract tests. Production
+   * callers must use the resolved, configured execution backend. */
+  readonly executionEnvironment?: ExecutionEnvironment;
 }
 
 export interface ClaudeIndependentReviewIntegration {
@@ -131,7 +134,7 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
   let environmentReport: ReturnType<ReturnType<typeof resolveExecutionEnvironment>["doctor"]>;
   try {
     executionProfile = loadExecutionProfile(compile.repository.ok ? compile.repository.worktreeRoot : options.repositoryPath);
-    executionEnvironment = resolveExecutionEnvironment(executionProfile, registry);
+    executionEnvironment = options.executionEnvironment ?? resolveExecutionEnvironment(executionProfile, registry);
     environmentReport = executionEnvironment.doctor(executionProfile);
   } catch {
     return blockRunningRun({
@@ -146,8 +149,8 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
       now: options.now ?? new Date().toISOString()
     });
   }
-  if (!environmentReport.supported) {
-    const detail = environmentReport.warnings.join(" ") || environmentReport.missingCapabilities.join(", ");
+  if (!environmentReport.supported || !environmentReport.providerSupported) {
+    const detail = [...environmentReport.warnings, ...environmentReport.providerWarnings].join(" ") || environmentReport.missingCapabilities.join(", ");
     return blockRunningRun({
       compile,
       eventLog,
@@ -161,10 +164,26 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
     });
   }
 
+  const providerProcessRunner = executionEnvironment.providerProcessRunner?.(executionProfile, "claude") ?? null;
+  if (!providerProcessRunner) {
+    return blockRunningRun({
+      compile,
+      eventLog,
+      code: "ENVIRONMENT_UNAVAILABLE",
+      message: "The configured execution environment does not provide an isolated Claude process runner.",
+      executedTasks,
+      taskCommits,
+      gateResults,
+      usageTotals,
+      now: options.now ?? new Date().toISOString()
+    });
+  }
+
   const adapter = new ClaudeCliAdapter(
     claudeConfig({
       ...claudeAdapterConfigFromProject(projectConfig),
-      ...options.adapterConfig
+      ...options.adapterConfig,
+      processRunner: providerProcessRunner
     }),
     registry
   );
@@ -336,7 +355,8 @@ export async function runClaude(options: ClaudeRunOptions): Promise<ClaudeRunRep
         }),
         startedAt: timestamp
       },
-      claudeOverrides: options.adapterConfig
+      claudeOverrides: options.adapterConfig,
+      providerProcessRunner: (candidate) => executionEnvironment.providerProcessRunner?.(executionProfile, candidate.engine) ?? null
     });
     const execution = taskExecution.execution;
     const activeEngine = taskExecution.candidate.engine;

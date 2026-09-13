@@ -1,10 +1,11 @@
-import { spawnSync } from "node:child_process";
+import { type SpawnSyncReturns } from "node:child_process";
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import type { AgentExecutionResult } from "./fake-engine.js";
 import { createEngineEvent, validateEngineEventStream, type EngineEvent, type EngineUsage } from "./engine-event.js";
-import { spawnBuffered, type BufferedProcessResult } from "./spawn-buffered.js";
+import { type BufferedProcessResult } from "./spawn-buffered.js";
 import { needsShellWrapper } from "./spawn-shell.js";
+import { localEngineProcessRunner, type EngineProcessRunner } from "./process-runner.js";
 import { versionMatchesAny } from "./version-match.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
 import { discoverEngineExecutable } from "./discover-cli.js";
@@ -31,6 +32,8 @@ export interface CodexCliAdapterConfig {
   /** Consecutive identical semantic actions allowed before loop protection stops the CLI. */
   readonly maximumRepeatedProgressEvents?: number;
   readonly maximumOutputBytes?: number;
+  /** Injected by an execution backend; omitted only for local/simulation paths. */
+  readonly processRunner?: EngineProcessRunner;
 }
 
 export interface CodexDoctorReport {
@@ -83,6 +86,7 @@ export class CodexCliAdapter {
   private readonly maximumRuntimeMs: number;
   private readonly maximumRepeatedProgressEvents: number;
   private readonly maximumOutputBytes: number;
+  private readonly processRunner: EngineProcessRunner;
 
   constructor(
     private readonly config: CodexCliAdapterConfig,
@@ -104,15 +108,13 @@ export class CodexCliAdapter {
     // confirmed live (spawnSync's maxBuffer growing the visible failure identically at
     // both a 20-minute and a 35-minute timeoutMs pointed at the same underlying cause).
     this.maximumOutputBytes = config.maximumOutputBytes ?? 20 * 1024 * 1024;
+    this.processRunner = config.processRunner ?? localEngineProcessRunner;
   }
 
   doctor(): CodexDoctorReport {
     const findings: CodexFinding[] = [];
-    const versionOutput = spawnSync(this.executable, [...this.baseArgs, "--version"], {
-      encoding: "utf8",
-      timeout: 10_000,
-      windowsHide: true,
-      shell: needsShellWrapper(this.executable)
+    const versionOutput = this.processRunner.runSync(this.executable, [...this.baseArgs, "--version"], {
+      cwd: process.cwd(), timeoutMs: 10_000, maximumOutputBytes: 1_048_576, shell: needsShellWrapper(this.executable)
     });
     const version = versionOutput.status === 0 ? versionOutput.stdout.trim() || versionOutput.stderr.trim() : null;
     const parsedVersion = version ? parseCodexVersion(version) : null;
@@ -219,13 +221,11 @@ export class CodexCliAdapter {
       payload: { sessionId: request.sessionId },
       registry: this.registry
     });
-    const child = spawnSync(invocation.executable, invocation.args, {
+    const child = this.processRunner.runSync(invocation.executable, invocation.args, {
       cwd: request.worktreePath,
       input: invocation.stdin,
-      encoding: "utf8",
-      maxBuffer: this.maximumOutputBytes,
-      timeout: this.timeoutMs,
-      windowsHide: true,
+      timeoutMs: this.timeoutMs,
+      maximumOutputBytes: this.maximumOutputBytes,
       shell: needsShellWrapper(invocation.executable)
     });
     const result = readAgentResult(child, request, this.registry) ?? failedResult(request, childOutputMessage(child));
@@ -283,7 +283,7 @@ export class CodexCliAdapter {
       payload: { sessionId: request.sessionId },
       registry: this.registry
     });
-    const child = await spawnBuffered(invocation.executable, invocation.args, {
+    const child = await this.processRunner.runAsync(invocation.executable, invocation.args, {
       cwd: request.worktreePath,
       input: invocation.stdin,
       maximumOutputBytes: this.maximumOutputBytes,
@@ -321,11 +321,8 @@ export class CodexCliAdapter {
   }
 
   private smokeTest(findings: CodexFinding[]): "PASS" | "BLOCKED" {
-    const smoke = spawnSync(this.executable, [...this.baseArgs, "exec", "--help"], {
-      encoding: "utf8",
-      timeout: 10_000,
-      windowsHide: true,
-      shell: needsShellWrapper(this.executable)
+    const smoke = this.processRunner.runSync(this.executable, [...this.baseArgs, "exec", "--help"], {
+      cwd: process.cwd(), timeoutMs: 10_000, maximumOutputBytes: 1_048_576, shell: needsShellWrapper(this.executable)
     });
     const combined = `${smoke.stdout}\n${smoke.stderr}`;
     const missing = REQUIRED_HELP_CAPABILITIES.filter((capability) => !combined.includes(capability));
@@ -384,7 +381,7 @@ interface CodexJsonlEvent {
 }
 
 function readAgentResult(
-  child: ReturnType<typeof spawnSync> | BufferedProcessResult,
+  child: SpawnSyncReturns<string> | BufferedProcessResult,
   request: CodexStartRequest,
   registry: SchemaRegistry
 ): AgentExecutionResult | null {
@@ -459,7 +456,7 @@ function failedResult(request: CodexStartRequest, message: string): AgentExecuti
   };
 }
 
-function childOutputMessage(child: ReturnType<typeof spawnSync> | BufferedProcessResult): string {
+function childOutputMessage(child: SpawnSyncReturns<string> | BufferedProcessResult): string {
   // Provider output is private evidence. It can contain source paths, prompt
   // fragments, tool arguments, or a secret echoed by a failed command. Never
   // propagate it through the public worker/root/benchmark finding chain.
@@ -505,7 +502,7 @@ export function classifyCodexProgressLine(stream: "stdout" | "stderr", line: str
   }
 }
 
-function childTimedOut(child: ReturnType<typeof spawnSync> | BufferedProcessResult): boolean {
+function childTimedOut(child: SpawnSyncReturns<string> | BufferedProcessResult): boolean {
   const error = child.error as (Error & { readonly code?: string }) | undefined;
   return ("timedOut" in child && child.timedOut === true) || error?.code === "ETIMEDOUT";
 }

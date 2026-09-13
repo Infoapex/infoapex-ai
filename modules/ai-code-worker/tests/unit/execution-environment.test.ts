@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { DockerExecutionEnvironment, FakeExecutionEnvironment, LocalIsolatedExecutionEnvironment } from "../../src/execution/environment.js";
+import { DockerExecutionEnvironment, FakeExecutionEnvironment, LocalIsolatedExecutionEnvironment, type ExecutionEnvironment } from "../../src/execution/environment.js";
 import { canonicalJson, sha256 } from "../../src/manifest/normalize.js";
 import type { JsonValue } from "../../src/schema/json-schema.js";
 
@@ -17,6 +17,9 @@ describe("fake execution environment", () => {
     assert.equal(report.missingCapabilities.length, 0);
     assert.ok(report.capabilities.includes("network-deny-repository-processes"));
     assert.ok(report.capabilities.includes("network-provider-only-adapter-control-plane"));
+    assert.ok(report.capabilities.includes("provider-execution-isolated"));
+    assert.equal(report.providerSupported, true);
+    assert.ok(new FakeExecutionEnvironment().providerProcessRunner?.(profile, "codex"));
   });
 
   it("does not report the adapter control-plane capability when the profile allows it", () => {
@@ -56,6 +59,11 @@ describe("fake execution environment", () => {
     assert.equal(report.securityBoundary, "host-process");
     assert.equal(report.supported, true);
     assert.equal(report.missingCapabilities.length, 0);
+    assert.equal(report.providerSupported, false);
+    assert.ok(report.providerWarnings.some((warning) => warning.includes("provider boundary")));
+    assert.ok(!report.capabilities.includes("provider-execution-isolated"));
+    const environmentContract: ExecutionEnvironment = environment;
+    assert.equal(environmentContract.providerProcessRunner?.(profile, "claude"), undefined);
 
     const result = await environment.run({
       executable: process.execPath,

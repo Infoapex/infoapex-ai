@@ -152,3 +152,24 @@ test("does not fail over when the task itself fails deterministically", async ()
   assert.equal(result.attempts.length, 1);
   assert.equal(result.attempts[0]?.availabilityFailure, false);
 });
+
+test("fails closed before adapter startup when the provider boundary is unavailable", async () => {
+  const result = await executeTaskWithFallback({
+    candidates: [{ engine: "codex", model: null }],
+    projectConfig: null,
+    request: {
+      runId: "run-boundary",
+      taskId: "TASK-3",
+      executionId: "execution-3",
+      sessionId: "session-3",
+      worktreePath: ".",
+      prompt: "Implement the task",
+      startedAt: new Date(0).toISOString()
+    },
+    providerProcessRunner: () => null
+  });
+
+  assert.equal(result.execution.result.status, "FAILED");
+  assert.equal(result.attempts[0]?.availabilityFailure, true);
+  assert.match(result.execution.result.failures[0]?.message ?? "", /execution boundary is unavailable/);
+});

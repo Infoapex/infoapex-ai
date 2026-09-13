@@ -8,6 +8,7 @@ import { writeFakeCodexCli } from "../../src/engines/codex-cli.js";
 import { runCodex } from "../../src/run/codex-run.js";
 import { SchemaRegistry } from "../../src/schema/json-schema.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
+import { FakeExecutionEnvironment } from "../../src/execution/environment.js";
 import type { ContextPackage } from "../../src/context-provider/types.js";
 
 const tempRepos: string[] = [];
@@ -42,6 +43,7 @@ describe("codex run coordinator", () => {
     const cli = fakeCli("0.146.0-alpha.3.1", "src/codex-output.txt");
     const report = await runCodex({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       codexSessionsDir: emptyCodexSessionsDir,
       planPath: "Plan/RUN.md",
       runId: "run-codex",
@@ -71,8 +73,8 @@ describe("codex run coordinator", () => {
     assert.deepEqual(registry.validate("evidence.schema.json", evidence), { valid: true, errors: [] });
     assert.deepEqual(registry.validate("evidence.schema.json", runEvidence), { valid: true, errors: [] });
     assert.equal(evidence.executionEnvironment.profileId, "isolated");
-    assert.equal(evidence.executionEnvironment.backend, "local-isolated");
-    assert.equal(evidence.executionEnvironment.securityBoundary, "host-process");
+    assert.equal(evidence.executionEnvironment.backend, "fake-isolated");
+    assert.equal(evidence.executionEnvironment.securityBoundary, "simulated");
     assert.match(evidence.executionEnvironment.profileSha256, /^[a-f0-9]{64}$/);
     assert.deepEqual(runEvidence.executionEnvironment, evidence.executionEnvironment);
     assert.equal(runReport.status, "DONE");
@@ -93,6 +95,7 @@ describe("codex run coordinator", () => {
 
     const report = await runCodex({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       codexSessionsDir: emptyCodexSessionsDir,
       planPath: "Plan/RUN.md",
       runId: "run-codex-project-config",
@@ -118,6 +121,7 @@ describe("codex run coordinator", () => {
 
     const report = await runCodex({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       codexSessionsDir: emptyCodexSessionsDir,
       planPath: "Plan/RUN.md",
       runId: "run-codex-context",

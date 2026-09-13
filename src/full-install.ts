@@ -295,6 +295,10 @@ function routingPolicy() {
 function executionEnvironmentConfig() {
   return {
     schemaVersion: "1.0", profileId: "isolated", kind: "isolated",
+    // The default profile is intentionally simulation-only until a provider
+    // runner is provisioned inside the declared OS-isolated backend. Real
+    // Codex/Claude runs fail closed rather than silently spawning on the host.
+    providerExecution: { mode: "simulated" },
     filesystem: {
       hostReadDefault: "deny", hostWriteDefault: "deny",
       mounts: [

@@ -87,6 +87,7 @@ function runSmoke(task) {
   const executable = fixture ? createFixtureExecutable(task) : null;
   const doctorArgs = [workerCli, "doctor", "--repo", repository, "--engine", task.engine, "--json"];
   const runArgs = [workerCli, "run", "--repo", repository, "--plan", "Plan/P2-A.md", "--run-id", `p2-a-${task.engine}-${live ? "live" : "fixture"}`, "--engine", task.engine, "--json"];
+  if (fixture) runArgs.push("--execution-backend", "fake");
   if (task.engine === "codex") {
     doctorArgs.push("--codex-model", provider.model, "--codex-sandbox", "danger-full-access");
     runArgs.push("--codex-model", provider.model, "--codex-sandbox", "danger-full-access");

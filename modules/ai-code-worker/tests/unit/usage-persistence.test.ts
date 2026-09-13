@@ -7,6 +7,7 @@ import { after, describe, it } from "node:test";
 import { runCodex } from "../../src/run/codex-run.js";
 import { taskWorktreeBranch, taskWorktreePath } from "../../src/git/worktree.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
+import { FakeExecutionEnvironment } from "../../src/execution/environment.js";
 
 // Real-world finding (a consumer project's Orders feature pilot, 2026-08-30): a 10-task
 // run hit a Codex rate limit mid-run and the pilot's own report says "the worker retained
@@ -52,6 +53,7 @@ describe("usage persistence: a task's own usage survives even when that task fai
 
     const report = await runCodex({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       planPath: "Plan/RUN.md",
       runId: "run-usage-drop-on-failure",
       now: "2026-08-01T10:00:00Z",
@@ -87,6 +89,7 @@ describe("usage persistence: resuming a run recovers real usage instead of subst
 
     const first = await runCodex({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       planPath: "Plan/RUN.md",
       runId,
       now: "2026-08-01T10:00:00Z",
@@ -112,6 +115,7 @@ describe("usage persistence: resuming a run recovers real usage instead of subst
 
     const resumed = await runCodex({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       planPath: "Plan/RUN.md",
       runId,
       now: "2026-08-01T10:05:00Z",

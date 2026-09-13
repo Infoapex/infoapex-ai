@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { spawnSync, type SpawnSyncReturns } from "node:child_process";
+import { type SpawnSyncReturns } from "node:child_process";
 import { candidateAgentResultObjects } from "../engines/claude-cli.js";
 import { lastAgentMessageText, parseAgentResultText } from "../engines/codex-cli.js";
 import { needsShellWrapper } from "../engines/spawn-shell.js";
@@ -8,6 +8,7 @@ import type { IndependentReviewer } from "../run/independent-review-repair.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
 import { buildReviewPrompt, type ReviewPromptTask } from "./build-review-prompt.js";
 import type { IndependentReviewResult } from "./independent-review.js";
+import { localEngineProcessRunner, type EngineProcessRunner } from "../engines/process-runner.js";
 
 export interface IndependentReviewerCliConfig {
   readonly executable?: string;
@@ -15,6 +16,9 @@ export interface IndependentReviewerCliConfig {
   readonly defaultModel?: string | null;
   readonly timeoutMs?: number;
   readonly maximumOutputBytes?: number;
+  /** Injected by an execution backend; omitted only for direct test fixtures. */
+  /** null explicitly means the configured production boundary is unavailable. */
+  readonly processRunner?: EngineProcessRunner | null;
 }
 
 export interface CreateIndependentReviewerOptions {
@@ -54,11 +58,15 @@ export function createClaudeIndependentReviewer(options: CreateIndependentReview
   const baseArgs = config.baseArgs ?? [];
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maximumOutputBytes = config.maximumOutputBytes ?? DEFAULT_MAXIMUM_OUTPUT_BYTES;
+  const processRunner = config.processRunner === null ? null : config.processRunner ?? localEngineProcessRunner;
   const now = options.now ?? (() => new Date().toISOString());
 
   return (context) => {
     const reviewId = `${context.runId}-review-${randomUUID().slice(0, 8)}`;
     const createdAt = now();
+    if (!processRunner) {
+      return engineFailureResult(context.runId, reviewId, context.graphVersion, createdAt, "claude", "The configured execution environment does not provide an isolated Claude reviewer process runner.");
+    }
     const diffsByTask = buildDiffsByTask(options.repositoryPath, options.baseCommit, context.taskCommits, options.tasks);
     const prompt = buildReviewPrompt({
       runId: context.runId,
@@ -94,13 +102,11 @@ export function createClaudeIndependentReviewer(options: CreateIndependentReview
       args.push("--model", config.defaultModel);
     }
 
-    const child = spawnSync(executable, args, {
+    const child = processRunner.runSync(executable, args, {
       cwd: options.repositoryPath,
       input: prompt,
-      encoding: "utf8",
-      maxBuffer: maximumOutputBytes,
-      timeout: timeoutMs,
-      windowsHide: true,
+      maximumOutputBytes,
+      timeoutMs,
       shell: needsShellWrapper(executable)
     });
 
@@ -115,11 +121,15 @@ export function createCodexIndependentReviewer(options: CreateIndependentReviewe
   const baseArgs = config.baseArgs ?? [];
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maximumOutputBytes = config.maximumOutputBytes ?? DEFAULT_MAXIMUM_OUTPUT_BYTES;
+  const processRunner = config.processRunner === null ? null : config.processRunner ?? localEngineProcessRunner;
   const now = options.now ?? (() => new Date().toISOString());
 
   return (context) => {
     const reviewId = `${context.runId}-review-${randomUUID().slice(0, 8)}`;
     const createdAt = now();
+    if (!processRunner) {
+      return engineFailureResult(context.runId, reviewId, context.graphVersion, createdAt, "codex", "The configured execution environment does not provide an isolated Codex reviewer process runner.");
+    }
     const diffsByTask = buildDiffsByTask(options.repositoryPath, options.baseCommit, context.taskCommits, options.tasks);
     const prompt = buildReviewPrompt({
       runId: context.runId,
@@ -150,13 +160,11 @@ export function createCodexIndependentReviewer(options: CreateIndependentReviewe
       args.push("--model", config.defaultModel);
     }
 
-    const child = spawnSync(executable, args, {
+    const child = processRunner.runSync(executable, args, {
       cwd: options.repositoryPath,
       input: prompt,
-      encoding: "utf8",
-      maxBuffer: maximumOutputBytes,
-      timeout: timeoutMs,
-      windowsHide: true,
+      maximumOutputBytes,
+      timeoutMs,
       shell: needsShellWrapper(executable)
     });
 

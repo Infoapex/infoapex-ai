@@ -8,6 +8,7 @@ import { writeFakeClaudeCli } from "../../src/engines/claude-cli.js";
 import { runClaude } from "../../src/run/claude-run.js";
 import { SchemaRegistry } from "../../src/schema/json-schema.js";
 import { resolveStateRoot } from "../../src/state/state-root.js";
+import { FakeExecutionEnvironment } from "../../src/execution/environment.js";
 
 const tempRepos: string[] = [];
 const stateRoots: string[] = [];
@@ -35,6 +36,7 @@ describe("claude run coordinator", () => {
     const cli = fakeCli("2.1.177", "src/claude-output.txt");
     const report = await runClaude({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       planPath: "Plan/RUN.md",
       runId: "run-claude",
       now: "2026-08-01T10:00:00Z",
@@ -64,8 +66,8 @@ describe("claude run coordinator", () => {
     assert.deepEqual(registry.validate("evidence.schema.json", evidence), { valid: true, errors: [] });
     assert.deepEqual(registry.validate("evidence.schema.json", runEvidence), { valid: true, errors: [] });
     assert.equal(evidence.executionEnvironment.profileId, "isolated");
-    assert.equal(evidence.executionEnvironment.backend, "local-isolated");
-    assert.equal(evidence.executionEnvironment.securityBoundary, "host-process");
+    assert.equal(evidence.executionEnvironment.backend, "fake-isolated");
+    assert.equal(evidence.executionEnvironment.securityBoundary, "simulated");
     assert.match(evidence.executionEnvironment.profileSha256, /^[a-f0-9]{64}$/);
     assert.deepEqual(runEvidence.executionEnvironment, evidence.executionEnvironment);
     assert.equal(runReport.status, "DONE");
@@ -87,6 +89,7 @@ describe("claude run coordinator", () => {
     const beforeHead = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
     const report = await runClaude({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       planPath: "Plan/RUN.md",
       runId: "run-claude-missing",
       now: "2026-08-01T10:00:00Z",
@@ -116,12 +119,31 @@ describe("claude run coordinator", () => {
 
     const report = await runClaude({
       repositoryPath: repo,
+      executionEnvironment: new FakeExecutionEnvironment(),
       planPath: "Plan/RUN.md",
       runId: "run-claude-environment-blocked",
       now: "2026-08-01T10:00:00Z",
       adapterConfig: {
         executable: join(tmpdir(), "no-such-claude-binary-environment-gate"),
         testedVersionRanges: ["2.1.x"],
+        requiresCapabilitySmokeTest: true
+      }
+    });
+
+    assert.equal(report.status, "BLOCKED");
+    assert.equal(report.findings[0]?.code, "ENVIRONMENT_UNAVAILABLE");
+    assert.deepEqual(report.executedTasks, []);
+  });
+
+  it("blocks a real provider before adapter doctor when the local backend cannot isolate it", async () => {
+    const repo = createGitRepository();
+    const report = await runClaude({
+      repositoryPath: repo,
+      planPath: "Plan/RUN.md",
+      runId: "run-claude-provider-boundary-blocked",
+      now: "2026-08-01T10:00:00Z",
+      adapterConfig: {
+        executable: join(tmpdir(), "provider-must-not-be-started-xyz"),
         requiresCapabilitySmokeTest: true
       }
     });
