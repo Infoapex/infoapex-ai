@@ -234,6 +234,7 @@ if (command === "benchmark") {
   const codexSandboxMode = readOption("--codex-sandbox") ?? undefined;
   const claudeBareMode = args.includes("--claude-bare") ? true : undefined;
   const claudeDangerouslySkipPermissions = args.includes("--claude-dangerously-skip-permissions") ? true : undefined;
+  const executionProfilePath = readOption("--execution-profile") ?? undefined;
   const asJson = args.includes("--json");
 
   if (engineOption && engineOption !== "fake" && engineOption !== "codex" && engineOption !== "claude") {
@@ -250,7 +251,8 @@ if (command === "benchmark") {
       claudeBareMode,
       claudeDangerouslySkipPermissions,
       claudePermissionMode: isClaudePermissionMode(claudePermissionMode) ? claudePermissionMode : undefined,
-      codexSandboxMode: isCodexSandboxMode(codexSandboxMode) ? codexSandboxMode : undefined
+      codexSandboxMode: isCodexSandboxMode(codexSandboxMode) ? codexSandboxMode : undefined,
+      executionProfilePath
     });
 
     if (asJson) {

@@ -13,6 +13,7 @@ const decisionRelative = option("--decision") ?? "validation/p6/solo-go-no-go.js
 const zipRelative = option("--zip") ?? `dist-release/infoapex-ai-${candidate}.zip`;
 const sbomRelative = option("--sbom") ?? `dist-release/infoapex-ai-${candidate}.cdx.json`;
 const policyManifestRelative = option("--policy-manifest") ?? `dist-release/infoapex-ai-${candidate}.policy.json`;
+const executionProfilePath = option("--execution-profile");
 const requireTag = !process.argv.includes("--skip-tag-check");
 const checks = [];
 
@@ -85,7 +86,7 @@ const workflowValid = releaseWorkflow.includes("actions/attest@v4") &&
   releaseWorkflow.includes("public-release-preflight");
 check("publication-workflow", workflowValid, "the public workflow must attest, verify the tag, require public visibility, and call this guard");
 
-const isolation = runIsolationPreflight();
+const isolation = runIsolationPreflight(executionProfilePath);
 check(
   "isolation-backend",
   isolation?.status === "PASS" && isolation.code === "ISOLATION_BACKEND_PROVEN",
@@ -128,9 +129,11 @@ function hashCommittedFile(commit, path) {
   try { return createHash("sha256").update(execFileSync("git", ["show", `${commit}:${path}`], { cwd: root })).digest("hex"); }
   catch { return null; }
 }
-function runIsolationPreflight() {
+function runIsolationPreflight(profilePath) {
   try {
-    const output = execFileSync(process.execPath, [join(root, "scripts/isolation-preflight.mjs")], {
+    const isolationArgs = [join(root, "scripts/isolation-preflight.mjs")];
+    if (profilePath) isolationArgs.push("--execution-profile", profilePath);
+    const output = execFileSync(process.execPath, isolationArgs, {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]

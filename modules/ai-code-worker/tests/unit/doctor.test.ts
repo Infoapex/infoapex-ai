@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { after, describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 import { runDoctor } from "../../src/doctor/doctor.js";
 import { gitPreflight } from "../../src/git/preflight.js";
 
@@ -38,7 +39,7 @@ describe("doctor preflight", () => {
 
   it("exposes doctor as a JSON CLI command", () => {
     const repo = createGitRepository();
-    const output = execFileSync(process.execPath, [resolve("dist/src/cli.js"), "doctor", "--repo", repo, "--json"], {
+    const output = execFileSync(process.execPath, [join(moduleRoot(), "dist/src/cli.js"), "doctor", "--repo", repo, "--json"], {
       cwd: tmpdir(),
       encoding: "utf8"
     });
@@ -53,6 +54,36 @@ describe("doctor preflight", () => {
 
     assert.equal(report.engineDoctor, null);
     assert.equal(report.status, "PASS");
+  });
+
+  it("uses a valid operator-supplied profile outside the repository without mutating the repository", () => {
+    const repo = createGitRepository();
+    const profileDirectory = mkdtempSync(join(tmpdir(), "aicw-external-profile-"));
+    tempRepos.push(profileDirectory);
+    const profilePath = join(profileDirectory, "execution-profile.json");
+    const profile = JSON.parse(readFileSync(join(moduleRoot(), "templates/project/.ai-code-worker/execution-environment.example.json"), "utf8")) as Record<string, unknown>;
+    profile.profileId = "operator-external";
+    writeFileSync(profilePath, JSON.stringify(profile), "utf8");
+
+    const report = runDoctor({ repositoryPath: repo, executionProfilePath: profilePath });
+
+    assert.equal(report.status, "PASS");
+    assert.equal(report.executionEnvironment?.profileId, "operator-external");
+    assert.equal(report.findings.length, 0);
+  });
+
+  it("fails closed for a missing or malformed external profile", () => {
+    const repo = createGitRepository();
+    const missing = runDoctor({ repositoryPath: repo, executionProfilePath: join(repo, "missing-profile.json") });
+    assert.equal(missing.status, "BLOCKED");
+    assert.ok(missing.findings.some((finding) => finding.code === "EXECUTION_PROFILE_INVALID"));
+
+    const malformedPath = join(repo, "malformed-profile.json");
+    writeFileSync(malformedPath, "{ invalid", "utf8");
+    const malformed = runDoctor({ repositoryPath: repo, executionProfilePath: malformedPath });
+    assert.equal(malformed.status, "BLOCKED");
+    assert.ok(malformed.findings.some((finding) => finding.code === "EXECUTION_PROFILE_INVALID"));
+    assert.equal(malformed.executionEnvironment, null);
   });
 
   it("wires --engine claude to the Claude Code CLI doctor check", () => {
@@ -87,6 +118,10 @@ describe("doctor preflight", () => {
 function isOnPath(executable: string): boolean {
   const probe = spawnSync(executable, ["--version"], { encoding: "utf8", timeout: 10_000, windowsHide: true });
   return probe.error === undefined;
+}
+
+function moduleRoot(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 }
 
 function createGitRepository(): string {

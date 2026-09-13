@@ -63,10 +63,21 @@ node modules/ai-code-worker/dist/src/cli.js doctor --repo <repo> --engine fake -
 node scripts/isolation-preflight.mjs
 ```
 
-Pentru a instala profilul fără editare manuală în repository, folosește opțiunea
-`--execution-profile <file>` a comenzii `init --full`. Fișierul este validat prin
-schema workerului înainte de orice scriere; instalarea se oprește fail-closed dacă
-profilul este invalid.
+The isolation checks can also consume an operator-managed profile from outside
+the consumer repository. This is a read-only verification path: it does not
+copy the profile, persist credentials, modify the repository, or start a
+provider request.
+
+```text
+node modules/ai-code-worker/dist/src/cli.js doctor --repo <repo> --engine fake --execution-profile <profile.json> --json
+node scripts/isolation-preflight.mjs --execution-profile <profile.json>
+node scripts/public-release-preflight.mjs --candidate v1.0.0 --execution-profile <profile.json>
+```
+
+To install a validated profile into a repository without manual editing, use
+`--execution-profile <file>` with `init --full`. The file is validated against
+the worker schema before any write; installation fails closed when the profile
+is missing, malformed, or a symlink.
 
 The final isolation gate must be `ISOLATION_BACKEND_PROVEN` before a stable
 release can be considered. A profile with only the generic Docker image, a

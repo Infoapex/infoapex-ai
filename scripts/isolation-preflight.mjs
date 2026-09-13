@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 // warnings before a stable release can be published.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workerCli = resolve(root, "modules/ai-code-worker/dist/src/cli.js");
+const executionProfilePath = option("--execution-profile");
 const requiredCapabilities = [
   "filesystem-restricted",
   "worktree-write-mount",
@@ -27,15 +28,23 @@ if (!existsSync(workerCli)) {
   check("worker-doctor", false, "the built ai-code-worker doctor is missing");
 } else {
   try {
-    const output = execFileSync(process.execPath, [workerCli, "doctor", "--repo", root, "--engine", "fake", "--json"], {
+    const doctorArgs = [workerCli, "doctor", "--repo", root, "--engine", "fake", "--json"];
+    if (executionProfilePath) doctorArgs.push("--execution-profile", executionProfilePath);
+    const output = execFileSync(process.execPath, doctorArgs, {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     });
     report = JSON.parse(output);
     check("worker-doctor", report?.status === "PASS", "worker doctor must pass");
-  } catch {
-    check("worker-doctor", false, "worker doctor could not produce a valid report");
+  } catch (error) {
+    const output = error?.stdout?.toString?.() ?? "";
+    try {
+      report = JSON.parse(output);
+      check("worker-doctor", report?.status === "PASS", "worker doctor must pass");
+    } catch {
+      check("worker-doctor", false, "worker doctor could not produce a valid report");
+    }
   }
 }
 
@@ -75,4 +84,9 @@ process.exitCode = passed ? 0 : 2;
 
 function check(id, pass, detail) {
   checks.push({ id, status: pass ? "PASS" : "BLOCKED", detail });
+}
+
+function option(name) {
+  const index = process.argv.indexOf(name);
+  return index < 0 ? null : process.argv[index + 1] ?? null;
 }

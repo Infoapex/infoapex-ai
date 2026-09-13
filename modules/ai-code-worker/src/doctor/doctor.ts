@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadProjectConfig, type ProjectConfig } from "../config/project-config.js";
@@ -20,6 +20,8 @@ export interface DoctorOptions {
   readonly claudeBareMode?: boolean;
   readonly claudeDangerouslySkipPermissions?: boolean;
   readonly codexSandboxMode?: "workspace-write" | "danger-full-access";
+  /** Read an operator-managed profile without writing it into the repository. */
+  readonly executionProfilePath?: string;
 }
 
 export interface DoctorReport {
@@ -61,9 +63,13 @@ export function runDoctor(options: DoctorOptions): DoctorReport {
   }
 
   const config = loadProjectConfig(repository.worktreeRoot);
-  const executionProfile =
-    readOptionalJson(join(repository.worktreeRoot, ".ai-code-worker", "execution-environment.example.json")) ??
-    readOptionalJson(join(packageRoot(), "templates", "project", ".ai-code-worker", "execution-environment.example.json"));
+  const profileRead = options.executionProfilePath !== undefined
+    ? readExecutionProfile(resolve(options.executionProfilePath), true)
+    : readExecutionProfile(join(repository.worktreeRoot, ".ai-code-worker", "execution-environment.example.json"), false);
+  const fallbackProfileRead = !profileRead.present && options.executionProfilePath === undefined
+    ? readExecutionProfile(join(packageRoot(), "templates", "project", ".ai-code-worker", "execution-environment.example.json"), true)
+    : profileRead;
+  const executionProfile = fallbackProfileRead.present && !fallbackProfileRead.error ? fallbackProfileRead.profile : null;
   const maximumParallelWriters = config?.maximumParallelWriters ?? 1;
   const syncRootPolicy = config?.syncRootPolicy ?? { sequentialWriter: "warn", parallelWriters: "block" };
   const stateRoot = resolveStateRoot({
@@ -75,7 +81,15 @@ export function runDoctor(options: DoctorOptions): DoctorReport {
     maximumParallelWriters,
     policy: syncRootPolicy
   });
-  const executionEnvironment = executionProfile ? resolveExecutionEnvironment(executionProfile).doctor(executionProfile) : null;
+  let profileError = fallbackProfileRead.error;
+  let executionEnvironment: EnvironmentCapabilityReport | null = null;
+  if (executionProfile) {
+    try {
+      executionEnvironment = resolveExecutionEnvironment(executionProfile).doctor(executionProfile);
+    } catch (error) {
+      profileError = `Execution profile failed schema validation: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
   const engineDoctor = options.engine === "codex"
     ? new CodexCliAdapter({
         ...defaultCodexConfig(),
@@ -118,7 +132,15 @@ export function runDoctor(options: DoctorOptions): DoctorReport {
     });
   }
 
-  if (!executionEnvironment?.supported) {
+  if (profileError) {
+    findings.push({
+      severity: "blocker",
+      code: "EXECUTION_PROFILE_INVALID",
+      message: profileError
+    });
+  }
+
+  if (!executionEnvironment?.supported && !profileError) {
     findings.push({
       severity: "blocker",
       code: "ENVIRONMENT_UNAVAILABLE",
@@ -203,12 +225,33 @@ function claudeAdapterConfigFromProject(config: ProjectConfig | null): Partial<C
   };
 }
 
-function readOptionalJson(path: string): unknown | null {
+function readExecutionProfile(path: string, required: boolean): {
+  readonly present: boolean;
+  readonly profile: unknown | null;
+  readonly error: string | null;
+} {
   if (!existsSync(path)) {
-    return null;
+    return required
+      ? { present: false, profile: null, error: `Execution profile is missing: ${path}` }
+      : { present: false, profile: null, error: null };
   }
 
-  return JSON.parse(readFileSync(path, "utf8"));
+  try {
+    const stats = lstatSync(path);
+    if (stats.isSymbolicLink()) {
+      return { present: true, profile: null, error: `Execution profile must not be a symlink: ${path}` };
+    }
+    if (!stats.isFile()) {
+      return { present: true, profile: null, error: `Execution profile must be a regular file: ${path}` };
+    }
+    return { present: true, profile: JSON.parse(readFileSync(path, "utf8")), error: null };
+  } catch (error) {
+    return {
+      present: true,
+      profile: null,
+      error: `Execution profile could not be read or parsed: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
 }
 
 function packageRoot(): string {
