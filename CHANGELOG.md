@@ -25,3 +25,6 @@
   workflow validates and attests it separately from the ZIP and SBOM.
 - Stable-release preflight now requires a concrete OS-isolated execution boundary;
   policy-visible isolation warnings can no longer be promoted to `v1.0.0`.
+- Full installs now persist an ownership manifest, and `uninstall --keep-data`
+  removes only unchanged installer-owned integration files while preserving state,
+  evidence, backups, run history, and project bootstrap.
