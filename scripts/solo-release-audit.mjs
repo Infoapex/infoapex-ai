@@ -24,6 +24,7 @@ step("upgrade-rollback-tests", process.execPath, ["--test", "dist/tests/release-
 step("reproducible-release-zip", "npm", ["run", "release:build-zip", "--", "--ref", "HEAD", "--allow-dirty", "--out", zipRelative]);
 step("cyclonedx-sbom", "npm", ["run", "release:sbom", "--", "--out", sbomRelative]);
 step("policy-manifest", "npm", ["run", "release:policy-manifest", "--", "--out", policyManifestRelative]);
+step("npm-package-smoke", "npm", ["run", "release:package-smoke"]);
 step("clean-install-smoke", process.execPath, ["scripts/release-smoke-test.mjs", "--zip", zipRelative]);
 verifyArtifacts();
 

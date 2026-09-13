@@ -15,6 +15,10 @@ node scripts/solo-release-audit.mjs --candidate v1.0.0-rc.1-internal
 The internal candidate uses package version `1.0.0-rc.1-internal`. The stable
 package version `1.0.0` is reserved for the separately guarded public tag.
 
+The audit also installs the npm package into a disposable offline target and exercises
+its root and delegated CLI entry points. This keeps the npm artefact boundary separate
+from the source checkout and the release ZIP clean-install check.
+
 The command never tags, pushes, deploys, publishes, uploads, or changes release-gate
 statuses. Its result is `SOLO_INTERNAL_RC_READY` with `publicationAllowed: false`.
 The maintainer must make an explicit Go/No-Go decision before any public release.

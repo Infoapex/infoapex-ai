@@ -30,3 +30,5 @@
   evidence, backups, run history, and project bootstrap.
 - Full-install writes are now transactional: conflicts or filesystem/control-init
   failures roll back installer-managed files and preserve the consumer's files.
+- The solo RC audit now includes the offline npm-package smoke test as a separate
+  artefact-boundary gate.
