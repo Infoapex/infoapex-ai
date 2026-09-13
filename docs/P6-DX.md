@@ -49,6 +49,10 @@ provider de coding. Dacă verificarea eșuează, comanda returnează `BLOCKED`; 
 un succes intermediar care să ascundă o instalare incompletă. Pentru un target deja
 configurat, `--repair` este necesar înainte de înlocuirea fișierelor managed diferite.
 
+Scrierile full-install sunt tranzacționale: un conflict sau o eroare de filesystem/
+`ai-code-control` declanșează rollback-ul fișierelor managed atinse. Fișierele aplicației,
+datele și directoarele consumatorului nu sunt șterse automat.
+
 `preflight` și `install --check` includ verificările `repository-filesystem-access` și
 `bundle-read-access`. Acestea testează accesul efectiv al utilizatorului curent la
 starea installerului și la runtime-urile modulelor. Installerul nu acordă ACL-uri

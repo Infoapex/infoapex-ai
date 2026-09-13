@@ -191,6 +191,28 @@ test("full CLI install blocks before creating partial bootstrap state", () => {
   }
 });
 
+test("full installer rolls back managed files after a pre-existing conflict", () => {
+  const repository = mkdtempSync(join(tmpdir(), "apex-cli-full-rollback-"));
+  try {
+    mkdirSync(join(repository, ".ai-code-control", "config"), { recursive: true });
+    writeFileSync(join(repository, ".ai-code-control", "config", "code-control.json"), "{\"consumerOwned\":true}\n", "utf8");
+    initializeGit(repository);
+
+    const result = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "generic"]);
+
+    assert.equal(result.status, 2);
+    const body = JSON.parse(result.stdout) as { status: string; findings: readonly string[] };
+    assert.equal(body.status, "BLOCKED");
+    assert.match(body.findings.join(" "), /rolled back/);
+    assert.equal(readFileSync(join(repository, ".ai-code-control", "config", "code-control.json"), "utf8"), "{\"consumerOwned\":true}\n");
+    assert.equal(existsSync(join(repository, ".ai-code-control", "config", "memory-control.json")), false);
+    assert.equal(existsSync(join(repository, ".ai-code-worker")), false);
+    assert.equal(existsSync(join(repository, ".infoapex-ai")), false);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
 test("full init preserves a differing bootstrap until repair is explicit", () => {
   const repository = mkdtempSync(join(tmpdir(), "apex-cli-bootstrap-conflict-"));
   try {

@@ -1,4 +1,4 @@
-import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { accessSync, closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -80,6 +80,24 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   const updated: string[] = [];
   const skipped: string[] = [];
   const findings: string[] = [];
+  const originals = new Map<string, Buffer | null>();
+  const transactionDirectories = [
+    ".infoapex-ai",
+    ".ai-code-control",
+    ".ai-code-control/config",
+    ".ai-code-control/reports",
+    ".ai-code-control/reports/refactor",
+    ".ai-code-control/memory",
+    ".ai-code-control/memory/tasks",
+    ".ai-code-worker",
+    ".ai-code-benchmark",
+    ".ai-code-review",
+    ".ai-code-docs",
+    ".claude",
+    ".codex"
+  ];
+  const initialDirectories = new Map(transactionDirectories.map((value) => [value, existsSync(join(repo, value))]));
+  let rolledBack = false;
   const previousOwned = readPreviousOwnership(repo);
   let executionProfile: Readonly<Record<string, unknown>> | null = null;
   if (!isRealDirectory(repo)) findings.push("Repository root must exist and must not be a symbolic link.");
@@ -101,12 +119,24 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   const writeManaged = (relative: string, value: string): void => {
     const path = installerPath(repo, relative);
     if (!path) { findings.push(`Unsafe installer-owned path '${relative}'.`); return; }
+    captureOriginal(relative, path);
+    if (findings.length > 0 && !originals.has(relative)) return;
     if (!existsSync(path)) {
-      writeText(path, value);
-      created.push(relative);
+      try {
+        writeText(path, value);
+        created.push(relative);
+      } catch (error) {
+        findings.push(`Could not write ${relative}: ${error instanceof Error ? error.message : String(error)}`);
+      }
       return;
     }
-    const current = readFileSync(path, "utf8");
+    let current: string;
+    try {
+      current = readFileSync(path, "utf8");
+    } catch (error) {
+      findings.push(`Could not read ${relative}: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
     if (current === value) {
       skipped.push(relative);
       return;
@@ -115,25 +145,38 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
       findings.push(`${relative} differs from the ${options.profile} full-install profile; rerun with --repair after reviewing it.`);
       return;
     }
-    writeText(path, value);
-    updated.push(relative);
+    try {
+      writeText(path, value);
+      updated.push(relative);
+    } catch (error) {
+      findings.push(`Could not update ${relative}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
   const writeSeed = (relative: string, value: string): void => {
     const path = installerPath(repo, relative);
     if (!path) { findings.push(`Unsafe installer-owned path '${relative}'.`); return; }
+    captureOriginal(relative, path);
+    if (findings.length > 0 && !originals.has(relative)) return;
     if (existsSync(path)) {
       skipped.push(relative);
       return;
     }
-    writeText(path, value);
-    created.push(relative);
+    try {
+      writeText(path, value);
+      created.push(relative);
+    } catch (error) {
+      findings.push(`Could not create ${relative}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
 
   const paths = modulePaths(bundle);
   for (const path of [paths.plannerCli, paths.workerCli, paths.reviewCli, paths.docsCli, paths.benchmarkCli, paths.controlProject, paths.controlMcp]) {
     if (!bundlePath(bundle, relative(bundle, path).replaceAll("\\", "/"))) findings.push(`Unsafe bundle runtime path '${path}'.`);
   }
-  if (findings.length > 0) return { status: "BLOCKED", profile: options.profile, created, updated, skipped, findings };
+  if (findings.length > 0) {
+    rollback();
+    return { status: "BLOCKED", profile: options.profile, created, updated, skipped, findings };
+  }
   writeManaged(".ai-code-control/config/code-control.json", json(controlConfig(repo, options.profile, options.layout)));
   writeManaged(".ai-code-control/config/memory-control.json", json(memoryConfig()));
   writeManaged(".ai-code-control/reports/refactor/current-plan.json", json(refactorPlan(options.profile)));
@@ -165,6 +208,8 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
     contextProvider: { kind: "ai-code-control", mode: "observe" }
   }));
   writeManaged(".infoapex-ai/production-policy.json", json(defaultProductionPolicy()));
+  const gitignorePath = installerPath(repo, ".gitignore");
+  if (gitignorePath) captureOriginal(".gitignore", gitignorePath);
   ensureRuntimeGitignore(repo, created, updated, skipped, findings);
 
   // Build the C# CLI once, then invoke its DLL directly. `dotnet run` in every
@@ -191,6 +236,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
       findings.push("Unsafe installer-owned path '.infoapex-ai/install-manifest.json'.");
     } else {
       try {
+        captureOriginal(".infoapex-ai/install-manifest.json", ownershipPath);
         const manifest: InstallOwnershipManifest = {
           schemaVersion: "1.0",
           installer: "@infoapex/infoapex-ai",
@@ -221,6 +267,8 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
     }
   }
 
+  if (findings.length > 0) rollback();
+
   return {
     status: findings.length === 0 ? "DONE" : "BLOCKED",
     profile: options.profile,
@@ -229,6 +277,57 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
     skipped,
     findings
   };
+  function captureOriginal(relative: string, path: string): void {
+    if (originals.has(relative)) return;
+    try {
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink() || !stat.isFile()) {
+        findings.push(`Installer target '${relative}' must be a regular non-symlink file.`);
+        return;
+      }
+      originals.set(relative, readFileSync(path));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        originals.set(relative, null);
+      } else {
+        findings.push(`Could not snapshot ${relative}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
+  function rollback(): void {
+    if (rolledBack || originals.size === 0) return;
+    rolledBack = true;
+    for (const [relative, original] of [...originals.entries()].reverse()) {
+      const target = installerPath(repo, relative);
+      if (!target) {
+        findings.push(`Rollback refused unsafe installer target '${relative}'.`);
+        continue;
+      }
+      try {
+        if (original === null) {
+          if (existsSync(target) && !lstatSync(target).isSymbolicLink()) unlinkSync(target);
+        } else {
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(target, original);
+        }
+      } catch (error) {
+        findings.push(`Rollback could not restore ${relative}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    created.length = 0;
+    updated.length = 0;
+    for (const relative of [...transactionDirectories].sort((left, right) => right.length - left.length)) {
+      if (initialDirectories.get(relative)) continue;
+      const directory = join(repo, relative);
+      try {
+        if (lstatSync(directory).isDirectory() && readdirSync(directory).length === 0) rmdirSync(directory);
+      } catch {
+        // Empty-directory cleanup is best effort; file rollback remains fail-closed.
+      }
+    }
+    findings.push("Full installation was rolled back after a validation or filesystem failure; no partial managed files were retained.");
+  }
 }
 
 export interface PreflightResult {
@@ -530,18 +629,22 @@ function ensureRuntimeGitignore(repo: string, created: string[], updated: string
   const relativePath = ".gitignore";
   const path = installerPath(repo, relativePath);
   if (!path) { findings.push("Unsafe installer-owned path '.gitignore'."); return; }
-  const marker = "# Infoapex AI local runtime (managed)";
-  const entries = [".ai-code-control/db/", ".ai-code-control/reports/tool.log", ".infoapex-ai/backups/", ".infoapex-ai/diagnostics/", ".infoapex-ai/runs/"];
-  const current = existsSync(path) ? readFileSync(path, "utf8") : "";
-  const missing = entries.filter((entry) => !current.split(/\r?\n/).includes(entry));
-  if (missing.length === 0) {
-    skipped.push(relativePath);
-    return;
+  try {
+    const marker = "# Infoapex AI local runtime (managed)";
+    const entries = [".ai-code-control/db/", ".ai-code-control/reports/tool.log", ".infoapex-ai/backups/", ".infoapex-ai/diagnostics/", ".infoapex-ai/runs/"];
+    const current = existsSync(path) ? readFileSync(path, "utf8") : "";
+    const missing = entries.filter((entry) => !current.split(/\r?\n/).includes(entry));
+    if (missing.length === 0) {
+      skipped.push(relativePath);
+      return;
+    }
+    const prefix = current.length === 0 || current.endsWith("\n") ? current : `${current}\n`;
+    const block = `${prefix.length > 0 ? "\n" : ""}${marker}\n${missing.join("\n")}\n`;
+    writeText(path, `${prefix}${block}`);
+    (current.length === 0 ? created : updated).push(relativePath);
+  } catch (error) {
+    findings.push(`Could not update .gitignore: ${error instanceof Error ? error.message : String(error)}`);
   }
-  const prefix = current.length === 0 || current.endsWith("\n") ? current : `${current}\n`;
-  const block = `${prefix.length > 0 ? "\n" : ""}${marker}\n${missing.join("\n")}\n`;
-  writeText(path, `${prefix}${block}`);
-  (current.length === 0 ? created : updated).push(relativePath);
 }
 function memoryConfig() { return { memory: { enabled: true, store: ".ai-code-control/db/memory.sqlite", root: ".ai-code-control/memory", include: [".ai-code-control/memory/**/*.md", "AGENTS.md", "CLAUDE.md", "TODO.md", ".ai-code-control/reports/refactor/**/*.json", ".ai-code-control/reports/validation/**/*.md"], exclude: ["**/secrets/**", "**/.env", "**/.env.*", "**/*.pem", "**/*.pfx", "**/*password*", "**/*secret*", "**/*token*", "**/appsettings.Production.json"], maxRecallItems: 8, maxBriefingTokens: 3000, briefCommands: null, rawConversationStorage: { enabled: false, reason: "Canonical summaries only; raw conversations can contain sensitive data." } } }; }
 function refactorPlan(profile: InstallProfile) { return { task: "none", language: profile === "dotnet-nextjs" ? "csharp" : "", affectedSymbol: "", allowedFiles: [], forbiddenPaths: ["node_modules/", ".next/", ".ai-code-control/db/"], allowedUntrackedPatterns: [".ai-code-control/memory/"], requiredValidation: ["run-validation"], riskLevel: "low" }; }

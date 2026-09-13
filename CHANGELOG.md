@@ -28,3 +28,5 @@
 - Full installs now persist an ownership manifest, and `uninstall --keep-data`
   removes only unchanged installer-owned integration files while preserving state,
   evidence, backups, run history, and project bootstrap.
+- Full-install writes are now transactional: conflicts or filesystem/control-init
+  failures roll back installer-managed files and preserve the consumer's files.
