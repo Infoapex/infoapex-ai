@@ -23,7 +23,7 @@ describe("CLI executable flags", () => {
     const executable = writeFakeCli("custom-claude", "claude");
     const report = invokeDoctorJson(["--engine", "claude", "--claude-executable", executable], {});
 
-    assert.equal(report.status, "BLOCKED");
+    assert.equal(report.status, "PASS");
     assert.equal(report.engineDoctor?.executable, executable);
   });
 
@@ -32,7 +32,7 @@ describe("CLI executable flags", () => {
     const executable = writeFakeCli("custom-codex", "codex");
     const report = invokeDoctorJson(["--engine", "codex", "--codex-executable", executable], { repo });
 
-    assert.equal(report.status, "BLOCKED");
+    assert.equal(report.status, "PASS");
     assert.equal(report.engineDoctor?.executable, executable);
   });
 

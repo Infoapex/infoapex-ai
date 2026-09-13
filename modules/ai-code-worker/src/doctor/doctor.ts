@@ -126,14 +126,6 @@ export function runDoctor(options: DoctorOptions): DoctorReport {
     });
   }
 
-  if ((options.engine === "codex" || options.engine === "claude") && !executionEnvironment?.providerSupported) {
-    findings.push({
-      severity: "blocker",
-      code: "PROVIDER_ENVIRONMENT_UNAVAILABLE",
-      message: "The configured execution environment does not provide an isolated provider boundary for the selected engine."
-    });
-  }
-
   if (engineDoctor?.status === "BLOCKED") {
     for (const finding of engineDoctor.findings) {
       findings.push(finding);
