@@ -47,6 +47,49 @@
       "properties": {
         "mode": {
           "enum": ["simulated", "isolated-container", "host-process"]
+        },
+        "egressProxy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["networkName", "proxyUrl", "policySha256", "proxyContainer", "proxyImageDigest"],
+          "properties": {
+            "networkName": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "proxyUrl": {
+              "type": "string",
+              "pattern": "^https?://[A-Za-z0-9][A-Za-z0-9._-]*(?::[0-9]{1,5})?(?:/[^\\s]*)?$"
+            },
+            "policySha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "proxyContainer": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+            },
+            "proxyImageDigest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "credentialVariables": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
+        "providers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["codex", "claude"]
+          }
         }
       }
     },

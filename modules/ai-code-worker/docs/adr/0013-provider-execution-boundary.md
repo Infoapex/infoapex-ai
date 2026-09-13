@@ -43,5 +43,8 @@ un run valid.
   provider OS-isolated;
 - release-ul public rămâne blocat până la dovada ambelor componente: backendul și
   execuția efectivă a providerului prin acel backend;
-- etapa următoare trebuie să implementeze runnerul containerizat, credential
-  forwarding allowlisted și proxy-ul de egress, cu probe și teste de anulare.
+- runnerul containerizat, credential forwarding allowlisted și probele de
+  anulare sunt implementate în `execution/environment.ts`;
+- activarea producției mai cere provisionarea externă a imaginii providerului și
+  a proxy-ului de egress intern, cu allowlist independent verificat. Procedura
+  este documentată în `docs/PROVIDER-RUNNER-PROVISIONING.md`.

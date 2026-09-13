@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { DockerExecutionEnvironment, FakeExecutionEnvironment, LocalIsolatedExecutionEnvironment, type ExecutionEnvironment } from "../../src/execution/environment.js";
+import type { EngineProcessRunner, EngineProcessSyncResult } from "../../src/engines/process-runner.js";
+import type { BufferedProcessResult } from "../../src/engines/spawn-buffered.js";
 import { canonicalJson, sha256 } from "../../src/manifest/normalize.js";
 import type { JsonValue } from "../../src/schema/json-schema.js";
 
@@ -121,8 +123,83 @@ describe("fake execution environment", () => {
       assert.equal(report.supported, false);
     }
   });
+
+  it("routes a provisioned provider through the attested internal proxy network", () => {
+    const policySha256 = "a".repeat(64);
+    const profile = readJson("templates/project/.ai-code-worker/execution-environment.example.json") as Record<string, unknown>;
+    const providerProfile = {
+      ...profile,
+      backend: {
+        type: "docker",
+        image: "infoapex/provider-runtime",
+        imageDigest: `sha256:${"b".repeat(64)}`
+      },
+      providerExecution: {
+        mode: "isolated-container",
+        egressProxy: {
+          networkName: "infoapex-provider-egress",
+          proxyUrl: "http://provider-egress-proxy:3128",
+          policySha256,
+          proxyContainer: "provider-egress-proxy",
+          proxyImageDigest: `sha256:${"c".repeat(64)}`
+        },
+        credentialVariables: ["OPENAI_API_KEY"]
+      },
+      environment: {
+        ...(profile.environment as Record<string, unknown>),
+        allowedVariables: ["CI", "NO_COLOR", "OPENAI_API_KEY"]
+      }
+    };
+    const calls: Array<{ executable: string; args: readonly string[] }> = [];
+    const dockerRunner: EngineProcessRunner = {
+      runSync(executable, args) {
+        calls.push({ executable, args });
+        if (args[0] === "network") return fakeSync(JSON.stringify({ Internal: true, Labels: { "com.infoapex.ai/provider-egress-policy-sha256": policySha256 }, Containers: { proxy: { Name: "/provider-egress-proxy" } } }));
+        if (args[0] === "container") return fakeSync(JSON.stringify({ Image: `sha256:${"c".repeat(64)}`, State: { Running: true }, Config: { Labels: { "com.infoapex.ai/provider-egress-policy-sha256": policySha256, "com.infoapex.ai/provider-egress-role": "proxy" } } }));
+        if (args[0] === "version") return fakeSync("29.7.2");
+        if (args[0] === "image") return fakeSync("sha256:provider");
+        if (args[0] === "run" && args.includes("--version")) return fakeSync(args.includes("codex") ? "codex-cli 0.154.0" : "2.1.270 (Claude Code)");
+        return fakeSync("provider-output");
+      },
+      async runAsync() { return fakeBuffered("provider-output"); }
+    };
+
+    const environment = new DockerExecutionEnvironment(undefined, dockerRunner);
+    const report = environment.doctor(providerProfile);
+
+    assert.equal(report.supported, true);
+    assert.equal(report.providerSupported, true);
+    assert.equal(report.providerWarnings.length, 0);
+    assert.ok(report.capabilities.includes("provider-execution-isolated"));
+
+    const runner = environment.providerProcessRunner?.(providerProfile, "codex");
+    assert.ok(runner);
+    const result = runner.runSync("codex", ["exec", "--json"], {
+      cwd: process.cwd(),
+      input: "bounded prompt",
+      timeoutMs: 10_000,
+      maximumOutputBytes: 4_096,
+      shell: false
+    });
+    assert.equal(result.status, 0);
+    const invocation = calls.at(-1);
+    assert.ok(invocation);
+    assert.equal(invocation.executable, "docker");
+    assert.equal(invocation.args[invocation.args.indexOf("--network") + 1], "infoapex-provider-egress");
+    assert.ok(invocation.args.includes("HTTP_PROXY=http://provider-egress-proxy:3128"));
+    assert.ok(invocation.args.includes("OPENAI_API_KEY"));
+    assert.ok(!invocation.args.some((arg) => arg.includes("OPENAI_API_KEY=")));
+  });
 });
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function fakeSync(stdout: string, status = 0): EngineProcessSyncResult {
+  return { pid: 1, output: [stdout, ""], stdout, stderr: "", status, signal: null };
+}
+
+function fakeBuffered(stdout: string): BufferedProcessResult {
+  return { status: 0, stdout, stderr: "", error: null, timedOut: false, stopReason: null, outputTruncated: false };
 }

@@ -9,12 +9,15 @@ provider-boundary capability checks,
 no silent fallback, export-off telemetry, redacted diagnostics, verified backups, and
 fail-closed release gates. Secrets and raw conversations are forbidden evidence.
 
-The current `local-isolated` implementation applies environment, timeout, output and
-process-tree controls, but cannot prove host-level filesystem/network isolation or
-isolate the Codex/Claude provider process. It is
-therefore not an accepted production backend. `node scripts/isolation-preflight.mjs`
-fails closed unless the worker doctor reports an `os-isolated` boundary,
-`providerSupported: true`, every required capability, and no unverifiable warnings.
+The current default `local-isolated` implementation applies environment, timeout,
+output and process-tree controls, but cannot prove host-level filesystem/network
+isolation or isolate the Codex/Claude provider process. It is therefore not an
+accepted production backend. The Docker implementation now provides the
+containerized provider runner, but reports `providerSupported: true` only when a
+pinned provider image and independently labelled internal egress-proxy network
+are present. `node scripts/isolation-preflight.mjs` fails closed unless the worker
+doctor reports an `os-isolated` boundary, `providerSupported: true`, every required
+capability, and no unverifiable warnings.
 The public-release workflow runs this gate
 before attestation and publication.
 

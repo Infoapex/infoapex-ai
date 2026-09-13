@@ -7,6 +7,7 @@ export interface EngineProcessOptions {
   readonly input?: string;
   readonly timeoutMs: number;
   readonly maximumOutputBytes: number;
+  readonly env?: NodeJS.ProcessEnv | Readonly<Record<string, string>>;
   readonly shell?: boolean;
   readonly watchdog?: BufferedProcessOptions["watchdog"];
 }
@@ -24,6 +25,7 @@ export const localEngineProcessRunner: EngineProcessRunner = {
     return spawnSync(executable, [...args], {
       cwd: options.cwd,
       input: options.input,
+      env: options.env,
       encoding: "utf8",
       maxBuffer: options.maximumOutputBytes,
       timeout: options.timeoutMs,

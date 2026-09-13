@@ -24,6 +24,7 @@
     "LICENSE",
     "CHANGELOG.md",
     "RELEASE-NOTES.md",
+    "docs/PROVIDER-RUNNER-PROVISIONING.md",
     "SECURITY.md"
   ],
   "bin": {

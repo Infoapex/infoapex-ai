@@ -1,10 +1,10 @@
-import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalJson, sha256 } from "../manifest/normalize.js";
 import { spawnBuffered } from "../engines/spawn-buffered.js";
-import { localEngineProcessRunner, type EngineProcessRunner } from "../engines/process-runner.js";
+import { localEngineProcessRunner, type EngineProcessRunner, type EngineProcessSyncResult } from "../engines/process-runner.js";
+import type { BufferedProcessResult } from "../engines/spawn-buffered.js";
 import { SchemaRegistry, type JsonValue } from "../schema/json-schema.js";
 
 export type EnvironmentCapability =
@@ -153,10 +153,14 @@ export class LocalIsolatedExecutionEnvironment implements ExecutionEnvironment {
  * Docker-backed isolated execution for repository-owned commands. The image is
  * pinned by digest and the container receives only the requested worktree mount;
  * host networking, inherited credentials and host writes are not available.
- * Provider control-plane execution is intentionally a separate integration step.
+ * Provider execution is allowed only through the separately provisioned,
+ * internally networked egress proxy described by the profile.
  */
 export class DockerExecutionEnvironment implements ExecutionEnvironment {
-  constructor(private readonly registry = SchemaRegistry.load()) {}
+  constructor(
+    private readonly registry = SchemaRegistry.load(),
+    private readonly dockerRunner: EngineProcessRunner = localEngineProcessRunner
+  ) {}
 
   doctor(profile: unknown): EnvironmentCapabilityReport {
     this.registry.assertValid("execution-environment.schema.json", profile);
@@ -165,6 +169,7 @@ export class DockerExecutionEnvironment implements ExecutionEnvironment {
     const required = requestedCapabilities(view);
     const warnings: string[] = [];
     const providerWarnings: string[] = [];
+    let providerSupported = false;
 
     if (view.kind !== "isolated") {
       warnings.push("DockerExecutionEnvironment requires an isolated profile.");
@@ -175,27 +180,29 @@ export class DockerExecutionEnvironment implements ExecutionEnvironment {
     if (view.providerExecution?.mode !== "isolated-container") {
       providerWarnings.push("Docker provider execution requires an explicit isolated-container provider runner.");
     } else {
-      // The current Docker implementation routes repository-owned commands,
-      // but the Codex/Claude adapters still spawn on the host. Do not promote
-      // this backend until the provider runner itself is wired and probed.
-      providerWarnings.push("Docker provider execution is not wired to the Codex/Claude adapters.");
+      const providerProbe = probeDockerProvider(view, this.dockerRunner);
+      providerSupported = providerProbe.ok;
+      providerWarnings.push(...providerProbe.warnings);
     }
 
     const probe = view.kind === "isolated" && view.backend?.type === "docker"
-      ? probeDocker(view)
+      ? probeDocker(view, this.dockerRunner)
       : { ok: false, warnings: [] as string[] };
     warnings.push(...probe.warnings);
-    // The generic Docker probe proves only repository-command isolation. The
-    // provider capability stays absent until an actual provider runner is wired.
     const repositoryCapabilities = required.filter((capability) => capability !== "provider-execution-isolated");
-    const capabilities = probe.ok && warnings.length === 0 ? repositoryCapabilities : [];
+    const capabilities = probe.ok && warnings.length === 0
+      ? [...repositoryCapabilities, ...(providerSupported ? ["provider-execution-isolated" as const] : [])]
+      : [];
 
     return {
       ...base,
       supported: view.kind === "isolated" && probe.ok && warnings.length === 0,
-      providerSupported: false,
+      providerSupported,
       requestedCapabilities: required,
       capabilities,
+      // `supported` is the repository-command contract. Provider readiness is
+      // reported independently through providerSupported/providerWarnings and
+      // the public isolation gate checks both contracts together.
       missingCapabilities: repositoryCapabilities.filter((capability) => !capabilities.includes(capability)),
       warnings,
       providerWarnings
@@ -212,10 +219,17 @@ export class DockerExecutionEnvironment implements ExecutionEnvironment {
       return unavailableResult(report.warnings.join(" ") || "Docker isolated backend is unavailable.");
     }
     try {
-      return runDocker(profile as EnvironmentProfileView, command);
+      return runDocker(profile as EnvironmentProfileView, command, this.dockerRunner);
     } catch (error) {
       return unavailableResult(error instanceof Error ? error.message : "Docker command could not be prepared.");
     }
+  }
+
+  providerProcessRunner(profile: unknown, provider: "codex" | "claude"): EngineProcessRunner | null {
+    this.registry.assertValid("execution-environment.schema.json", profile);
+    const view = profile as EnvironmentProfileView;
+    const report = this.doctor(profile);
+    return report.providerSupported ? dockerProviderProcessRunner(view, this.dockerRunner, provider) : null;
   }
 }
 
@@ -332,6 +346,15 @@ interface EnvironmentProfileView {
   };
   readonly providerExecution?: {
     readonly mode: "simulated" | "isolated-container" | "host-process";
+    readonly egressProxy?: {
+      readonly networkName: string;
+      readonly proxyUrl: string;
+      readonly policySha256: string;
+      readonly proxyContainer: string;
+      readonly proxyImageDigest: string;
+    };
+    readonly credentialVariables?: readonly string[];
+    readonly providers?: readonly ("codex" | "claude")[];
   };
   readonly filesystem: {
     readonly hostReadDefault: "deny" | "allow";
@@ -388,18 +411,18 @@ function requestedCapabilities(view: EnvironmentProfileView): readonly Environme
   return [...capabilities].sort();
 }
 
-function probeDocker(view: EnvironmentProfileView): { readonly ok: boolean; readonly warnings: readonly string[] } {
+function probeDocker(view: EnvironmentProfileView, runner: EngineProcessRunner): { readonly ok: boolean; readonly warnings: readonly string[] } {
   const backend = view.backend;
   if (!backend) return { ok: false, warnings: ["No Docker backend configuration is present."] };
   const warnings: string[] = [];
-  const version = spawnSync("docker", ["version", "--format", "{{.Server.Version}}"], { encoding: "utf8", timeout: 10_000, windowsHide: true });
-  if (version.status !== 0 || !version.stdout.trim()) {
+  const version = runner.runSync("docker", ["version", "--format", "{{.Server.Version}}"], dockerProbeOptions(10_000));
+  if (version.status !== 0 || !textOutput(version.stdout).trim()) {
     warnings.push("Docker Engine is unavailable.");
     return { ok: false, warnings };
   }
   const image = `${backend.image}@${backend.imageDigest}`;
-  const inspect = spawnSync("docker", ["image", "inspect", image, "--format", "{{.Id}}"], { encoding: "utf8", timeout: 10_000, windowsHide: true });
-  if (inspect.status !== 0 || !inspect.stdout.trim()) {
+  const inspect = runner.runSync("docker", ["image", "inspect", image, "--format", "{{.Id}}"], dockerProbeOptions(10_000));
+  if (inspect.status !== 0 || !textOutput(inspect.stdout).trim()) {
     warnings.push("The pinned Docker image is not available locally.");
     return { ok: false, warnings };
   }
@@ -408,11 +431,11 @@ function probeDocker(view: EnvironmentProfileView): { readonly ok: boolean; read
   try {
     writeFileSync(join(probeRoot, "host-secret.fixture"), "must-not-be-visible\n", "utf8");
     const script = "const fs=require('node:fs'); if(fs.existsSync('/host-secret.fixture')) process.exit(21); const r=require('node:http').get({host:'1.1.1.1',port:80,path:'/',timeout:500},()=>process.exit(22)); r.on('error',()=>process.exit(0)); r.on('timeout',()=>{r.destroy();process.exit(0)});";
-    const result = spawnSync("docker", dockerArgs(view, { executable: "node", args: ["-e", script], cwd: probeRoot, timeoutMs: 5_000, maximumOutputBytes: 2_048 }, probeRoot), {
-      encoding: "utf8",
-      timeout: 15_000,
-      windowsHide: true
-    });
+    const result = runner.runSync(
+      "docker",
+      dockerArgs(view, { executable: "node", args: ["-e", script], cwd: probeRoot, timeoutMs: 5_000, maximumOutputBytes: 2_048 }, probeRoot),
+      dockerProbeOptions(15_000)
+    );
     if (result.status !== 0) warnings.push("Docker isolation probe failed for filesystem and network boundaries.");
   } finally {
     rmSync(probeRoot, { recursive: true, force: true });
@@ -420,27 +443,232 @@ function probeDocker(view: EnvironmentProfileView): { readonly ok: boolean; read
   return { ok: warnings.length === 0, warnings };
 }
 
-function runDocker(view: EnvironmentProfileView, command: EnvironmentCommand): EnvironmentRunResult {
+/**
+ * Provider execution is a second Docker contract. The repository probe above
+ * proves only the generic worktree boundary; this probe additionally requires
+ * both provider binaries in the pinned image and an operator-provisioned,
+ * internal Docker network whose only egress path is the pinned proxy.
+ */
+function probeDockerProvider(
+  view: EnvironmentProfileView,
+  runner: EngineProcessRunner
+): { readonly ok: boolean; readonly warnings: readonly string[] } {
+  const execution = view.providerExecution;
+  const egress = execution?.egressProxy;
+  const warnings: string[] = [];
+
+  if (!egress) {
+    return { ok: false, warnings: ["No provider egress proxy attestation is configured."] };
+  }
+  const credentialVariables = execution?.credentialVariables ?? [];
+  const allowedVariables = new Set(view.environment.allowedVariables);
+  if (credentialVariables.some((name) => !allowedVariables.has(name))) {
+    warnings.push("Provider credential variables must be included in the execution profile environment allowlist.");
+  }
+  warnings.push(...probeDockerEgress(egress, runner));
+  if (warnings.length > 0) return { ok: false, warnings };
+
+  const probeRoot = mkdtempSync(join(tmpdir(), "aicw-provider-probe-"));
+  try {
+    for (const provider of view.providerExecution?.providers ?? (["codex", "claude"] as const)) {
+      const result = runner.runSync(
+        "docker",
+        dockerArgs(
+          view,
+          { executable: provider, args: ["--version"], cwd: probeRoot, timeoutMs: 10_000, maximumOutputBytes: 4_096 },
+          probeRoot,
+          "none"
+        ),
+        dockerProbeOptions(15_000)
+      );
+      if (result.status !== 0 || !textOutput(result.stdout).trim()) {
+        warnings.push(`The pinned provider image does not expose a usable ${provider} CLI.`);
+      }
+    }
+  } finally {
+    rmSync(probeRoot, { recursive: true, force: true });
+  }
+  return { ok: warnings.length === 0, warnings };
+}
+
+function probeDockerEgress(
+  egress: NonNullable<NonNullable<EnvironmentProfileView["providerExecution"]>["egressProxy"]>,
+  runner: EngineProcessRunner
+): readonly string[] {
+  const warnings: string[] = [];
+  let proxyUrl: URL;
+  try {
+    proxyUrl = new URL(egress.proxyUrl);
+    if (!(["http:", "https:"].includes(proxyUrl.protocol)) || proxyUrl.username || proxyUrl.password) {
+      warnings.push("Provider proxy URL must be an HTTP(S) URL without embedded credentials.");
+    }
+  } catch {
+    warnings.push("Provider proxy URL is invalid.");
+  }
+
+  const network = dockerJsonInspect(runner, ["network", "inspect", egress.networkName]);
+  if (!network) {
+    warnings.push("The provider egress Docker network is unavailable.");
+  } else {
+    const labels = recordValue(network["Labels"]);
+    if (network["Internal"] !== true) warnings.push("The provider egress Docker network must be internal.");
+    if (labels?.[EGRESS_POLICY_LABEL] !== egress.policySha256) {
+      warnings.push("The provider egress network policy hash does not match the execution profile.");
+    }
+    const containers = recordValue(network["Containers"]);
+    if (!containers || !Object.keys(containers).some((id) => id === egress.proxyContainer || recordValue(containers[id])?.["Name"] === egress.proxyContainer || recordValue(containers[id])?.["Name"] === `/${egress.proxyContainer}`)) {
+      warnings.push("The attested provider proxy container is not attached to the provider egress network.");
+    }
+  }
+
+  const proxy = dockerJsonInspect(runner, ["container", "inspect", egress.proxyContainer]);
+  if (!proxy) {
+    warnings.push("The attested provider proxy container is unavailable.");
+  } else {
+    const state = recordValue(proxy["State"]);
+    const config = recordValue(proxy["Config"]);
+    const labels = recordValue(config?.["Labels"]);
+    if (state?.["Running"] !== true) warnings.push("The attested provider proxy container is not running.");
+    if (proxy["Image"] !== egress.proxyImageDigest) warnings.push("The provider proxy image digest does not match the execution profile.");
+    if (labels?.[EGRESS_POLICY_LABEL] !== egress.policySha256 || labels?.[EGRESS_ROLE_LABEL] !== "proxy") {
+      warnings.push("The provider proxy container is missing the required policy attestation labels.");
+    }
+  }
+
+  return warnings;
+}
+
+function dockerProviderProcessRunner(view: EnvironmentProfileView, runner: EngineProcessRunner, provider: "codex" | "claude"): EngineProcessRunner {
+  const execution = view.providerExecution;
+  const egress = execution?.egressProxy;
+  if (!egress) throw new Error("Provider egress proxy configuration is missing.");
+  if (!(execution.providers ?? ["codex", "claude"]).includes(provider)) {
+    throw new Error(`Provider '${provider}' is not enabled by the execution profile.`);
+  }
+  const credentialVariables = execution.credentialVariables ?? [];
+  const allowedVariables = new Set(view.environment.allowedVariables);
+  if (credentialVariables.some((name) => !allowedVariables.has(name))) {
+    throw new Error("Provider credential variables must be included in the execution profile environment allowlist.");
+  }
+
+  const additionalEnvArgs = [
+    "-e", `HTTP_PROXY=${egress.proxyUrl}`,
+    "-e", `HTTPS_PROXY=${egress.proxyUrl}`,
+    "-e", `ALL_PROXY=${egress.proxyUrl}`,
+    "-e", "NO_PROXY="
+  ];
+  for (const name of credentialVariables) additionalEnvArgs.push("-e", name);
+
+  return {
+    runSync(executable, args, options) {
+      if (options.shell) return invalidSyncResult("Provider execution refuses shell interpolation inside the container.");
+      const cwd = resolve(options.cwd);
+      return runner.runSync("docker", dockerArgs(
+        view,
+        { executable, args, cwd, input: options.input, timeoutMs: options.timeoutMs, maximumOutputBytes: options.maximumOutputBytes },
+        cwd,
+        egress.networkName,
+        additionalEnvArgs
+      ), {
+        ...options,
+        cwd,
+        env: dockerClientEnvironment(credentialVariables),
+        shell: false,
+        timeoutMs: Math.min(options.timeoutMs, view.limits.maximumDurationSeconds * 1_000)
+      });
+    },
+    runAsync(executable, args, options) {
+      if (options.shell) return Promise.resolve(invalidAsyncResult("Provider execution refuses shell interpolation inside the container."));
+      const cwd = resolve(options.cwd);
+      return runner.runAsync("docker", dockerArgs(
+        view,
+        { executable, args, cwd, input: options.input, timeoutMs: options.timeoutMs, maximumOutputBytes: options.maximumOutputBytes },
+        cwd,
+        egress.networkName,
+        additionalEnvArgs
+      ), {
+        ...options,
+        cwd,
+        env: dockerClientEnvironment(credentialVariables),
+        shell: false,
+        timeoutMs: Math.min(options.timeoutMs, view.limits.maximumDurationSeconds * 1_000)
+      });
+    }
+  };
+}
+
+const EGRESS_POLICY_LABEL = "com.infoapex.ai/provider-egress-policy-sha256";
+const EGRESS_ROLE_LABEL = "com.infoapex.ai/provider-egress-role";
+
+function dockerJsonInspect(runner: EngineProcessRunner, args: readonly string[]): Record<string, unknown> | null {
+  const result = runner.runSync("docker", [...args, "--format", "{{json .}}"], dockerProbeOptions(10_000));
+  if (result.status !== 0) return null;
+  try {
+    const value: unknown = JSON.parse(textOutput(result.stdout));
+    return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function dockerProbeOptions(timeoutMs: number) {
+  return { cwd: process.cwd(), timeoutMs, maximumOutputBytes: 1_048_576, shell: false } as const;
+}
+
+function dockerClientEnvironment(credentialVariables: readonly string[]): Readonly<Record<string, string>> {
+  // The Docker CLI is the host-side control process. It receives only the
+  // variables needed to reach the daemon plus the explicitly allowlisted
+  // provider credentials; all other host environment variables are scrubbed.
+  const names = [
+    "PATH", "SystemRoot", "TEMP", "TMP", "DOCKER_HOST", "DOCKER_CONTEXT",
+    "DOCKER_CONFIG", "DOCKER_CERT_PATH", "DOCKER_TLS_VERIFY", ...credentialVariables
+  ];
+  return Object.fromEntries(names.flatMap((name) => process.env[name] === undefined ? [] : [[name, process.env[name] as string]]));
+}
+
+function textOutput(value: string | Buffer | null | undefined): string {
+  return typeof value === "string" ? value : value instanceof Buffer ? value.toString("utf8") : "";
+}
+
+function invalidSyncResult(message: string): EngineProcessSyncResult {
+  return { pid: 0, output: ["", message], stdout: "", stderr: message, status: null, signal: null, error: new Error(message) } as unknown as EngineProcessSyncResult;
+}
+
+function invalidAsyncResult(message: string): BufferedProcessResult {
+  return { status: null, stdout: "", stderr: message, error: new Error(message), timedOut: false, stopReason: null, outputTruncated: false };
+}
+
+function runDocker(view: EnvironmentProfileView, command: EnvironmentCommand, runner: EngineProcessRunner): EnvironmentRunResult {
   const timeoutMs = Math.min(command.timeoutMs, view.limits.maximumDurationSeconds * 1_000);
-  const result = spawnSync("docker", dockerArgs(view, command, command.cwd), {
+  const result = runner.runSync("docker", dockerArgs(view, command, command.cwd), {
+    cwd: command.cwd,
     input: command.input,
-    encoding: "utf8",
-    timeout: timeoutMs,
-    windowsHide: true,
-    maxBuffer: command.maximumOutputBytes
+    timeoutMs,
+    maximumOutputBytes: command.maximumOutputBytes,
+    shell: false
   });
   const error = result.error ?? null;
   return {
     status: result.status,
-    stdout: typeof result.stdout === "string" ? result.stdout : "",
-    stderr: typeof result.stderr === "string" ? result.stderr : "",
+    stdout: textOutput(result.stdout),
+    stderr: textOutput(result.stderr),
     timedOut: (error as NodeJS.ErrnoException | null)?.code === "ETIMEDOUT",
     outputTruncated: (error as NodeJS.ErrnoException | null)?.code === "ENOBUFS",
     error
   };
 }
 
-function dockerArgs(view: EnvironmentProfileView, command: EnvironmentCommand, mountRoot: string): string[] {
+function dockerArgs(
+  view: EnvironmentProfileView,
+  command: EnvironmentCommand,
+  mountRoot: string,
+  network = "none",
+  additionalEnvArgs: readonly string[] = []
+): string[] {
   const backend = view.backend;
   if (!backend) throw new Error("Docker backend configuration is missing.");
   const cwd = resolve(command.cwd);
@@ -471,12 +699,12 @@ function dockerArgs(view: EnvironmentProfileView, command: EnvironmentCommand, m
     return ["-v", `${source}:${containerTarget}:ro`];
   }).flat();
   return [
-    "run", "--rm", "--init", "--network", "none", "--read-only", "--cap-drop", "ALL",
+    "run", "--rm", "--init", "--network", network, "--read-only", "--cap-drop", "ALL",
     "--security-opt", "no-new-privileges", "--pids-limit", String(view.limits.maximumProcesses),
     ...(view.limits.maximumMemoryBytes ? ["--memory", String(view.limits.maximumMemoryBytes)] : []),
     ...(view.limits.maximumCpuUnits ? ["--cpus", String(view.limits.maximumCpuUnits)] : []),
     "--tmpfs", "/tmp:rw,nosuid,nodev", "-v", `${root}:/workspace:rw`, ...linkedMounts, "-w", containerCwd,
-    ...envArgs, `${backend.image}@${backend.imageDigest}`, command.executable, ...mappedArgs
+    ...envArgs, ...additionalEnvArgs, `${backend.image}@${backend.imageDigest}`, command.executable, ...mappedArgs
   ];
 }
 
