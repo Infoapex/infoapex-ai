@@ -81,6 +81,7 @@ describe("doctor preflight", () => {
       assert.equal(report.status, "BLOCKED");
       assert.ok(report.findings.some((finding) => finding.code === "CODEX_VERSION_UNAVAILABLE"));
     }
+    assert.ok(report.findings.some((finding) => finding.code === "PROVIDER_ENVIRONMENT_UNAVAILABLE"));
   });
 });
 

@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
+import { loadExecutionProfile } from "../compile/compile.js";
 import { createClaudeIndependentReviewer, createCodexIndependentReviewer } from "./independent-reviewer-cli.js";
 import { loadReviewFixture } from "./review-fixture.js";
 import type { IndependentReviewResult } from "./independent-review.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
+import { resolveExecutionEnvironment } from "../execution/environment.js";
 
 export interface ReadOnlyReviewRequest {
   readonly schemaVersion: "1.0";
@@ -41,6 +43,21 @@ export function runReadOnlyReview(options: ReadOnlyReviewOptions): {
       acceptanceCriteria: [criterion.description],
       criterionIds: [criterion.id]
     }));
+    const processRunner = options.engine === "fake"
+      ? undefined
+      : (() => {
+          try {
+            const profile = loadExecutionProfile(options.repositoryPath);
+            const environment = resolveExecutionEnvironment(profile, registry);
+            const report = environment.doctor(profile);
+            return report.providerSupported
+              ? environment.providerProcessRunner?.(profile, options.engine) ?? null
+              : null;
+          } catch {
+            return null;
+          }
+        })();
+
     const base = {
       repositoryPath: options.repositoryPath,
       baseCommit: request.baseCommit,
@@ -48,7 +65,8 @@ export function runReadOnlyReview(options: ReadOnlyReviewOptions): {
       context: request.controlContext,
       config: {
         ...(options.executable ? { executable: options.executable } : {}),
-        ...(options.model ? { defaultModel: options.model } : {})
+        ...(options.model ? { defaultModel: options.model } : {}),
+        ...(options.engine !== "fake" ? { processRunner } : {})
       }
     };
 

@@ -27,3 +27,14 @@ test("read-only review command fails closed without a fake fixture", () => {
   assert.equal(result.status, "BLOCKED");
   assert.match(result.message ?? "", /fixture/i);
 });
+
+test("read-only real review fails closed when no isolated provider runner is configured", () => {
+  const result = runReadOnlyReview({
+    repositoryPath: process.cwd(),
+    inputPath: join(fixtureRoot, "request.json"),
+    engine: "codex"
+  });
+
+  assert.equal(result.status, "BLOCKED");
+  assert.match(result.review?.findings[0]?.evidence ?? "", /isolated Codex reviewer process runner|provider boundary/i);
+});
