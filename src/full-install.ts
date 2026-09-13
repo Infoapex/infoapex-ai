@@ -4,6 +4,10 @@ import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { defaultProductionPolicy } from "./production.js";
+import { Ajv2020 } from "ajv/dist/2020.js";
+import addFormatsPlugin from "ajv-formats";
+
+const addFormats = addFormatsPlugin as unknown as (ajv: Ajv2020) => void;
 
 /** Technology profiles, never consumer-project names. */
 export type InstallProfile = "generic" | "dotnet-nextjs";
@@ -16,6 +20,8 @@ export interface FullInstallOptions {
   readonly layout: { readonly backendDir: string; readonly frontendDir: string; readonly mlDir: string | null };
   /** Repair only files owned by this installer. It never touches application source. */
   readonly repair: boolean;
+  /** Optional operator-provided, schema-validated execution profile. */
+  readonly executionProfilePath?: string;
 }
 
 export interface FullInstallResult {
@@ -46,6 +52,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   const updated: string[] = [];
   const skipped: string[] = [];
   const findings: string[] = [];
+  let executionProfile: Readonly<Record<string, unknown>> | null = null;
   if (!isRealDirectory(repo)) findings.push("Repository root must exist and must not be a symbolic link.");
   if (!isRealDirectory(bundle)) findings.push("Bundle root must exist and must not be a symbolic link.");
   if (isRealDirectory(repo) && !hasCommittedGitHead(repo)) findings.push("Repository root must be a Git repository with an initial commit before full installation.");
@@ -54,6 +61,9 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
   const layoutValues = [options.layout?.backendDir, options.layout?.frontendDir, ...(options.layout?.mlDir === null ? [] : [options.layout?.mlDir])];
   for (const value of layoutValues) {
     if (!isSafeRelativePath(value)) findings.push(`Unsafe project layout path '${value}'. Use a repository-relative path without '..'.`);
+  }
+  if (options.executionProfilePath !== undefined) {
+    executionProfile = readExecutionProfile(options.executionProfilePath, bundle, findings);
   }
   // No write helper is created until every caller-controlled boundary is valid.
   // This prevents a malformed profile from causing even installer-owned files to
@@ -107,7 +117,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
 
   writeManaged(".ai-code-worker/config.json", json(workerConfig(paths)));
   writeManaged(".ai-code-worker/routing-policy.json", json(routingPolicy()));
-  writeManaged(".ai-code-worker/execution-environment.example.json", json(executionEnvironmentConfig()));
+  writeManaged(".ai-code-worker/execution-environment.example.json", json(executionProfile ?? executionEnvironmentConfig()));
   writeManaged(".ai-code-benchmark/config.json", json(benchmarkConfig(paths)));
   writeSeed(".ai-code-worker/README.md", "# ai-code-worker\n\nConfigurat de `infoapex-ai init --full`. Nu modifica politica de rutare fără un experiment/autorizare nouă.\n");
   writeManaged(".ai-code-review/config.json", json(reviewConfig(paths)));
@@ -157,6 +167,41 @@ export interface PreflightResult {
   readonly status: "PASS" | "BLOCKED";
   readonly profile: string | null;
   readonly checks: readonly { readonly id: string; readonly status: "PASS" | "BLOCKED"; readonly detail: string }[];
+}
+
+/** Read and validate an operator profile before creating any managed state. */
+function readExecutionProfile(
+  sourcePath: string,
+  bundle: string,
+  findings: string[]
+): Readonly<Record<string, unknown>> | null {
+  const source = resolve(sourcePath);
+  try {
+    const sourceStat = lstatSync(source);
+    if (!sourceStat.isFile() || sourceStat.isSymbolicLink()) {
+      findings.push("Execution profile must be an existing regular file and must not be a symbolic link.");
+      return null;
+    }
+    const value = JSON.parse(readFileSync(source, "utf8")) as unknown;
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      findings.push("Execution profile must be a JSON object.");
+      return null;
+    }
+    const schemaPath = join(bundle, "modules", "ai-code-worker", "schemas", "execution-environment.schema.json");
+    const schema = JSON.parse(readFileSync(schemaPath, "utf8")) as object;
+    const ajv = new Ajv2020({ strict: false });
+    addFormats(ajv);
+    const valid = ajv.compile(schema)(value);
+    if (!valid) {
+      const detail = ajv.errors?.slice(0, 3).map((error: { readonly instancePath?: string; readonly message?: string }) => `${error.instancePath || "/"} ${error.message ?? "is invalid"}`).join("; ") ?? "schema validation failed";
+      findings.push(`Execution profile is invalid: ${detail}.`);
+      return null;
+    }
+    return value as Readonly<Record<string, unknown>>;
+  } catch {
+    findings.push("Execution profile could not be read or parsed.");
+    return null;
+  }
 }
 
 export interface FilesystemPermissionsResult {

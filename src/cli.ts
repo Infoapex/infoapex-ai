@@ -24,7 +24,7 @@ interface CommandHelp {
  *  restated here: they are the target module's contract, and an incomplete invocation
  *  already surfaces that module's own usage message inside the BLOCKED envelope. */
 const COMMAND_HELP: Readonly<Record<string, CommandHelp>> = {
-  init: { usage: "infoapex-ai init --repo <path> [--mode independent|integrated] [--full --profile generic|dotnet-nextjs] [--backend-dir <dir> --frontend-dir <dir> --ml-dir <dir>] [--repair] [--verify]", summary: "Bootstrap handoff only, or install a reusable P6 technology profile with --full; --verify runs the no-provider readiness gate after installation.", delegatesTo: null },
+  init: { usage: "infoapex-ai init --repo <path> [--mode independent|integrated] [--full --profile generic|dotnet-nextjs] [--backend-dir <dir> --frontend-dir <dir> --ml-dir <dir>] [--execution-profile <file>] [--repair] [--verify]", summary: "Bootstrap handoff only, or install a reusable P6 technology profile with --full; --execution-profile imports a schema-validated provider/isolation profile; --verify runs the no-provider readiness gate after installation.", delegatesTo: null },
   install: { usage: "infoapex-ai install --check --repo <path>", summary: "Check an existing full installation and the active bundle without changing it.", delegatesTo: null },
   upgrade: { usage: "infoapex-ai upgrade [--check] --repo <path>", summary: "Back up installer-owned files and retarget a full installation to this bundle.", delegatesTo: null },
   preflight: { usage: "infoapex-ai preflight --repo <path>", summary: "Run the strict no-provider readiness gate for a full installation.", delegatesTo: null },
@@ -101,7 +101,7 @@ if (command === "help" || command === "--help" || command === "-h") {
     if (profile !== "generic" && profile !== "dotnet-nextjs") {
       fail("--profile must be generic or dotnet-nextjs");
     }
-    const result = fullInstall({ repositoryRoot: repo, bundleRoot: bundleRoot(), profile: profile as InstallProfile, repair, layout: { backendDir: option("--backend-dir") ?? "backend", frontendDir: option("--frontend-dir") ?? "frontend", mlDir: option("--ml-dir") ?? "ml" } });
+    const result = fullInstall({ repositoryRoot: repo, bundleRoot: bundleRoot(), profile: profile as InstallProfile, repair, executionProfilePath: option("--execution-profile") ?? undefined, layout: { backendDir: option("--backend-dir") ?? "backend", frontendDir: option("--frontend-dir") ?? "frontend", mlDir: option("--ml-dir") ?? "ml" } });
     if (result.status === "DONE") {
       mkdirSync(handoffRoot, { recursive: true });
       writeBootstrap(apexRoot, config, mode, repair);

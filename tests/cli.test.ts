@@ -209,3 +209,60 @@ test("full init preserves a differing bootstrap until repair is explicit", () =>
     rmSync(repository, { recursive: true, force: true });
   }
 });
+
+test("full installer imports a schema-validated execution profile atomically", () => {
+  const repository = mkdtempSync(join(tmpdir(), "apex-cli-execution-profile-"));
+  const profilePath = join(repository, "operator-profile.json");
+  try {
+    writeFileSync(profilePath, JSON.stringify({
+      schemaVersion: "1.0",
+      profileId: "docker-provider",
+      kind: "isolated",
+      backend: { type: "docker", image: "node", imageDigest: `sha256:${"a".repeat(64)}` },
+      providerExecution: {
+        mode: "isolated-container",
+        providers: ["codex"],
+        credentialVariables: ["OPENAI_API_KEY"],
+        egressProxy: {
+          networkName: "infoapex-provider-egress",
+          proxyUrl: "http://provider-egress-proxy:3128",
+          policySha256: "b".repeat(64),
+          proxyContainer: "provider-egress-proxy",
+          proxyImageDigest: `sha256:${"c".repeat(64)}`
+        }
+      },
+      filesystem: { hostReadDefault: "deny", hostWriteDefault: "deny", mounts: [{ purpose: "worktree", access: "read-write" }] },
+      network: { repositoryProcesses: "deny", adapterControlPlane: "provider-only" },
+      environment: { inheritByDefault: false, allowedVariables: ["CI", "OPENAI_API_KEY"] },
+      limits: { maximumDurationSeconds: 60, maximumOutputBytes: 4096, maximumProcesses: 4 }
+    }), "utf8");
+    initializeGit(repository);
+    const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "generic", "--execution-profile", profilePath]);
+    assert.equal(init.status, 0, init.stderr || init.stdout);
+    const installed = JSON.parse(readFileSync(join(repository, ".ai-code-worker", "execution-environment.example.json"), "utf8")) as { profileId: string; backend: { type: string }; providerExecution: { mode: string; credentialVariables: readonly string[] } };
+    assert.equal(installed.profileId, "docker-provider");
+    assert.equal(installed.backend.type, "docker");
+    assert.equal(installed.providerExecution.mode, "isolated-container");
+    assert.deepEqual(installed.providerExecution.credentialVariables, ["OPENAI_API_KEY"]);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("full installer rejects an invalid execution profile before creating managed state", () => {
+  const repository = mkdtempSync(join(tmpdir(), "apex-cli-invalid-execution-profile-"));
+  const profilePath = join(repository, "operator-profile.json");
+  try {
+    writeFileSync(profilePath, JSON.stringify({ schemaVersion: "1.0", kind: "isolated" }), "utf8");
+    initializeGit(repository);
+    const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "generic", "--execution-profile", profilePath]);
+    assert.equal(init.status, 2);
+    const body = JSON.parse(init.stdout) as { status: string; findings: readonly string[] };
+    assert.equal(body.status, "BLOCKED");
+    assert.match(body.findings.join(" "), /Execution profile is invalid/);
+    assert.equal(existsSync(join(repository, ".infoapex-ai")), false);
+    assert.equal(existsSync(join(repository, ".ai-code-worker")), false);
+  } finally {
+    rmSync(repository, { recursive: true, force: true });
+  }
+});

@@ -63,6 +63,11 @@ node modules/ai-code-worker/dist/src/cli.js doctor --repo <repo> --engine fake -
 node scripts/isolation-preflight.mjs
 ```
 
+Pentru a instala profilul fără editare manuală în repository, folosește opțiunea
+`--execution-profile <file>` a comenzii `init --full`. Fișierul este validat prin
+schema workerului înainte de orice scriere; instalarea se oprește fail-closed dacă
+profilul este invalid.
+
 The final isolation gate must be `ISOLATION_BACKEND_PROVEN` before a stable
 release can be considered. A profile with only the generic Docker image, a
 non-internal network, an unlabelled proxy, or an unverified allowlist remains

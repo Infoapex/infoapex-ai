@@ -20,6 +20,18 @@ npm run build
 node dist/src/cli.js init --repo /cale/catre/proiect --mode integrated --full --profile generic --verify
 ```
 
+După provisioning-ul extern al backendului Docker și al proxy-ului de egress, un
+profil operator validat poate fi importat atomic la instalare:
+
+```bash
+node dist/src/cli.js init --repo /cale/catre/proiect --mode integrated --full \
+  --profile dotnet-nextjs --execution-profile /cale/catre/execution-profile.json --verify
+```
+
+Profilul este validat prin schema `ai-code-worker` înainte de prima scriere. Installerul
+nu copiază valori de credentiale și nu creează automat network-ul, proxy-ul sau ACL-uri.
+Un profil invalid produce `BLOCKED` fără stare de instalare parțială.
+
 `--verify` rulează imediat după instalare gate-ul `preflight`, fără să invoce un
 provider de coding. Dacă verificarea eșuează, comanda returnează `BLOCKED`; nu există
 un succes intermediar care să ascundă o instalare incompletă. Pentru un target deja
