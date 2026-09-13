@@ -67,7 +67,11 @@ export function upgrade(repositoryRoot: string, bundleRoot: string): Record<stri
   let journal: UpgradeJournal = { schemaVersion: "1.0", upgradeId, status: "PREPARED", createdAt: new Date().toISOString(), bundleRoot: normalizePath(roots.bundle), previousBundleRoot: normalizePath(profile.bundleRoot), profile: profile.profile, layout: profile.layout, backupRoot: normalizePath(backupRoot), entries };
   writeJournal(journalPath, journal);
   try {
-    const result = fullInstall({ repositoryRoot: roots.repo, bundleRoot: roots.bundle, profile: profile.profile, layout: profile.layout, repair: true });
+    // Preserve an operator-provisioned Docker/provider profile across upgrades.
+    // Replacing it with the installer's simulation default would silently widen
+    // or change the execution contract of an already configured consumer.
+    const executionProfilePath = repoPath(roots.repo, ".ai-code-worker/execution-environment.example.json") ?? undefined;
+    const result = fullInstall({ repositoryRoot: roots.repo, bundleRoot: roots.bundle, profile: profile.profile, layout: profile.layout, repair: true, executionProfilePath });
     journal = { ...journal, status: result.status === "DONE" ? "APPLIED" : "FAILED", ...(result.status === "DONE" ? { appliedAt: new Date().toISOString() } : {}), entries: withTargetHashes(roots.repo, entries), installResult: result };
     writeJournal(journalPath, journal);
     return result.status === "DONE" ? { schemaVersion: "1.0", status: "PASS", code: "UPGRADE_APPLIED", mode: "apply", upgradeId, journalPath, backupRoot, install: result } : { schemaVersion: "1.0", status: "BLOCKED", code: "INSTALL_FAILED", mode: "apply", upgradeId, journalPath, install: result };

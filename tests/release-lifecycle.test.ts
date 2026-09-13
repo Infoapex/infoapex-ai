@@ -88,6 +88,40 @@ test("upgrade dry-runs are stable and rollback refuses malformed journals and ch
   } finally { rmSync(repository, { recursive: true, force: true }); }
 });
 
+test("upgrade preserves an operator-provisioned execution profile", () => {
+  const repository = createRepository();
+  try {
+    const profilePath = join(repository, ".ai-code-worker", "execution-environment.example.json");
+    const profile = {
+      schemaVersion: "1.0",
+      profileId: "docker-provider",
+      kind: "isolated",
+      backend: { type: "docker", image: "infoapex/provider-runtime", imageDigest: `sha256:${"a".repeat(64)}` },
+      providerExecution: {
+        mode: "isolated-container",
+        providers: ["codex"],
+        credentialVariables: ["OPENAI_API_KEY"],
+        egressProxy: {
+          networkName: "infoapex-provider-egress",
+          proxyUrl: "http://provider-egress-proxy:3128",
+          policySha256: "b".repeat(64),
+          proxyContainer: "provider-egress-proxy",
+          proxyImageDigest: `sha256:${"c".repeat(64)}`
+        }
+      },
+      filesystem: { hostReadDefault: "deny", hostWriteDefault: "deny", mounts: [{ purpose: "worktree", access: "read-write" }] },
+      network: { repositoryProcesses: "deny", adapterControlPlane: "provider-only" },
+      environment: { inheritByDefault: false, allowedVariables: ["CI", "OPENAI_API_KEY"] },
+      limits: { maximumDurationSeconds: 60, maximumOutputBytes: 4096, maximumProcesses: 4 }
+    };
+    writeFileSync(profilePath, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
+    const before = readFileSync(profilePath, "utf8");
+    const result = upgrade(repository, process.cwd());
+    assert.equal(result.status, "PASS", JSON.stringify(result));
+    assert.equal(readFileSync(profilePath, "utf8"), before);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
 test("full install validates caller-controlled paths before creating installer state", () => {
   const repository = mkdtempSync(join(tmpdir(), "apex-release-layout-"));
   try {
