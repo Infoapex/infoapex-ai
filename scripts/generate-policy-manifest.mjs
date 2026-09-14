@@ -16,6 +16,8 @@ const policyFiles = [
   "scripts/isolation-preflight.mjs",
   "modules/ai-code-worker/schemas/execution-environment.schema.json",
   "modules/ai-code-worker/templates/project/.ai-code-worker/execution-environment.example.json",
+  "modules/ai-code-worker/templates/project/.ai-code-worker/execution-environment.trusted-host.example.json",
+  "docs/TRUSTED-HOST-RC.md",
   "src/production.ts",
   "validation/p6/evidence-index.json",
   "validation/p6/release-gates.json",

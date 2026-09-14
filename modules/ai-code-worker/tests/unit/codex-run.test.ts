@@ -37,6 +37,26 @@ after(() => {
 });
 
 describe("codex run coordinator", () => {
+  it("executes the real trusted-host path with a test CLI and records the honest boundary", async () => {
+    const repo = createGitRepository();
+    const executionProfile = readFileSync("templates/project/.ai-code-worker/execution-environment.trusted-host.example.json", "utf8");
+    mkdirSync(join(repo, ".ai-code-worker"), { recursive: true });
+    writeFileSync(join(repo, ".ai-code-worker", "execution-environment.example.json"), executionProfile);
+    execFileSync("git", ["add", ".ai-code-worker/execution-environment.example.json"], { cwd: repo });
+    execFileSync("git", ["-c", "user.name=ai-code-worker", "-c", "user.email=worker@example.test", "commit", "-m", "Explicit trusted host fixture"], { cwd: repo, stdio: "ignore" });
+    const cli = fakeCli("0.146.0-alpha.3.1", "src/codex-output.txt");
+    const report = await runCodex({
+      repositoryPath: repo, codexSessionsDir: emptyCodexSessionsDir,
+      planPath: "Plan/RUN.md", runId: "run-trusted-host",
+      now: "2026-08-01T10:00:00Z",
+      adapterConfig: { executable: process.execPath, baseArgs: [cli], testedVersionRanges: ["0.146.0-alpha.3.1"], requiresCapabilitySmokeTest: true }
+    });
+    assert.equal(report.status, "DONE", JSON.stringify(report.findings));
+    const evidence = JSON.parse(readFileSync(report.state.runEvidencePath!, "utf8"));
+    assert.equal(evidence.executionEnvironment.backend, "trusted-host");
+    assert.equal(evidence.executionEnvironment.securityBoundary, "host-process");
+  });
+
   it("executes a single-writer codex run through worktree, commit, gates, review, and report", async () => {
     const repo = createGitRepository();
     const beforeFiles = listRepositoryFiles(repo);

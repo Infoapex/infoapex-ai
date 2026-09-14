@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Internal RC: explicit trusted-host execution, host-access acknowledgement, bounded
+  provider transport and honest host-process evidence; no implicit isolated-to-host fallback.
+- Preserve Docker/corporate qualification and optimization plans as deferred TODO work.
+
 - P6 `core-local` full installer and strict preflight.
 - Configuration validation, migration backup, and rollback foundation.
 - P6 release-gate registry and local CycloneDX SBOM generation.

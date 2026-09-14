@@ -126,6 +126,7 @@ export function runCompile(options: CompileOptions): CompileReport {
   let executionProfile: unknown;
   try {
     executionProfile = loadExecutionProfile(repository.worktreeRoot);
+    registry.assertValid("execution-environment.schema.json", executionProfile);
   } catch {
     return blocked(
       repository,
@@ -140,6 +141,7 @@ export function runCompile(options: CompileOptions): CompileReport {
     baseCommit: repository.headCommit,
     repositoryFingerprint,
     budgets: manifest.budgets,
+    executionEnvironmentKind: (executionProfile as { kind: RunIntent["executionEnvironmentKind"] }).kind,
     now
   });
   let authorization: RunAuthorization;
@@ -255,6 +257,7 @@ function buildRunIntent(input: {
   readonly baseCommit: string;
   readonly repositoryFingerprint: string;
   readonly budgets: Record<string, unknown>;
+  readonly executionEnvironmentKind: RunIntent["executionEnvironmentKind"];
   readonly now: string;
 }): RunIntent {
   const maximumRunMinutes = Number(input.budgets.maximumRunMinutes);
@@ -268,10 +271,10 @@ function buildRunIntent(input: {
     baseRef: "HEAD",
     baseCommit: input.baseCommit,
     repositoryFingerprint: input.repositoryFingerprint,
-    requestedCapabilities: ["write-worktree", "run-isolated-tests", "create-local-commits"],
+    requestedCapabilities: ["write-worktree", input.executionEnvironmentKind === "trusted-local" ? "run-trusted-host-tests" : "run-isolated-tests", "create-local-commits"],
     forbiddenCapabilities: ["push", "deploy", "network-write"],
     approvalMode: "never",
-    executionEnvironmentKind: "isolated",
+    executionEnvironmentKind: input.executionEnvironmentKind,
     limits: {
       maximumRunMinutes,
       maximumAgentInvocations: Number(input.budgets.maximumAgentInvocations),

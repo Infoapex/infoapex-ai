@@ -3,6 +3,22 @@ import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { test } from "node:test";
 
+test("stable isolation gate still refuses an explicitly authorized trusted host", () => {
+  try {
+    execFileSync(process.execPath, [resolve("scripts/isolation-preflight.mjs"), "--execution-profile",
+      resolve("modules/ai-code-worker/templates/project/.ai-code-worker/execution-environment.trusted-host.example.json")],
+    { cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    assert.fail("trusted host must never pass the stable isolation gate");
+  } catch (error) {
+    const child = error as { status?: number; stdout?: string };
+    assert.equal(child.status, 2);
+    const report = JSON.parse(child.stdout ?? "{}");
+    assert.equal(report.backend, "trusted-host");
+    assert.equal(report.securityBoundary, "host-process");
+    assert.equal(report.code, "ISOLATION_BACKEND_UNPROVEN");
+  }
+});
+
 test("stable release isolation gate refuses an unproven host backend", () => {
   let output = "";
   try {

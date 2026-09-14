@@ -48,6 +48,7 @@
         "mode": {
           "enum": ["simulated", "isolated-container", "host-process"]
         },
+        "acknowledgeHostAccess": { "const": true },
         "egressProxy": {
           "type": "object",
           "additionalProperties": false,
@@ -128,10 +129,10 @@
       "required": ["repositoryProcesses", "adapterControlPlane"],
       "properties": {
         "repositoryProcesses": {
-          "enum": ["deny", "allowlist"]
+          "enum": ["deny", "allowlist", "allow"]
         },
         "adapterControlPlane": {
-          "enum": ["provider-only", "allowlist", "deny"]
+          "enum": ["provider-only", "allowlist", "deny", "allow"]
         }
       }
     },
@@ -180,5 +181,22 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["providerExecution"],
+        "properties": { "providerExecution": { "type": "object", "properties": { "mode": { "const": "host-process" } } } }
+      },
+      "then": {
+        "not": { "required": ["backend"], "properties": { "backend": {} } },
+        "properties": {
+          "kind": { "const": "trusted-local" },
+          "providerExecution": { "type": "object", "required": ["acknowledgeHostAccess", "providers"], "properties": { "acknowledgeHostAccess": {}, "providers": {} } },
+          "filesystem": { "type": "object", "properties": { "hostReadDefault": { "const": "allow" }, "hostWriteDefault": { "const": "allow" } } },
+          "network": { "type": "object", "properties": { "repositoryProcesses": { "const": "allow" }, "adapterControlPlane": { "const": "allow" } } }
+        }
+      }
+    }
+  ]
 }

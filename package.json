@@ -25,6 +25,7 @@
     "CHANGELOG.md",
     "RELEASE-NOTES.md",
     "docs/PROVIDER-RUNNER-PROVISIONING.md",
+    "docs/TRUSTED-HOST-RC.md",
     "SECURITY.md"
   ],
   "bin": {

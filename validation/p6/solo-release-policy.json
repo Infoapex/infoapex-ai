@@ -2,6 +2,11 @@
   "schemaVersion": "1.0",
   "profile": "solo-maintainer",
   "candidateClass": "internal-rc",
+  "executionMode": "trusted-host-explicit",
+  "osIsolationRequiredForInternalRc": false,
+  "productionReadyClaim": false,
+  "liveProviderQualification": "SEPARATELY_AUTHORIZED",
+  "knownLimitations": ["no OS filesystem or network isolation", "best-effort process-tree cleanup", "lockfile-fingerprint SBOM only", "no new live-provider qualification"],
   "requiredLocalChecks": [
     "npm test",
     "p6:verify",
@@ -11,14 +16,16 @@
     "policy-manifest",
     "cyclonedx-sbom",
     "npm-package-smoke",
-    "clean-install-smoke"
+    "clean-install-smoke",
+    "trusted-host-regression"
   ],
   "notRequiredForInternalRc": [
     "consumer-pilot",
     "three-consumer-repositories",
     "two-independent-teams",
     "thirty-day-adoption-window",
-    "independent-audit"
+    "independent-audit",
+    "docker-isolation-qualification"
   ],
   "publicationBoundary": {
     "automaticPublication": false,

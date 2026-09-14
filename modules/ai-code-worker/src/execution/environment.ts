@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalJson, sha256 } from "../manifest/normalize.js";
 import { spawnBuffered } from "../engines/spawn-buffered.js";
-import { localEngineProcessRunner, type EngineProcessRunner, type EngineProcessSyncResult } from "../engines/process-runner.js";
+import { localEngineProcessRunner, type EngineProcessOptions, type EngineProcessRunner, type EngineProcessSyncResult } from "../engines/process-runner.js";
 import type { BufferedProcessResult } from "../engines/spawn-buffered.js";
 import { SchemaRegistry, type JsonValue } from "../schema/json-schema.js";
 
@@ -26,7 +26,7 @@ export interface EnvironmentCapabilityReport {
   readonly securityBoundary: "host-process" | "os-isolated" | "simulated";
   readonly profileSha256: string;
   readonly supported: boolean;
-  /** Whether the provider CLI itself is executed inside the declared boundary. */
+  /** Provider transport available for this explicit profile; not proof of authentication or OS isolation. */
   readonly providerSupported: boolean;
   readonly requestedCapabilities: readonly EnvironmentCapability[];
   readonly capabilities: readonly EnvironmentCapability[];
@@ -38,7 +38,7 @@ export interface EnvironmentCapabilityReport {
 export interface ExecutionEnvironment {
   doctor(profile: unknown): EnvironmentCapabilityReport;
   readonly runWithProfileSync?: (profile: unknown, command: EnvironmentCommand) => EnvironmentRunResult;
-  /** Returns the provider process path, or null when the backend cannot isolate it. */
+  /** Returns the explicitly selected provider process path; never an implicit fallback. */
   readonly providerProcessRunner?: (profile: unknown, provider: "codex" | "claude") => EngineProcessRunner | null;
 }
 
@@ -326,11 +326,85 @@ const requiredCapabilities: readonly EnvironmentCapability[] = [
   "process-tree-cancellation"
 ];
 
+/** Opt-in execution for trusted repositories. This is deliberately NOT a sandbox. */
+export class TrustedHostExecutionEnvironment implements ExecutionEnvironment {
+  constructor(
+    private readonly registry = SchemaRegistry.load(),
+    private readonly runner: EngineProcessRunner = localEngineProcessRunner
+  ) {}
+
+  doctor(profile: unknown): EnvironmentCapabilityReport {
+    this.registry.assertValid("execution-environment.schema.json", profile);
+    const view = profile as EnvironmentProfileView;
+    const variables = new Set(view.environment.allowedVariables.map(environmentKey));
+    const valid = view.kind === "trusted-local" && !view.backend &&
+      view.providerExecution?.mode === "host-process" && view.providerExecution.acknowledgeHostAccess === true &&
+      (view.providerExecution.providers?.length ?? 0) > 0 &&
+      (view.providerExecution.credentialVariables ?? []).every((name) => variables.has(environmentKey(name)));
+    return {
+      ...reportBase(profile, view, "trusted-host", "0.1.0", "host-process"),
+      supported: valid, providerSupported: valid,
+      requestedCapabilities: ["environment-scrubbed", "output-limits"],
+      capabilities: valid ? ["environment-scrubbed", "output-limits"] : [],
+      missingCapabilities: valid ? [] : ["environment-scrubbed", "output-limits"],
+      warnings: [
+        "TRUSTED_HOST: commands execute with the current user's host filesystem and network permissions; no OS isolation.",
+        "CPU, memory and process-count isolation are not enforced; process-tree cleanup is best effort. Use only trusted code."
+      ],
+      providerWarnings: valid ? ["Provider transport enabled explicitly; authentication and live task readiness are not verified by this report."]
+        : ["Trusted host requires explicit host-process acknowledgement, enabled providers and allowlisted credential variables."]
+    };
+  }
+
+  providerProcessRunner(profile: unknown, provider: "codex" | "claude"): EngineProcessRunner | null {
+    if (!this.doctor(profile).providerSupported) return null;
+    const view = profile as EnvironmentProfileView;
+    if (!view.providerExecution?.providers?.includes(provider)) return null;
+    return {
+      runSync: (executable, args, options) => this.runner.runSync(executable, args, trustedHostOptions(view, options)),
+      runAsync: (executable, args, options) => this.runner.runAsync(executable, args, trustedHostOptions(view, options))
+    };
+  }
+
+  runWithProfileSync(profile: unknown, command: EnvironmentCommand): EnvironmentRunResult {
+    if (!this.doctor(profile).supported) return unavailableResult("Trusted host profile is not authorized.");
+    const result = this.runner.runSync(command.executable, command.args, trustedHostOptions(profile as EnvironmentProfileView, {
+      cwd: command.cwd, input: command.input, env: command.env, timeoutMs: command.timeoutMs,
+      maximumOutputBytes: command.maximumOutputBytes, shell: false
+    }));
+    const error = result.error ?? null;
+    return {
+      status: result.status, stdout: textOutput(result.stdout), stderr: textOutput(result.stderr), error,
+      timedOut: (error as NodeJS.ErrnoException | null)?.code === "ETIMEDOUT",
+      outputTruncated: (error as NodeJS.ErrnoException | null)?.code === "ENOBUFS"
+    };
+  }
+}
+
+function environmentKey(name: string): string { return process.platform === "win32" ? name.toUpperCase() : name; }
+
+function trustedHostOptions(view: EnvironmentProfileView, options: EngineProcessOptions): EngineProcessOptions {
+  const allowed = new Set(view.environment.allowedVariables.map(environmentKey));
+  const env = Object.fromEntries(Object.entries(options.env ?? process.env)
+    .filter(([name, value]) => value !== undefined && allowed.has(environmentKey(name))));
+  const timeoutMs = Math.min(options.timeoutMs, view.limits.maximumDurationSeconds * 1_000);
+  return {
+    ...options, env, timeoutMs,
+    maximumOutputBytes: Math.min(options.maximumOutputBytes, view.limits.maximumOutputBytes),
+    ...(options.watchdog ? { watchdog: { ...options.watchdog,
+      maximumRuntimeMs: Math.min(options.watchdog.maximumRuntimeMs, timeoutMs) } } : {})
+  };
+}
+
 export function resolveExecutionEnvironment(
   profile: unknown,
   registry = SchemaRegistry.load()
 ): ExecutionEnvironment {
   registry.assertValid("execution-environment.schema.json", profile);
+  const view = profile as EnvironmentProfileView;
+  if (view.kind === "trusted-local" && view.providerExecution?.mode === "host-process") {
+    return new TrustedHostExecutionEnvironment(registry);
+  }
   return (profile as EnvironmentProfileView).backend?.type === "docker"
     ? new DockerExecutionEnvironment(registry)
     : new LocalIsolatedExecutionEnvironment(registry);
@@ -346,6 +420,7 @@ interface EnvironmentProfileView {
   };
   readonly providerExecution?: {
     readonly mode: "simulated" | "isolated-container" | "host-process";
+    readonly acknowledgeHostAccess?: boolean;
     readonly egressProxy?: {
       readonly networkName: string;
       readonly proxyUrl: string;
@@ -365,8 +440,8 @@ interface EnvironmentProfileView {
     }>;
   };
   readonly network: {
-    readonly repositoryProcesses: "deny" | "allowlist";
-    readonly adapterControlPlane: "provider-only" | "allowlist" | "deny";
+    readonly repositoryProcesses: "deny" | "allowlist" | "allow";
+    readonly adapterControlPlane: "provider-only" | "allowlist" | "deny" | "allow";
   };
   readonly environment: {
     readonly inheritByDefault: boolean;

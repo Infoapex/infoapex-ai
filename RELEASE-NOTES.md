@@ -1,5 +1,15 @@
 # Release notes
 
+## Internal trusted-host RC — 2026-09-14
+
+`1.0.0-rc.1-internal` supports explicit host-process execution without Docker.
+Opt-in requires a trusted-local profile and host-access acknowledgement; the default
+does not silently enable host providers. Transport, environment filtering, bounded
+time/output and coordinator evidence are regression-tested with local test processes.
+No new live-provider qualification or OS isolation is claimed. Stable publication
+remains blocked by its existing isolation/GO gates. See [activation and limits](docs/TRUSTED-HOST-RC.md).
+The full Docker, >=8.5 score qualification and optimization plans remain in TODO.
+
 ## P6 readiness update — 2026-09-12
 
 P6.1–P6.8 local implementation and deterministic verification are available on the

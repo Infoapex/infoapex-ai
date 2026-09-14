@@ -19,6 +19,12 @@
 </p>
 
 > [!IMPORTANT]
+> **RC curent: `1.0.0-rc.1-internal`, fără Docker obligatoriu.** Execuția reală pe host
+> este disponibilă doar prin profilul `trusted-host` activat explicit; nu oferă izolare
+> OS și nu este un release stabil corporate. [Activare și limitări](docs/TRUSTED-HOST-RC.md).
+> Planurile de izolare, calificare și optimizare sunt păstrate în [TODO](todo.md).
+> Rezultatele istorice de mai jos nu reprezintă probe live pentru profilul nou.
+>
 > **Stare: private beta, pre-release.** P0–P4, pilotul live P2 și smoke test-ul ZIP
 > sunt închise. P4.5 are un candidat local integrat, evaluatorul independent
 > `ai-code-benchmark`, iar rerun-ul BENCH-09 R5 din 2026-09-04 a închis matricea

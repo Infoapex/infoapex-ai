@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +12,11 @@ const sbomRelative = `dist-release/infoapex-ai-${candidate}.cdx.json`;
 const policyManifestRelative = `dist-release/infoapex-ai-${candidate}.policy.json`;
 const zipPath = join(root, zipRelative);
 const checks = [];
+const reportOutput = option("--out");
+const reportPath = reportOutput ? resolve(root, reportOutput) : null;
+if (reportPath && !reportPath.startsWith(resolve(root, "dist-release") + (process.platform === "win32" ? "\\" : "/"))) {
+  throw new Error("Audit output must be inside dist-release.");
+}
 const policy = JSON.parse(readFileSync(join(root, "validation/p6/solo-release-policy.json"), "utf8"));
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 
@@ -19,6 +24,7 @@ function check(id, pass, detail = null) { checks.push({ id, status: pass ? "PASS
 check("package-version", packageJson.version === candidate.replace(/^v/, ""), `package version must match ${candidate}`);
 check("tracked-tree-clean", exec(["diff", "--quiet", "HEAD", "--"], root), "tracked files are committed; untracked local state is excluded by git archive");
 step("npm-test", "npm", ["test"]);
+step("trusted-host-regression", process.execPath, ["--test", "dist/tests/unit/trusted-host-environment.test.js", "dist/tests/unit/codex-run.test.js"], join(root, "modules/ai-code-worker"));
 step("p6-verify", "npm", ["run", "p6:verify"]);
 step("upgrade-rollback-tests", process.execPath, ["--test", "dist/tests/release-lifecycle.test.js", "dist/tests/config-lifecycle.test.js"]);
 step("reproducible-release-zip", "npm", ["run", "release:build-zip", "--", "--ref", "HEAD", "--allow-dirty", "--out", zipRelative]);
@@ -37,6 +43,10 @@ const result = {
   code: blocked.length === 0 ? "SOLO_INTERNAL_RC_READY" : "SOLO_INTERNAL_RC_BLOCKED",
   releaseAction: "INTERNAL_RC_ONLY",
   publicationAllowed: false,
+  executionMode: policy.executionMode,
+  osIsolationProven: false,
+  liveProviderQualification: "NOT_RUN",
+  knownLimitations: policy.knownLimitations,
   externalPilot: "OPTIONAL_POST_RELEASE",
   checks,
   artifacts: blocked.length === 0 ? { zip: zipRelative, sbom: sbomRelative, policyManifest: policyManifestRelative, checksum: `${zipRelative}.sha256`, provenance: `${zipRelative}.manifest.json` } : null,
@@ -44,12 +54,13 @@ const result = {
   commit: git(["rev-parse", "HEAD"]),
   commitSha256: createHash("sha256").update(git(["rev-parse", "HEAD"]).trim()).digest("hex")
 };
+if (reportPath) { mkdirSync(dirname(reportPath), { recursive: true }); writeFileSync(reportPath, `${JSON.stringify(result, null, 2)}\n`); }
 console.log(JSON.stringify(result, null, 2));
 process.exitCode = blocked.length === 0 ? 0 : 2;
 
-function step(id, command, args) {
+function step(id, command, args, cwd = root) {
   const startedAt = Date.now();
-  const status = run(command, args);
+  const status = run(command, args, cwd);
   checks.push({ id, status, durationMs: Date.now() - startedAt });
 }
 function verifyArtifacts() {
@@ -67,9 +78,9 @@ function verifyArtifacts() {
     checks.push({ id: "artifact-metadata", status: pass ? "PASS" : "BLOCKED", detail: pass ? "checksum, provenance, and SBOM match the candidate" : "artifact metadata mismatch" });
   } catch (error) { checks.push({ id: "artifact-metadata", status: "BLOCKED", detail: String(error) }); }
 }
-function run(command, args) {
+function run(command, args, cwd = root) {
   const executable = process.platform === "win32" && command === "npm" ? "npm.cmd" : command;
-  const result = spawnSync(executable, args, { cwd: root, stdio: "inherit", windowsHide: true, shell: process.platform === "win32" && executable.endsWith(".cmd") });
+  const result = spawnSync(executable, args, { cwd, stdio: "inherit", windowsHide: true, shell: process.platform === "win32" && executable.endsWith(".cmd") });
   return result.status === 0 ? "PASS" : "BLOCKED";
 }
 function exec(args, cwd) { try { execFileSync("git", args, { cwd, stdio: "ignore" }); return true; } catch { return false; } }

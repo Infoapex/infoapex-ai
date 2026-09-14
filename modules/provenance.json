@@ -23,6 +23,7 @@
       "provenanceStatus": "published",
       "syncMode": "generic-bundle-projection",
       "allowedAdaptations": [
+        "2026-09-14 bundle-local trusted-host opt-in, profile schema and compile authorization; not yet synced upstream",
         "bundle-local schema URNs",
         "generic consumer documentation",
         "bundle-relative integration paths"

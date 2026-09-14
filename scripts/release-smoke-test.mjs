@@ -108,10 +108,15 @@ try {
     if (status.config?.mode !== "integrated") throw new Error(`status did not report integrated mode: ${JSON.stringify(status)}`);
   });
 
-  step("root installer: full generic profile with spaces/Unicode + install check + no-provider preflight + ownership-safe uninstall", () => {
+  step("root installer: explicit trusted-host generic profile with spaces/Unicode + install check + no-provider preflight + ownership-safe uninstall", () => {
     initializeGitRepository(targetFullInstall);
-    const init = runJson(process.execPath, [rootCli, "init", "--repo", targetFullInstall, "--mode", "integrated", "--full", "--profile", "generic"], extractedRoot);
+    const trustedProfile = join(extractedRoot, "modules/ai-code-worker/templates/project/.ai-code-worker/execution-environment.trusted-host.example.json");
+    const init = runJson(process.execPath, [rootCli, "init", "--repo", targetFullInstall, "--mode", "integrated", "--full", "--profile", "generic", "--execution-profile", trustedProfile], extractedRoot);
     if (init.status !== "DONE" || init.profile !== "generic") throw new Error(`full install did not complete: ${JSON.stringify(init)}`);
+    const doctor = runJson(process.execPath, [join(extractedRoot, "modules/ai-code-worker/dist/src/cli.js"), "doctor", "--repo", targetFullInstall, "--engine", "fake", "--json"], extractedRoot);
+    if (doctor.executionEnvironment?.backend !== "trusted-host" || doctor.executionEnvironment?.securityBoundary !== "host-process" || doctor.executionEnvironment?.providerSupported !== true) {
+      throw new Error("The installed trusted-host profile was not selected or misrepresented its boundary.");
+    }
     const install = runJson(process.execPath, [rootCli, "install", "--check", "--repo", targetFullInstall], extractedRoot);
     if (install.status !== "PASS") throw new Error(`install check did not pass: ${JSON.stringify(install)}`);
     const preflight = runJson(process.execPath, [rootCli, "preflight", "--repo", targetFullInstall], extractedRoot);

@@ -1,5 +1,11 @@
 # P6 core-local threat model
 
+Internal-RC exception approved 2026-09-14: the explicit trusted-host profile is for
+trusted repositories only, runs with the user's host permissions, and is not an OS
+security boundary. Its warnings are intentional and stable-public isolation gates
+must still fail. See [trusted-host RC](TRUSTED-HOST-RC.md); the production requirements
+below remain applicable to the later isolated/stable profile.
+
 Trust boundary: one explicitly authorized local repository. Provider output, plans,
 Git contents, filesystem paths, and subprocess output are untrusted inputs.
 

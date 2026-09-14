@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0",
+  "profileId": "trusted-host-explicit",
+  "kind": "trusted-local",
+  "providerExecution": {
+    "mode": "host-process",
+    "acknowledgeHostAccess": true,
+    "providers": ["codex"],
+    "credentialVariables": []
+  },
+  "filesystem": { "hostReadDefault": "allow", "hostWriteDefault": "allow", "mounts": [] },
+  "network": { "repositoryProcesses": "allow", "adapterControlPlane": "allow" },
+  "environment": {
+    "inheritByDefault": false,
+    "allowedVariables": [
+      "PATH", "PATHEXT", "SystemRoot", "WINDIR", "ComSpec", "SystemDrive",
+      "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "TMPDIR",
+      "ProgramData", "PUBLIC", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432",
+      "CommonProgramFiles", "CommonProgramFiles(x86)", "CommonProgramW6432",
+      "DOTNET_ROOT", "NUGET_PACKAGES", "CI", "NO_COLOR", "LANG", "LC_ALL"
+    ]
+  },
+  "limits": { "maximumDurationSeconds": 2700, "maximumOutputBytes": 10485760, "maximumProcesses": 64 }
+}

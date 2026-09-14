@@ -1,5 +1,14 @@
 # P6 solo-maintainer profile
 
+## Current internal RC decision — 2026-09-14
+
+The maintainer selected an internal v1 RC without Docker, with explicit trusted-host
+opt-in. See [the current profile](TRUSTED-HOST-RC.md). This does not waive the stable
+public-release isolation gate, claim corporate production-readiness, or authorize
+publication. Docker qualification and optimization remain approved TODO backlog.
+The internal audit checks the trusted-host transport using real local processes and
+test provider CLIs; live authentication/LLM qualification remains separately authorized.
+
 The `solo-maintainer` profile is intended for a public project owned and operated by
 one developer. It separates technical release readiness from multi-team adoption
 research.

@@ -1,5 +1,50 @@
 # Infoapex AI TODO
 
+## Prioritate curentă — RC v1 intern fără Docker (decizie 2026-09-14)
+
+Profil aprobat de maintainer: `trusted-host` explicit, cu drepturile contului local,
+fără izolare OS. Nu reprezintă un release stabil production-ready sau calificare
+corporate >=8,5/10. Publicarea, tag-ul public și profilul izolat rămân separate.
+
+- [x] Aprobarea celor trei planuri de mai jos și păstrarea lor în backlog.
+- [x] Alegerea RC-ului intern cu execuție reală pe host activată numai explicit.
+- [x] LOCAL-RC-01: profil cu acknowledgement, runner bounded, fără fallback automat.
+- [x] LOCAL-RC-02: teste de transport, mediu, limite și flux worker cu CLI de test (459 teste worker PASS, 75 JSON validate).
+- [x] LOCAL-RC-03: documentarea instalării și a limitărilor; policy/README concordante.
+- [ ] LOCAL-RC-04: audit solo pe commit, ZIP/npm smoke și checksum/provenance.
+- [ ] LOCAL-RC-05: handoff RC intern cu dovezi și limitări; fără publicare automată.
+
+### Backlog aprobat — izolare și calificare ulterioară
+
+[Plan implementare](docs/plans/RC-HARDENING-IMPLEMENTATION-PLAN.md) și
+[plan testare/scor](docs/plans/RC-VALIDATION-AND-SCORING-PLAN.md).
+Acestea nu blochează RC-ul intern trusted-host și nu sunt marcate ca implementate.
+
+- [ ] RC-00: înghețarea profilului izolat și a matricei de suport.
+- [ ] RC-01: transport Docker, executabile și căi Windows/Linux (T01–T03).
+- [ ] RC-02: mount-uri, permisiuni, limite și cleanup Docker (T04–T09).
+- [ ] RC-03: proxy, rețea și secrete verificate efectiv (T10–T14).
+- [ ] RC-04: build/test și MCP fără execuție neizolată pe host (T15–T17).
+- [ ] RC-05: provisionare și installer Docker reproductibile (T18–T21).
+- [ ] RC-06: SBOM complet, GO și integritate release/evidence (T27–T31).
+- [ ] RC-07: documentație și operabilitate pentru profilul izolat (T24–T26, T32–T33).
+- [ ] RC-08: matrice completă, probe live aprobate și scor >=8,5/10 (T22–T36).
+
+### Backlog aprobat — optimizare
+
+[Plan optimizare](docs/plans/POST-RC-OPTIMIZATION-PLAN.md).
+
+- [ ] OPT-00: baseline de consum, latență, intervenții și calitate.
+- [ ] OPT-01: simplificarea onboarding-ului și workflow-ului.
+- [ ] OPT-02: context selectiv și eliminarea invocărilor redundante.
+- [ ] OPT-03: imagini/cache și validare incrementală sigure.
+- [ ] OPT-04: contracte provider și actualizări canary.
+- [ ] OPT-05: eliminarea configurațiilor/statusurilor duplicate.
+- [ ] OPT-06: experiment comparativ și păstrarea numai a beneficiilor demonstrate.
+
+Istoricul și checklist-urile de mai jos rămân evidențe/cerințe ale etapelor respective;
+nu sunt reinterpretate ca rezultate actuale ale RC-ului fără Docker.
+
 ## NEW-PROJECT-ONBOARDING (obligatoriu inainte de prima rulare)
 
 Acest checklist este rezultatul auditului EuroCarScan din 2026-09-05. Un proiect
