@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { test } from "node:test";
 
-test("stable isolation gate still refuses an explicitly authorized trusted host", () => {
+test("stable isolation gate still refuses an explicitly authorized trusted host", {
+  skip: existsSync(resolve(".git")) ? false : "Requires a Git checkout; ZIP smoke verifies the installed trusted-host target separately."
+}, () => {
   try {
     execFileSync(process.execPath, [resolve("scripts/isolation-preflight.mjs"), "--execution-profile",
       resolve("modules/ai-code-worker/templates/project/.ai-code-worker/execution-environment.trusted-host.example.json")],
