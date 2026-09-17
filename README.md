@@ -64,46 +64,174 @@ conversații nu poate răspunde:
 
 ## Cum funcționează
 
+Mai jos sunt două perspective: **arhitectura curentă, trusted-host**, și **ținta
+planificată cu Docker**. Infograficul de la început este o sinteză vizuală; aceste
+diagrame descriu fluxurile și limitele în detaliu. Ghidul
+[Arhitectură: prezent și ținta Docker](docs/ARCHITECTURE.md) adaugă două diagrame de
+secvență, rolurile modulelor, locația datelor și o comparație prezent/viitor.
+
+### Arhitectura curentă: RC intern trusted-host
+
+Modulele sunt CLI-uri care comunică prin JSON și fișiere, nu servicii permanente.
+Săgețile continue arată comenzi sau rezultate; cele punctate arată context și
+feedback. Albastru = coordonare, verde = execuție, mov = context/evaluare,
+portocaliu = verificare, roșu = limită de încredere.
+
+<p align="center">
+  <img src="docs/assets/infoapex-ai-current-architecture-illustrated-ro-control-flow.png"
+       alt="Ilustrație în română a arhitecturii curente Infoapex AI trusted-host, cu progresul modulelor către ai-code-control"
+       width="100%">
+</p>
+
+Imaginea este o vedere ilustrată; diagrama Mermaid de mai jos rămâne reprezentarea
+exactă și editabilă a relațiilor dintre componente.
+
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#7A90B4','primaryTextColor':'#7C93B5','edgeLabelBackground':'#152238','tertiaryTextColor':'#E8F2FF'}}}%%
-flowchart LR
-    O(["🎯 Obiectiv<br/><small>prompt + criterii</small>"]) --> P
-
-    P["<b>ai-code-planner</b><br/>descompune și rutează<br/><small>DAG · scope · profil per task</small>"]
-    W["<b>ai-code-worker</b><br/>execută și dovedește<br/><small>worktree · gate-uri · commit</small>"]
-    R["<b>ai-code-review</b><br/>verifică independent<br/><small>read-only · fail-closed</small>"]
-    D["<b>ai-code-docs</b><br/>documentează<br/><small>ciclu propriu, gated</small>"]
-    T(["✅ Țintă<br/><small>cod verificat + dovezi</small>"])
-
-    P --> W
-    W -. "replan: dependență nouă<br/>sau task incomplet" .-> P
-    W <==> E{{"🔌 Motoare LLM<br/>codex · claude · fake"}}
-    W --> R
-    R -- "PASS / FAIL / BLOCKED" --> D
-    D --> T
-
-    C["<b>ai-code-control</b> — advisory, opțional<br/><small>memorie · graf de cod · impact · scope guard</small>"]
-    C -.-> P & W & R & D
-
-    classDef start fill:#082032,stroke:#7FD3FF,stroke-width:2px,color:#DFF3FF
-    classDef plan fill:#0B1B33,stroke:#2F9BFF,stroke-width:2px,color:#DCEBFF
-    classDef work fill:#0A1E2E,stroke:#7FD3FF,stroke-width:2px,color:#DFF3FF
-    classDef check fill:#2A2008,stroke:#F0B429,stroke-width:2px,color:#FFEFC8
-    classDef done fill:#082419,stroke:#3DD68C,stroke-width:2px,color:#D6FBEA
-    classDef engine fill:#141C2E,stroke:#94A3B8,stroke-width:2px,color:#E2E8F0
-    classDef advisory fill:#0E1626,stroke:#4A6A99,stroke-width:1.5px,color:#B6C6DC
-
-    class O start
-    class P plan
-    class W work
-    class R check
-    class D,T done
-    class E engine
-    class C advisory
+%%{init: {'theme':'default','flowchart':{'curve':'basis','nodeSpacing':24,'rankSpacing':36}}}%%
+%% Diagrama descrie profilul trusted-host activat explicit, nu backend-ul fake.
+flowchart TB
+    U["Utilizator / agent principal<br/>obiectiv, criterii, aprobări"] --> CLI
+    subgraph HOST["HOST LOCAL — drepturile contului utilizatorului"]
+        CLI["Infoapex CLI + installer<br/>deleagă comenzi; nu automatizează tot ciclul"]
+        CLI -->|plan| P["ai-code-planner<br/>draft, lint, dependențe, profil logic"]
+        P --> A["Inspectare + compilare explicită<br/>plan acceptat pentru worker"]
+        CLI -->|run / resume| W["ai-code-worker<br/>manifest, bugete, task-uri, recovery"]
+        A --> W
+        CLI -->|review| R["ai-code-review<br/>criterii + dovezi; verdict independent"]
+        CLI -->|docs| D["ai-code-docs<br/>plan de documentare + ciclu verificat"]
+        R -->|worker review: read-only| W
+        D -->|worker run: scriere documente| W
+        D -->|review după execuție| R
+        W --> E["Provider CLI pe host<br/>Codex în presetul RC"]
+        E --> T["Worktree task<br/>fișiere modificate de agent"]
+        T --> G["Worker: scope + gate-uri<br/>reparații limitate, commit, integrare"]
+        G --> S[("Stare externă repository-ului<br/>checkpoint-uri, dovezi, rapoarte")]
+        W -.->|feedback prin fișiere, mod integrated| P
+        C["ai-code-control / MCP<br/>memorie, graf, impact, context scoped"]
+        C -.-> P
+        C -.-> W
+        C -.-> R
+        C -.-> D
+        B["ai-code-benchmark<br/>evaluator separat, experimente autorizate"] -->|brațe orchestrate, CLI public| CLI
+    end
+    E --> L["Serviciu LLM extern<br/>context transmis conform politicii"]
+    P -.->|adaptor propriu de planificare| L
+    B -.->|braț direct, în afara fluxului productiv| L
+    G --> OUT["Rezultat: commit-uri + dovezi<br/>merge / push sunt operații distincte"]
+    N["Limită actuală: worktree ≠ sandbox OS<br/>filesystem și rețea au drepturile hostului"] -.-> T
+    %% Modulele și depozitele de date au culori diferite; culoarea nu înlocuiește eticheta.
+    classDef coord fill:#dbeafe,stroke:#2563eb,color:#172554
+    classDef exec fill:#dcfce7,stroke:#15803d,color:#14532d
+    classDef check fill:#ffedd5,stroke:#c2410c,color:#7c2d12
+    classDef context fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef data fill:#e0f2fe,stroke:#0369a1,color:#0c4a6e
+    classDef warning fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d
+    class U,CLI,P,A coord
+    class W,E,T,OUT exec
+    class R,D,G check
+    class C,B context
+    class S,L data
+    class N warning
+    style HOST fill:#f8fafc,stroke:#64748b,color:#0f172a
 ```
 
-Fluxul citește de la stânga la dreapta, dar trei detalii din diagramă sunt
-intenționate și schimbă complet ce înseamnă proiectul.
+**Cum se citește:** utilizatorul cere un plan, îl inspectează și îl compilează, apoi
+pornește worker-ul. Acesta execută task-urile după dependențe, verifică rezultatul
+și păstrează dovezile. Review este o comandă distinctă; docs are propriul ciclu
+`plan → worker → review`. Benchmark-ul compară produsul cu agentul direct și nu
+face parte din fiecare run. Diagrama nu reprezintă o buclă automată între module.
+
+Presetul curent al installerului folosește `codex / gpt-6-astra / high`, fără
+candidat alternativ. Planner-ul poate invoca separat un LLM pentru a produce planul;
+regula „worker-ul scrie” nu înseamnă că toate apelurile LLM trec prin worker.
+Control este opțional în arhitectura de bază, dar poate fi cerut de un flux configurat.
+
+### Varianta planificată cu Docker
+
+**Țintă aprobată ca backlog, nu funcționalitate calificată astăzi.** Există deja
+un backend Docker în cod; schema de mai jos arată separarea completă cerută de
+[RC-00–RC-08](docs/plans/RC-HARDENING-IMPLEMENTATION-PLAN.md).
+Containerele sunt separate după drepturi, nu câte unul pentru fiecare modul.
+
+<p align="center">
+  <img src="docs/assets/infoapex-ai-docker-architecture-illustrated-ro-control-flow.png"
+       alt="Ilustrație în română a arhitecturii Docker planificate Infoapex AI, cu fluxul către policy, context și evidence"
+       width="100%">
+</p>
+
+Imaginea descrie ținta planificată; containerele, proxy-ul și granițele de securitate
+trebuie încă implementate și calificate prin matricea RC.
+
+```mermaid
+%%{init: {'theme':'default','flowchart':{'curve':'basis','nodeSpacing':24,'rankSpacing':36}}}%%
+%% Roluri conceptuale din planul RC; nu reprezintă un docker-compose existent.
+flowchart TB
+    U["Utilizator / agent principal<br/>plan, profil și buget aprobate"] --> O
+    subgraph TRUST["HOST DE ÎNCREDERE — coordonare și acceptare"]
+        O["CLI + orchestrator / worker<br/>planner, review și docs își păstrează rolurile"]
+        POL["Politici + context / control<br/>în afara zonelor writable ale agentului"] --> O
+        REPO[("Repository original<br/>HEAD de bază verificat")]
+        O -->|snapshot / export controlat| INPUT["Copie temporară pentru task<br/>fără Git host writable"]
+        REPO --> INPUT
+        O -->|creează, limitează, oprește| DK["Docker daemon<br/>controlat numai de orchestrator"]
+        APPLY["Acceptare pe host<br/>scope, diff, link-uri, policy, HEAD"] -->|aplicare autorizată| REPO
+        EVID[("Stare + evidence protejate<br/>hash-uri, ID-uri, rezultate, recovery")]
+        O --> EVID
+        APPLY --> EVID
+    end
+    subgraph ISO["ZONĂ CONTAINERIZATĂ — resurse temporare per run"]
+        AG["Container AGENT<br/>provider CLI + tool-uri<br/>workspace writable, auth scoped"]
+        CAND["Candidat înghețat de orchestrator<br/>același conținut pentru validare și acceptare"]
+        TEST["Container BUILD / TEST<br/>toolchain + scratch<br/>fără credențiale LLM"]
+        SVC["Containere servicii de test<br/>DB / cache dacă sunt necesare<br/>rețea internă, date temporare"]
+        FETCH["Etapă izolată: dependențe<br/>fetch aprobat + cache controlat"]
+        PROXY["Proxy de egress<br/>destinații permise, trafic verificat"]
+        AG -->|rezultat colectat și înghețat| CAND
+        CAND -->|snapshot identificat prin hash| TEST
+        TEST <-->|rețea internă autorizată| SVC
+        FETCH -->|dependențe pregătite| TEST
+        AG -->|restricted-agent-egress| PROXY
+        FETCH -->|registries aprobate| PROXY
+    end
+    INPUT --> AG
+    DK -.->|ciclu de viață| ISO
+    CAND --> APPLY
+    TEST -->|dovezi build / lint / test| APPLY
+    O -->|review cerut și politica de acceptare| APPLY
+    PROXY --> LLM["Serviciu LLM permis"]
+    PROXY --> REG["Registry de pachete permis"]
+    RULE["Containere: non-root, limite CPU/RAM/PID/timp<br/>fără Docker socket, home host sau privileged"] -.-> ISO
+    %% Săgețile nu acordă acces la original: doar pasul APPLY îl poate modifica.
+    classDef coord fill:#dbeafe,stroke:#2563eb,color:#172554
+    classDef agent fill:#ede9fe,stroke:#7c3aed,color:#3b0764
+    classDef isolated fill:#dcfce7,stroke:#15803d,color:#14532d
+    classDef check fill:#ffedd5,stroke:#c2410c,color:#7c2d12
+    classDef data fill:#e0f2fe,stroke:#0369a1,color:#0c4a6e
+    classDef boundary fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d
+    class U,O,POL,DK coord
+    class AG agent
+    class TEST,SVC,FETCH isolated
+    class APPLY,PROXY check
+    class REPO,INPUT,CAND,EVID,LLM,REG data
+    class RULE boundary
+    style TRUST fill:#eff6ff,stroke:#2563eb,color:#172554
+    style ISO fill:#f0fdf4,stroke:#15803d,stroke-width:2px,color:#14532d
+```
+
+**Fluxul final:** orchestratorul pregătește o copie temporară, agentul produce un
+candidat, iar un container separat execută validările. Orchestratorul leagă dovezile
+de conținutul verificat, aplică politica de review și reverifică HEAD-ul original
+înainte de aplicare. La final oprește resursele identificate ale run-ului și păstrează
+dovezile. Un eșec nu declanșează execuție de rezervă pe host.
+
+**Limita de rețea:** agentul și subprocesele lui pot folosi aceleași destinații
+permise; acesta nu este un profil „numai providerul are internet”. Build/test nu
+primește acea ieșire sau credențialele LLM. Proxy-ul are reguli distincte pentru
+serviciul LLM și fetch-ul de dependențe. Docker nu împiedică trimiterea codului către
+LLM și nu izolează administratorul hostului ori agentul principal de încredere.
+
+Detalii despre mount-uri, autentificare, MCP, anulare, recovery și pașii rămași:
+[ghidul complet de arhitectură](docs/ARCHITECTURE.md#4-cum-va-funcționa-varianta-cu-containere).
 
 ## Cele trei reguli care fac diferența
 
@@ -137,10 +265,10 @@ verificator.
 
 ## Economia de tokeni
 
-O sesiune de agent obișnuită folosește același model scump și pentru un README, și
-pentru o migrare de bază de date. Planner-ul alocă fiecărui subtask cel mai ieftin model
-care îl poate rezolva corect și păstrează modelele capabile pentru contracte, migrări și
-review.
+Profilele logice permit politici diferite pentru task-uri mecanice și task-uri
+complexe. Worker-ul rezolvă profilul în model concret; economia trebuie măsurată,
+nu presupusă. Schema de mai jos ilustrează o politică posibilă, nu presetul RC actual:
+acesta fixează același `gpt-6-astra/high` pentru cele două profile generate.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#7A90B4','primaryTextColor':'#7C93B5','edgeLabelBackground':'#152238','tertiaryTextColor':'#E8F2FF'}}}%%
@@ -243,7 +371,8 @@ scheme versionate, ceea ce le face utilizabile și testabile independent.
 | `ai-code-worker` | Îngheață manifestul, construiește DAG-ul, rezolvă profilul logic, invocă motorul, aplică gate-uri, bugete și cicluri limitate de reparare, comite. | Nu importă cod de planner. Nu decide singur criteriile de acceptare. |
 | `ai-code-review` | Orchestrare read-only pentru criterii și diferențe între commit-uri. `run` este fail-closed. | Nu scrie în repository-ul țintă. Nu primește capacitate de reparare. |
 | `ai-code-docs` | Documentație prin ciclu propriu planner → worker → review. `generate` cade dacă oricare pas nu trece. | Nu invocă direct providerul; deleagă worker-ului. |
-| `ai-code-control` | Memorie Markdown + index SQLite FTS, graf de cod, analiză de impact, scope guard, runner de validare, server MCP. | **Advisory și opțional** — absența lui reduce contextul, nu blochează un run. |
+| `ai-code-control` | Memorie Markdown + index SQLite FTS, graf de cod, analiză de impact, scope guard, runner de validare, server MCP. | Opțional în arhitectura de bază; poate bloca un flux care îl cere explicit, inclusiv docs. |
+| `ai-code-benchmark` | Experimente înghețate și comparații agent direct / orchestrare / orchestrare + context, prin adaptoare separate. | Nu este o etapă obligatorie a fiecărui run și nu schimbă politica produsului pentru a obține un rezultat favorabil. |
 
 ## Instalare
 
@@ -513,7 +642,8 @@ infoapex-ai/
 │   ├── ai-code-worker/          # execuție, gate-uri, dovezi, commit
 │   ├── ai-code-review/          # review independent, read-only
 │   ├── ai-code-docs/            # documentație prin ciclu gated
-│   └── ai-code-control/         # memorie, graf de cod, scope guard, MCP
+│   ├── ai-code-control/         # memorie, graf de cod, scope guard, MCP
+│   └── ai-code-benchmark/       # evaluare independentă și comparații
 ├── scripts/
 │   ├── *.mjs                    # setup, build și gate-uri integrate
 │   └── splash/                  # generator design-time pentru assets

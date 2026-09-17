@@ -1,0 +1,30 @@
+﻿{
+    "allowedFiles":  [
+                         "README.md",
+                         "docs/ARCHITECTURE.md",
+                         ".ai-code-control/reports/refactor/architecture-diagrams-20260917.json",
+                         ".ai-code-control/memory/tasks/2026-09-17-architecture-diagrams.md"
+                     ],
+    "forbiddenPaths":  [
+                           "src/",
+                           "modules/",
+                           ".github/"
+                       ],
+    "allowedUntrackedPatterns":  [
+                                     ".codex/",
+                                     ".claude/",
+                                     ".mcp.json",
+                                     "validation/benchmark/eurocarscan/csharp/.local/",
+                                     "validation/benchmark/eurocarscan/csharp-v2/.local/"
+                                 ],
+    "riskLevel":  "low",
+    "taskId":  "ARCHITECTURE-DIAGRAMS-20260917",
+    "task":  "Explain current architecture and planned Docker isolation with colored Mermaid diagrams",
+    "requiredValidation":  [
+                               "mermaid-render",
+                               "local-links",
+                               "verify-changed-files"
+                           ],
+    "status":  "completed",
+    "schemaVersion":  "1.0"
+}
