@@ -10,7 +10,7 @@ import { ExecutionTimeoutError, scheduleBounded, withTimeout } from "../src/exec
 import { captureWorkspaceDiff, cleanupWorkspace, prepareWorkspace, preserveWorkspaceForEvaluation, renameWorkspaceWithRetry } from "../src/isolation/workspace.js";
 import { readEvents } from "../src/persistence/store.js";
 import { createObservationMatrix, resumeExperiment, runExperiment, type ObservationExecutor } from "../src/runtime/index.js";
-import { canonicalPath } from "../src/security/paths.js";
+import { canonicalPath, containedPath } from "../src/security/paths.js";
 
 function frozenExperiment(id = "exp-runtime", repetitions = 1): Record<string, unknown> {
   const snapshot = {
@@ -40,6 +40,9 @@ test("temporary paths use their canonical OS location without allowing nested li
     let symlinksAvailable = true;
     try { symlinkSync(outside, join(paths.repository, "escape"), "dir"); } catch { symlinksAvailable = false; }
     if (symlinksAvailable) assert.throws(() => canonicalPath(join(paths.repository, "escape")), /symlink|junction/i);
+    let brokenSymlinksAvailable = true;
+    try { symlinkSync(join(paths.root, "missing-target"), join(paths.repository, "broken-link"), "file"); } catch { brokenSymlinksAvailable = false; }
+    if (brokenSymlinksAvailable) assert.throws(() => containedPath(paths.repository, "broken-link"), /symlink|junction/i);
   } finally { rmSync(paths.root, { recursive: true, force: true }); }
 });
 

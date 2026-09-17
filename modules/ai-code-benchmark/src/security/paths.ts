@@ -10,6 +10,7 @@ function outside(root: string, candidate: string): boolean {
 export function canonicalPath(input: string, createDirectory = false): string {
   if (!input || input.includes("\0")) throw new Error("A non-empty filesystem path is required.");
   const absolute = resolve(input);
+  assertPlainPath(absolute);
   const missing: string[] = [];
   let cursor = absolute;
   while (!existsSync(cursor)) {
@@ -42,8 +43,15 @@ export function assertPlainPath(input: string): void {
     cursor = parent;
   }
   for (const part of parts) {
-    if (!existsSync(part)) break;
-    if (lstatSync(part).isSymbolicLink() && !isDarwinSystemAlias(part)) {
+    let stat: ReturnType<typeof lstatSync>;
+    try {
+      stat = lstatSync(part);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") break;
+      throw error;
+    }
+    if (stat.isSymbolicLink() && !isDarwinSystemAlias(part)) {
       throw new Error(`Symlink or junction is not allowed in benchmark paths: ${part}`);
     }
   }
