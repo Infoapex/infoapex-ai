@@ -1,0 +1,38 @@
+﻿{
+    "requiredValidation":  [
+                               "npm test",
+                               "verify-changed-files"
+                           ],
+    "forbiddenPaths":  [
+                           ".ai-code-control/db/"
+                       ],
+    "allowedUntrackedPatterns":  [
+                                     ".codex/",
+                                     ".claude/",
+                                     ".mcp.json",
+                                     "validation/benchmark/eurocarscan/csharp/.local/",
+                                     "validation/benchmark/eurocarscan/csharp-v2/.local/"
+                                 ],
+    "riskLevel":  "low",
+    "allowedFiles":  [
+                         ".ai-code-control/config/code-control.json",
+                         ".ai-code-control/config/memory-control.json",
+                         ".ai-code-control/memory/project-memory.md",
+                         ".ai-code-control/memory/tasks/2026-09-12-full-installer-post-install-verification.md",
+                         ".ai-code-control/memory/tasks/2026-09-13-rc-hardening-test-optimization-plans.md",
+                         ".ai-code-control/memory/tasks/2026-09-17-sync-remote.md",
+                         ".ai-code-control/reports/refactor/current-plan.json",
+                         ".ai-code-control/reports/refactor/rc-planning-20260913.json",
+                         ".ai-code-control/reports/refactor/sync-remote-20260917.json",
+                         ".ai-code-control/reports/refactor/trusted-host-rc-20260914.json",
+                         "AGENTS.md",
+                         "CLAUDE.md",
+                         "docs/RC-INTERNAL-HANDOFF.md",
+                         "src/full-install.ts",
+                         "src/release-lifecycle.ts",
+                         "tests/cli.test.ts",
+                         "todo.md"
+                     ],
+    "status":  "active",
+    "task":  "Review, validate, commit and push current repository changes"
+}

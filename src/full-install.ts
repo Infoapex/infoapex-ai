@@ -204,7 +204,7 @@ export function fullInstall(options: FullInstallOptions): FullInstallResult {
     bundleRoot: bundle.replaceAll("\\", "/"),
     // Deliberately deterministic: a readiness profile is configuration, not an
     // audit event. Re-running init must not manufacture a conflicting diff.
-    provider: { engine: "codex", model: "gpt-5.6", reasoningEffort: "high", fallback: "disabled" },
+    provider: { engine: "codex", model: "gpt-6-astra", reasoningEffort: "high", fallback: "disabled" },
     contextProvider: { kind: "ai-code-control", mode: "observe" }
   }));
   writeManaged(".infoapex-ai/production-policy.json", json(defaultProductionPolicy()));
@@ -447,8 +447,8 @@ export function preflight(repositoryRoot: string, bundleRoot: string): Preflight
     const codex = config.adapters?.codex;
     const control = config.adapters?.aiCodeControl;
     const valid = config.contextProvider === "ai-code-control" && config.contextPackage?.mode === "observe" &&
-      codex?.model === "gpt-5.6" && codex?.reasoningEffort === "high" && Array.isArray(control?.baseArgs);
-    checks.push({ id: "explicit-provider-policy", status: valid ? "PASS" : "BLOCKED", detail: valid ? "Codex gpt-5.6/high is explicit; no automatic engine fallback is configured." : "Worker context/provider policy is incomplete or permits an implicit fallback." });
+      codex?.model === "gpt-6-astra" && codex?.reasoningEffort === "high" && Array.isArray(control?.baseArgs);
+    checks.push({ id: "explicit-provider-policy", status: valid ? "PASS" : "BLOCKED", detail: valid ? "Codex gpt-6-astra/high is explicit; no automatic engine fallback is configured." : "Worker context/provider policy is incomplete or permits an implicit fallback." });
   } catch {
     checks.push({ id: "explicit-provider-policy", status: "BLOCKED", detail: "Worker config is invalid JSON." });
   }
@@ -491,7 +491,7 @@ function workerConfig(paths: ReturnType<typeof modulePaths>) {
     schemaVersion: "1.0", contextProvider: "ai-code-control", contextPackage: { mode: "observe", maximumTokens: 12_000 }, maximumParallelWriters: 1,
     stateRoot: null, syncRootPolicy: { sequentialWriter: "block", parallelWriters: "block" },
     adapters: {
-      codex: { executable: "codex", model: "gpt-5.6", reasoningEffort: "high", sandboxMode: "workspace-write", idleTimeoutSeconds: 180, maximumRuntimeSeconds: 1800, maximumRepeatedProgressEvents: 4, maximumOutputBytes: 2_000_000 },
+      codex: { executable: "codex", model: "gpt-6-astra", reasoningEffort: "high", sandboxMode: "workspace-write", idleTimeoutSeconds: 180, maximumRuntimeSeconds: 1800, maximumRepeatedProgressEvents: 4, maximumOutputBytes: 2_000_000 },
       aiCodeControl: { executable: "dotnet", baseArgs: [paths.controlDll], timeoutSeconds: 60, maximumOutputBytes: 1_000_000 }
     }
   };
@@ -499,8 +499,8 @@ function workerConfig(paths: ReturnType<typeof modulePaths>) {
 
 function routingPolicy() {
   return { schemaVersion: "1.0", policyVersion: "p6-explicit-codex-v1", profiles: {
-    "mechanical-fast-v1": { candidates: [{ engine: "codex", model: "gpt-5.6" }], reason: "P6 profile pins one reviewed provider; automatic fallback is prohibited.", confidence: "high" },
-    "balanced-default-v1": { candidates: [{ engine: "codex", model: "gpt-5.6" }], reason: "P6 profile pins one reviewed provider; automatic fallback is prohibited.", confidence: "high" }
+    "mechanical-fast-v1": { candidates: [{ engine: "codex", model: "gpt-6-astra" }], reason: "P6 profile pins one reviewed provider; automatic fallback is prohibited.", confidence: "high" },
+    "balanced-default-v1": { candidates: [{ engine: "codex", model: "gpt-6-astra" }], reason: "P6 profile pins one reviewed provider; automatic fallback is prohibited.", confidence: "high" }
   } };
 }
 

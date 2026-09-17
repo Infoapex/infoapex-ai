@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0",
+  "taskId": "RC-PLANNING-20260913",
+  "task": "Document implementation, release validation and optimization plans after audit dc0d8c8",
+  "owner": "documentation",
+  "branch": "docs/rc-hardening-test-optimization-plan",
+  "baseCommit": "dc0d8c8",
+  "status": "completed",
+  "language": "markdown",
+  "affectedSymbol": "",
+  "allowedFiles": [
+    "docs/plans/RC-HARDENING-IMPLEMENTATION-PLAN.md",
+    "docs/plans/RC-VALIDATION-AND-SCORING-PLAN.md",
+    "docs/plans/POST-RC-OPTIMIZATION-PLAN.md",
+    ".ai-code-control/reports/refactor/rc-planning-20260913.json",
+    ".ai-code-control/memory/tasks/2026-09-13-rc-hardening-test-optimization-plans.md"
+  ],
+  "allowedUntrackedPatterns": [
+    ".ai-code-control/config/",
+    ".ai-code-control/memory/project-memory.md",
+    ".ai-code-control/memory/tasks/2026-09-12-full-installer-post-install-verification.md",
+    ".ai-code-control/reports/refactor/current-plan.json",
+    ".claude/",
+    ".codex/",
+    ".mcp.json",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "validation/benchmark/eurocarscan/csharp-v2/.local/",
+    "validation/benchmark/eurocarscan/csharp/.local/"
+  ],
+  "forbiddenPaths": ["src/", "modules/", "scripts/", ".github/", "package.json", "README.md"],
+  "requiredValidation": ["markdown-local-links", "plan-cross-references", "scorecard-arithmetic", "verify-changed-files", "baseline-file-integrity"],
+  "riskLevel": "low",
+  "acceptanceCriteria": [
+    "Three linked plans with dependencies, deliverables, measurable acceptance criteria and effort estimates",
+    "No runtime implementation, policy changes, provider invocation or publication",
+    "Existing user-owned untracked files remain byte-for-byte unchanged"
+  ]
+}

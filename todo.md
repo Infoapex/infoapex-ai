@@ -11,8 +11,10 @@ corporate >=8,5/10. Publicarea, tag-ul public și profilul izolat rămân separa
 - [x] LOCAL-RC-01: profil cu acknowledgement, runner bounded, fără fallback automat.
 - [x] LOCAL-RC-02: teste de transport, mediu, limite și flux worker cu CLI de test (459 teste worker PASS, 75 JSON validate).
 - [x] LOCAL-RC-03: documentarea instalării și a limitărilor; policy/README concordante.
-- [ ] LOCAL-RC-04: audit solo pe commit, ZIP/npm smoke și checksum/provenance.
-- [ ] LOCAL-RC-05: handoff RC intern cu dovezi și limitări; fără publicare automată.
+- [x] LOCAL-RC-04: audit solo pe commit, ZIP/npm smoke și checksum/provenance
+      (`dist-release/trusted-host-rc-audit.json`, PASS la commit `0ade79e`).
+- [x] LOCAL-RC-05: handoff RC intern cu dovezi și limitări; fără publicare automată.
+      Vezi [docs/RC-INTERNAL-HANDOFF.md](docs/RC-INTERNAL-HANDOFF.md).
 
 ### Backlog aprobat — izolare și calificare ulterioară
 

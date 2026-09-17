@@ -34,9 +34,9 @@ export function checkInstall(repositoryRoot: string, bundleRoot: string, require
   checks.push({ id: "managed-config", status: config.status === "PASS" ? "PASS" : "BLOCKED", detail: config.status === "PASS" ? "All installer-owned configuration validates." : "Installer-owned configuration is missing or invalid." });
   const workerConfig = safeReadJson(roots.repo, ".ai-code-worker/config.json");
   const providerPolicy = workerConfig?.contextProvider === "ai-code-control" && workerConfig?.contextPackage?.mode === "observe" &&
-    workerConfig?.adapters?.codex?.model === "gpt-5.6" && workerConfig?.adapters?.codex?.reasoningEffort === "high" &&
+    workerConfig?.adapters?.codex?.model === "gpt-6-astra" && workerConfig?.adapters?.codex?.reasoningEffort === "high" &&
     Array.isArray(workerConfig?.adapters?.aiCodeControl?.baseArgs);
-  checks.push({ id: "explicit-provider-policy", status: providerPolicy ? "PASS" : "BLOCKED", detail: providerPolicy ? "Codex gpt-5.6/high is explicit; no automatic engine fallback is configured." : "Worker context/provider policy is incomplete or stale; rerun full init with --repair after review." });
+  checks.push({ id: "explicit-provider-policy", status: providerPolicy ? "PASS" : "BLOCKED", detail: providerPolicy ? "Codex gpt-6-astra/high is explicit; no automatic engine fallback is configured." : "Worker context/provider policy is incomplete or stale; rerun full init with --repair after review." });
   checks.push(...verifyFilesystemPermissions(roots.repo, roots.bundle).checks);
   const missing = RUNTIME_PATHS.filter((path) => !safeExists(roots.bundle, path));
   checks.push({ id: "bundle-runtime", status: missing.length === 0 ? "PASS" : "BLOCKED", detail: missing.length === 0 ? "All root, module, control, and provenance runtime entries exist." : `Missing or unsafe bundle entries: ${missing.join(", ")}` });

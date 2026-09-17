@@ -150,7 +150,7 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
       adapters: { codex: { model: string; reasoningEffort: string }; aiCodeControl: { baseArgs: readonly string[] } };
     };
     assert.equal(worker.contextProvider, "ai-code-control");
-    assert.equal(worker.adapters.codex.model, "gpt-5.6");
+    assert.equal(worker.adapters.codex.model, "gpt-6-astra");
     assert.equal(worker.adapters.codex.reasoningEffort, "high");
     assert.match(worker.adapters.aiCodeControl.baseArgs.join(" "), /AiCodeControl\.Cli/);
 

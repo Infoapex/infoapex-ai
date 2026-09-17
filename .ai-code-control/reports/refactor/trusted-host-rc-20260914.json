@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "taskId": "TRUSTED-HOST-RC-20260914",
+  "task": "Prepare internal v1 RC with explicit trusted-host execution and defer Docker to TODO",
+  "owner": "maintainer-authorized",
+  "branch": "docs/rc-hardening-test-optimization-plan",
+  "baseCommit": "dc0d8c8",
+  "status": "active",
+  "allowedFiles": [
+    "TODO.md", "README.md", "RELEASE-NOTES.md", "CHANGELOG.md", "package.json",
+    "docs/P6-SOLO-PROFILE.md", "docs/P6-THREAT-MODEL.md", "docs/TRUSTED-HOST-RC.md",
+    "docs/plans/RC-HARDENING-IMPLEMENTATION-PLAN.md",
+    "docs/plans/RC-VALIDATION-AND-SCORING-PLAN.md",
+    "docs/plans/POST-RC-OPTIMIZATION-PLAN.md",
+    "validation/p6/solo-release-policy.json",
+    "modules/ai-code-worker/src/execution/environment.ts",
+    "modules/ai-code-worker/src/compile/compile.ts",
+    "modules/ai-code-worker/schemas/execution-environment.schema.json",
+    "modules/ai-code-worker/templates/project/.ai-code-worker/execution-environment.trusted-host.example.json",
+    "modules/ai-code-worker/tests/unit/trusted-host-environment.test.ts",
+    "modules/ai-code-worker/tests/unit/codex-run.test.ts",
+    "modules/provenance.json",
+    "scripts/solo-release-audit.mjs", "scripts/generate-policy-manifest.mjs",
+    "scripts/release-smoke-test.mjs", "tests/isolation-preflight.test.ts",
+    ".ai-code-control/reports/refactor/trusted-host-rc-20260914.json",
+    ".ai-code-control/memory/tasks/2026-09-14-trusted-host-internal-rc.md"
+  ],
+  "allowedUntrackedPatterns": [".ai-code-control/config/", ".ai-code-control/memory/", ".ai-code-control/reports/refactor/", ".claude/", ".codex/", ".mcp.json", "AGENTS.md", "CLAUDE.md", "validation/benchmark/eurocarscan/csharp-v2/.local/", "validation/benchmark/eurocarscan/csharp/.local/"],
+  "forbiddenPaths": [".github/"],
+  "requiredValidation": ["trusted-host-unit", "trusted-host-coordinator", "worker-suite", "solo-release-audit", "verify-changed-files"],
+  "riskLevel": "high",
+  "acceptanceCriteria": ["Host execution requires explicit profile and acknowledgement", "No silent Docker-to-host fallback", "No OS isolation claim or public publication", "User files preserved"]
+}
