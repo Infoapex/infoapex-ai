@@ -1,5 +1,6 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { runtimeEnvironment } from "../runner/quality-gate.js";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalJson, sha256 } from "../manifest/normalize.js";
 import { spawnBuffered } from "../engines/spawn-buffered.js";
@@ -369,7 +370,9 @@ export class TrustedHostExecutionEnvironment implements ExecutionEnvironment {
   runWithProfileSync(profile: unknown, command: EnvironmentCommand): EnvironmentRunResult {
     if (!this.doctor(profile).supported) return unavailableResult("Trusted host profile is not authorized.");
     const result = this.runner.runSync(command.executable, command.args, trustedHostOptions(profile as EnvironmentProfileView, {
-      cwd: command.cwd, input: command.input, env: command.env, timeoutMs: command.timeoutMs,
+      // Gates inherit only runtime paths, then the profile allowlist is applied.
+      // An explicit empty gate environment must not erase executable lookup.
+      cwd: command.cwd, input: command.input, env: runtimeEnvironment(command.env), timeoutMs: command.timeoutMs,
       maximumOutputBytes: command.maximumOutputBytes, shell: false
     }));
     const error = result.error ?? null;

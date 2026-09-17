@@ -4,7 +4,7 @@ import { writeFileSync } from "node:fs";
 import type { AgentExecutionResult } from "./fake-engine.js";
 import { createEngineEvent, validateEngineEventStream, type EngineEvent, type EngineUsage } from "./engine-event.js";
 import { type BufferedProcessResult } from "./spawn-buffered.js";
-import { needsShellWrapper } from "./spawn-shell.js";
+import { needsShellWrapper, resolveCommandShim } from "./spawn-shell.js";
 import { localEngineProcessRunner, type EngineProcessRunner } from "./process-runner.js";
 import { versionMatchesAny } from "./version-match.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
@@ -92,7 +92,7 @@ export class CodexCliAdapter {
     private readonly config: CodexCliAdapterConfig,
     private readonly registry = SchemaRegistry.load()
   ) {
-    this.executable = config.executable ?? discoverEngineExecutable("codex");
+    this.executable = resolveCommandShim(config.executable ?? discoverEngineExecutable("codex"), process.env);
     this.baseArgs = config.baseArgs ?? [];
     this.adapterVersion = config.adapterVersion ?? "0.1.0";
     // timeoutMs remains for synchronous legacy callers. Async P5 execution uses the

@@ -33,7 +33,17 @@
                          "scripts/fixtures/codex-doctor/codex",
                          "scripts/fixtures/codex-doctor/codex.cmd",
                          ".ai-code-control/reports/refactor/splash-ci-20260917.json",
-                         ".ai-code-control/memory/tasks/2026-09-17-splash-ci.md"
+                         ".ai-code-control/memory/tasks/2026-09-17-splash-ci.md",
+                         "modules/ai-code-worker/src/execution/environment.ts",
+                         "modules/ai-code-worker/src/run/codex-run.ts",
+                         "modules/ai-code-worker/src/run/claude-run.ts",
+                         "modules/ai-code-worker/tests/unit/trusted-host-execution.test.ts",
+                         "modules/ai-code-worker/tests/unit/usage-persistence.test.ts",
+                         "modules/ai-code-worker/src/runner/quality-gate.ts",
+                         "modules/ai-code-worker/tests/unit/trusted-host-environment.test.ts",
+                         "modules/ai-code-worker/src/engines/codex-cli.ts",
+                         "modules/ai-code-worker/src/engines/claude-cli.ts",
+                         "modules/ai-code-worker/src/engines/spawn-shell.ts"
                      ],
     "task":  "Promote architecture splash and repair cross-platform CI"
 }

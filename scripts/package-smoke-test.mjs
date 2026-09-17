@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -9,7 +9,9 @@ import { join, resolve } from "node:path";
 // exercised from a disposable target repository.
 const root = resolve(import.meta.dirname, "..");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const workspace = mkdtempSync(join(tmpdir(), "infoapex-package-smoke-"));
+// Keep npm's prefix and local tarball URL on the same canonical path on macOS
+// (/var is an alias of /private/var), as in the release ZIP smoke test.
+const workspace = realpathSync.native(mkdtempSync(join(tmpdir(), "infoapex-package-smoke-")));
 const packRoot = join(workspace, "pack");
 const installRoot = join(workspace, "install");
 const targetRoot = join(workspace, "target");

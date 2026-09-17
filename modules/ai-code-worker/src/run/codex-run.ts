@@ -320,7 +320,7 @@ export async function runCodex(options: CodexRunOptions): Promise<CodexRunReport
     }
 
     for (const dependency of snapshot.transitiveDependencies) {
-      git(["cherry-pick", "--no-gpg-sign", dependency.commit], worktree.worktree.path);
+      git(["-c", "user.name=ai-code-worker", "-c", "user.email=worker@example.test", "cherry-pick", "--no-gpg-sign", dependency.commit], worktree.worktree.path);
     }
 
     const expectedHead = currentHead(worktree.worktree.path);
