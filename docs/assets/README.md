@@ -2,14 +2,17 @@
 
 | Fișier | Dimensiune | Utilizare |
 |---|---|---|
-| `infoapex-ai-splash-architecture.svg` | 1672 × 941 | infografic principal |
-| `infoapex-ai-splash-architecture.png` | 1672 × 941 | hero-ul din README |
+| `infoapex-ai-current-architecture-illustrated-ro-control-flow.png` | 1672 × 941 | splash screen-ul curent din README, cu modulele etichetate |
+| `infoapex-ai-splash-architecture.svg` | 1672 × 941 | varianta vectorială anterioară |
+| `infoapex-ai-splash-architecture.png` | 1672 × 941 | rasterizarea variantei vectoriale anterioare |
 | `infoapex-logo.png` / `.svg` | 327 × 271, RGBA | marca InfoApex, fundal transparent |
 | `infoapex-logo-lockup.png` / `.svg` | 1144 × 281, RGBA | marca + wordmark, transparent |
 | `src/` | — | randările sursă ale logo-ului, înainte de cheiere |
 
-PNG-ul infograficului este sub limita de 1 MB a GitHub, deci poate fi folosit și
-ca social preview al repository-ului.
+Splash screen-ul curent este un PNG ilustrat, editat cu ImageGen. Apare o singură
+dată, la începutul README-ului; secțiunea arhitecturii curente păstrează Mermaid-ul
+și explicațiile. Generatorul de mai jos păstrează varianta vectorială anterioară
+și nu suprascrie imaginea curentă.
 
 ## Regenerare
 

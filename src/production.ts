@@ -117,6 +117,6 @@ function isObject(value: unknown): value is Record<string, unknown> { return val
 function hash(value: string | Buffer): string { return createHash("sha256").update(value).digest("hex"); }
 function readPolicy(repo: string): ProductionPolicy | null { const value = jsonFile(join(repo, ".infoapex-ai", "production-policy.json")); return value as ProductionPolicy | null; }
 function isInside(root: string, path: string): boolean { const rel = relative(resolve(root), resolve(path)); return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); }
-function safeExistingPath(repo: string, path: string): boolean { try { return isInside(repo, realPath(path)); } catch { return false; } }
+function safeExistingPath(repo: string, path: string): boolean { try { return isInside(realPath(repo), realPath(path)); } catch { return false; } }
 function safeExistingParent(repo: string, path: string): boolean { const parent = dirname(path); return existsSync(parent) ? safeExistingPath(repo, parent) : safeExistingParent(repo, parent); }
 function realPath(path: string): string { lstatSync(path); return realpathSync(path); }

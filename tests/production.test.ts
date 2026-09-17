@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
@@ -8,6 +8,35 @@ import { defaultProductionPolicy, diagnosticsBundle, productionDoctor, productio
 test("production defaults disable external actions, export and raw conversations", () => {
   const policy = defaultProductionPolicy();
   assert.equal(policy.externalActions, "disabled"); assert.equal(policy.telemetryExport, "off"); assert.equal(policy.rawConversationStorage, false); assert.equal(policy.resources.maximumParallelWriters, 1);
+});
+
+test("diagnostics and retention accept a repository alias but reject links outside it", () => {
+  const workspace = mkdtempSync(join(tmpdir(), "infoapex-prod-alias-"));
+  const repo = join(workspace, "repository");
+  const alias = join(workspace, "alias");
+  const outside = join(workspace, "outside");
+  try {
+    mkdirSync(join(repo, ".infoapex-ai"), { recursive: true });
+    mkdirSync(outside);
+    symlinkSync(repo, alias, process.platform === "win32" ? "junction" : "dir");
+    writeFileSync(join(repo, ".infoapex-ai", "production-policy.json"), JSON.stringify(defaultProductionPolicy()));
+    const result = diagnosticsBundle(alias, ".infoapex-ai/diagnostics/alias.json");
+    assert.equal(result.status, "PASS", JSON.stringify(result));
+    const evidence = join(repo, ".infoapex-ai", "diagnostics", "alias.json");
+    const old = new Date(Date.now() - 31 * 86_400_000);
+    utimesSync(evidence, old, old);
+    assert.equal(retention(alias, false).status, "PASS");
+    assert.equal(existsSync(evidence), false);
+    symlinkSync(outside, join(repo, "escape"), process.platform === "win32" ? "junction" : "dir");
+    assert.equal(diagnosticsBundle(alias, "escape/bundle.json").code, "PATH_UNSAFE");
+    assert.equal(existsSync(join(outside, "bundle.json")), false);
+    symlinkSync(outside, join(repo, ".infoapex-ai", "telemetry"), process.platform === "win32" ? "junction" : "dir");
+    const sentinel = join(outside, "keep.json");
+    writeFileSync(sentinel, "keep");
+    utimesSync(sentinel, old, old);
+    assert.equal(retention(alias, false).code, "PATH_UNSAFE");
+    assert.equal(readFileSync(sentinel, "utf8"), "keep");
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
 });
 
 test("production doctor fails closed without policy", () => {
