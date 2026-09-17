@@ -208,21 +208,20 @@ test("candidate telemetry evidence is aggregate-only and detects unsafe span att
 
 test("candidate telemetry accepts the worker's current platform-default state layout", () => {
   const repository = mkdtempSync(join(tmpdir(), "ai-code-benchmark-otel-default-"));
-  const temporaryBase = mkdtempSync(join(tmpdir(), "ai-code-benchmark-local-state-"));
-  const defaultBase = process.platform === "darwin" ? join(homedir(), "Library", "Application Support") : temporaryBase;
+  const defaultBase = process.platform === "win32"
+    ? process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local")
+    : process.platform === "darwin"
+      ? join(homedir(), "Library", "Application Support")
+      : process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state");
   const runRoot = join(defaultBase, "ai-code-worker", "repos", "a".repeat(16), "runs", "run-default"); mkdirSync(runRoot, { recursive: true }); mkdirSync(join(repository, ".ai-code-worker"), { recursive: true });
   writeFileSync(join(repository, ".ai-code-worker", "config.json"), JSON.stringify({ stateRoot: join(repository, "declared-state") }), "utf8");
   writeFileSync(join(runRoot, "events.jsonl"), JSON.stringify({ type: "run.done", payload: { tasks: ["TASK-1"] } }) + "\n", "utf8");
   writeFileSync(join(runRoot, "otel-spans.jsonl"), JSON.stringify({ name: "run.done", attributes: { tasks: ["TASK-1"] } }) + "\n", "utf8");
-  const environmentName = process.platform === "win32" ? "LOCALAPPDATA" : "XDG_STATE_HOME";
-  const prior = process.env[environmentName];
-  if (process.platform !== "darwin") process.env[environmentName] = temporaryBase;
   try {
     const evidence = collectCandidateTelemetry(JSON.stringify({ body: { state: { runRoot, eventLogPath: join(runRoot, "events.jsonl") } } }), request({ arm: "candidate", repositoryPath: repository }));
     assert.equal(evidence?.eligibleTraceCoverage, 1); assert.equal(evidence?.telemetryLeakageCount, 0);
   } finally {
-    if (prior === undefined) delete process.env[environmentName]; else process.env[environmentName] = prior;
-    rmSync(repository, { recursive: true, force: true }); rmSync(temporaryBase, { recursive: true, force: true }); rmSync(runRoot, { recursive: true, force: true });
+    rmSync(repository, { recursive: true, force: true }); rmSync(runRoot, { recursive: true, force: true });
   }
 });
 
