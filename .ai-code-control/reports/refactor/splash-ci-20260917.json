@@ -45,7 +45,10 @@
                          "modules/ai-code-worker/src/engines/claude-cli.ts",
                          "modules/ai-code-worker/src/engines/spawn-shell.ts",
                          "modules/ai-code-planner/tests/unit/claude-adapter.test.ts",
-                         "modules/ai-code-benchmark/tests/adapters.test.ts"
+                         "modules/ai-code-benchmark/tests/adapters.test.ts",
+                         "modules/ai-code-benchmark/src/security/paths.ts",
+                         "modules/ai-code-benchmark/tests/security.test.ts",
+                         "modules/ai-code-benchmark/tests/runtime.test.ts"
                      ],
     "task":  "Promote architecture splash and repair cross-platform CI"
 }
