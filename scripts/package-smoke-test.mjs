@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -8,7 +9,9 @@ import { join, resolve } from "node:path";
 // exercised from a disposable target repository.
 const root = resolve(import.meta.dirname, "..");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const workspace = mkdtempSync(join(tmpdir(), "infoapex-package-smoke-"));
+// Keep npm's prefix and local tarball URL on the same canonical path on macOS
+// (/var is an alias of /private/var), as in the release ZIP smoke test.
+const workspace = realpathSync.native(mkdtempSync(join(tmpdir(), "infoapex-package-smoke-")));
 const packRoot = join(workspace, "pack");
 const installRoot = join(workspace, "install");
 const targetRoot = join(workspace, "target");
@@ -21,9 +24,22 @@ try {
   const tarball = resolve(packRoot, packed.filename);
   if (!existsSync(tarball)) throw new Error(`npm pack reported a missing artefact: ${tarball}`);
 
-  // Installation is offline as well as startup: an undeclared runtime download
-  // cannot be hidden by a developer's network connection.
-  execFileSync(npm, ["install", tarball, "--ignore-scripts", "--no-save", "--package-lock=false", "--offline", "--prefix", installRoot], npmOptions);
+  // npm ci caches locked tarballs, not necessarily registry metadata. Reuse the
+  // reviewed resolutions so a clean runner needs no cached version-range lookup.
+  const sourceLock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8"));
+  const sourcePackage = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const dependency = pathToFileURL(tarball).href;
+  const fixture = { name: "infoapex-package-smoke", version: "1.0.0", private: true, dependencies: { [packed.name]: dependency } };
+  const { [""]: _rootPackage, ...dependencies } = sourceLock.packages;
+  const lock = { name: fixture.name, version: fixture.version, lockfileVersion: 3, requires: true, packages: {
+    "": fixture,
+    ...dependencies,
+    [`node_modules/${packed.name}`]: { version: packed.version, resolved: dependency, integrity: packed.integrity, dependencies: sourcePackage.dependencies, bin: sourcePackage.bin }
+  } };
+  mkdirSync(installRoot, { recursive: true });
+  writeFileSync(join(installRoot, "package.json"), JSON.stringify(fixture));
+  writeFileSync(join(installRoot, "package-lock.json"), JSON.stringify(lock));
+  execFileSync(npm, ["ci", "--ignore-scripts", "--omit=dev", "--offline", "--prefix", installRoot], npmOptions);
   const packageRoot = join(installRoot, "node_modules", "@infoapex", "infoapex-ai");
   const cli = join(packageRoot, "dist", "src", "cli.js");
   if (!existsSync(cli)) throw new Error("Installed package is missing dist/src/cli.js.");

@@ -1,16 +1,17 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 
 const cliPath = resolve("dist/src/cli.js");
 
-function runCli(repositoryPath: string, args: string[]): { status: number; stdout: string; stderr: string } {
+function runCli(repositoryPath: string, args: string[], env = process.env): { status: number; stdout: string; stderr: string } {
   try {
     const stdout = execFileSync(process.execPath, [cliPath, ...args], {
       cwd: repositoryPath,
+      env,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"]
     });
@@ -130,7 +131,12 @@ test("full installer creates a reusable .NET/Next.js profile without module-rela
     writeFileSync(join(repository, "server", "Product.Api", "Program.cs"), 'System.Console.WriteLine("ok");\n');
     writeFileSync(join(repository, "client", "package.json"), JSON.stringify({ scripts: { build: "node -e \"process.exit(0)\"", typecheck: "node -e \"process.exit(0)\"" } }));
     initializeGit(repository);
-    const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "dotnet-nextjs", "--backend-dir", "server", "--frontend-dir", "client", "--ml-dir", "data", "--verify"]);
+    // Exercise real module wiring without depending on an installed provider.
+    // The fixture exposes metadata only and refuses all execution requests.
+    const env = { ...process.env };
+    const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+    env[pathKey] = `${resolve("scripts/fixtures/codex-doctor")}${delimiter}${env[pathKey] ?? ""}`;
+    const init = runCli(repository, ["init", "--repo", repository, "--mode", "integrated", "--full", "--profile", "dotnet-nextjs", "--backend-dir", "server", "--frontend-dir", "client", "--ml-dir", "data", "--verify"], env);
     assert.equal(init.status, 0, init.stderr || init.stdout);
     const body = JSON.parse(init.stdout) as { status: string; profile: string; created: readonly string[]; postInstallVerification?: { status: string; checks: readonly { id: string; status: string }[] } };
     assert.equal(body.status, "DONE");

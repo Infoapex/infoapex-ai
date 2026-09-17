@@ -1,3 +1,6 @@
+import { existsSync } from "node:fs";
+import { delimiter, join } from "node:path";
+
 /**
  * Windows cannot execute .cmd/.bat files directly via CreateProcess - spawnSync given a
  * full path to one, without shell:true, fails with EINVAL (confirmed live). This is
@@ -17,4 +20,20 @@
  */
 export function needsShellWrapper(executable: string): boolean {
   return process.platform === "win32" && /\.(cmd|bat)$/i.test(executable);
+}
+
+/** Resolve bare Windows command shims before choosing the spawn strategy. */
+export function resolveCommandShim(executable: string, env: NodeJS.ProcessEnv): string {
+  if (process.platform !== "win32" || executable.includes("\\") || executable.includes("/") || /\.[^./\\]+$/i.test(executable)) return executable;
+  const pathValue = env.Path ?? env.PATH;
+  if (!pathValue) return executable;
+  for (const directory of pathValue.split(delimiter)) {
+    if (!directory) continue;
+    for (const extension of [".exe", ".com", ".cmd", ".bat"]) {
+      // Keep a PATH-relative name: shell:true does not quote absolute paths
+      // containing spaces. Respect native executables before command shims.
+      if (existsSync(join(directory, `${executable}${extension}`))) return `${executable}${extension}`;
+    }
+  }
+  return executable;
 }

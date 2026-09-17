@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, existsSync, writeFileSync, realpathSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // P3, steps 2-6 (docs/plans/INFOAPEX-AI-ROADMAP-P0-P5.md section 7): extract a release ZIP
@@ -39,7 +39,7 @@ try {
 
   step("extract ZIP into a clean directory", () => {
     const zip = new AdmZip(zipPath);
-    zip.extractAllTo(extractedRoot, true);
+    zip.extractAllTo(extractedRoot, true, true);
     for (const forbidden of ["node_modules", "dist", ".git"]) {
       if (existsSync(join(extractedRoot, forbidden))) {
         throw new Error(`Extracted release ZIP unexpectedly contains ${forbidden} - the ZIP is not clean.`);
@@ -119,7 +119,10 @@ try {
     }
     const install = runJson(process.execPath, [rootCli, "install", "--check", "--repo", targetFullInstall], extractedRoot);
     if (install.status !== "PASS") throw new Error(`install check did not pass: ${JSON.stringify(install)}`);
-    const preflight = runJson(process.execPath, [rootCli, "preflight", "--repo", targetFullInstall], extractedRoot);
+    const env = { ...process.env };
+    const pathKey = Object.keys(env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+    env[pathKey] = `${join(extractedRoot, "scripts", "fixtures", "codex-doctor")}${delimiter}${env[pathKey] ?? ""}`;
+    const preflight = runJson(process.execPath, [rootCli, "preflight", "--repo", targetFullInstall], extractedRoot, env);
     if (preflight.status !== "PASS") throw new Error(`full install preflight did not pass: ${JSON.stringify(preflight)}`);
     writeFileSync(join(targetFullInstall, ".ai-code-control", "memory", "DECISIONS.md"), "# preserved state\n", "utf8");
     writeFileSync(join(targetFullInstall, ".infoapex-ai", "runs", "preserved.json"), "{\"state\":true}\n", "utf8");
@@ -215,8 +218,8 @@ function runGit(args, cwd) {
   }
 }
 
-function runJson(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, encoding: "utf8", windowsHide: true, timeout: timeoutMs });
+function runJson(command, args, cwd, env = process.env) {
+  const result = spawnSync(command, args, { cwd, env, encoding: "utf8", windowsHide: true, timeout: timeoutMs });
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(" ")} exited with status ${result.status}: ${result.stderr}`);
   }

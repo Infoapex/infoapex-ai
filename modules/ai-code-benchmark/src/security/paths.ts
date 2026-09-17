@@ -10,6 +10,7 @@ function outside(root: string, candidate: string): boolean {
 export function canonicalPath(input: string, createDirectory = false): string {
   if (!input || input.includes("\0")) throw new Error("A non-empty filesystem path is required.");
   const absolute = resolve(input);
+  assertPlainPath(absolute);
   const missing: string[] = [];
   let cursor = absolute;
   while (!existsSync(cursor)) {
@@ -42,9 +43,33 @@ export function assertPlainPath(input: string): void {
     cursor = parent;
   }
   for (const part of parts) {
-    if (!existsSync(part)) break;
-    if (lstatSync(part).isSymbolicLink()) throw new Error(`Symlink or junction is not allowed in benchmark paths: ${part}`);
+    let stat: ReturnType<typeof lstatSync>;
+    try {
+      stat = lstatSync(part);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") break;
+      throw error;
+    }
+    if (stat.isSymbolicLink() && !isDarwinSystemAlias(part)) {
+      throw new Error(`Symlink or junction is not allowed in benchmark paths: ${part}`);
+    }
   }
+}
+
+/** macOS exposes stable root aliases such as /var -> /private/var. They are part
+ * of the OS filesystem layout and cannot be avoided by tmpdir() callers. Only
+ * these exact, verified aliases are allowed; links below them still fail. */
+function isDarwinSystemAlias(path: string): boolean {
+  if (process.platform !== "darwin") return false;
+  const expected = new Map([
+    ["/var", "/private/var"],
+    ["/tmp", "/private/tmp"],
+    ["/etc", "/private/etc"]
+  ]);
+  const target = expected.get(resolve(path));
+  if (!target) return false;
+  try { return realpathSync.native(path) === target; } catch { return false; }
 }
 
 export function assertSeparateRoots(repositoryPath: string, stateRoot: string): void {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ import { ExecutionTimeoutError, scheduleBounded, withTimeout } from "../src/exec
 import { captureWorkspaceDiff, cleanupWorkspace, prepareWorkspace, preserveWorkspaceForEvaluation, renameWorkspaceWithRetry } from "../src/isolation/workspace.js";
 import { readEvents } from "../src/persistence/store.js";
 import { createObservationMatrix, resumeExperiment, runExperiment, type ObservationExecutor } from "../src/runtime/index.js";
+import { canonicalPath, containedPath } from "../src/security/paths.js";
 
 function frozenExperiment(id = "exp-runtime", repetitions = 1): Record<string, unknown> {
   const snapshot = {
@@ -30,6 +31,20 @@ function fixture(): { root: string; repository: string; state: string } {
   mkdirSync(repository); mkdirSync(state); writeFileSync(join(repository, "baseline.txt"), "clean\n");
   return { root, repository, state };
 }
+
+test("temporary paths use their canonical OS location without allowing nested links", () => {
+  const paths = fixture();
+  try {
+    assert.equal(canonicalPath(paths.repository), realpathSync.native(paths.repository));
+    const outside = join(paths.root, "outside"); mkdirSync(outside);
+    let symlinksAvailable = true;
+    try { symlinkSync(outside, join(paths.repository, "escape"), "dir"); } catch { symlinksAvailable = false; }
+    if (symlinksAvailable) assert.throws(() => canonicalPath(join(paths.repository, "escape")), /symlink|junction/i);
+    let brokenSymlinksAvailable = true;
+    try { symlinkSync(join(paths.root, "missing-target"), join(paths.repository, "broken-link"), "file"); } catch { brokenSymlinksAvailable = false; }
+    if (brokenSymlinksAvailable) assert.throws(() => containedPath(paths.repository, "broken-link"), /symlink|junction/i);
+  } finally { rmSync(paths.root, { recursive: true, force: true }); }
+});
 
 test("matrix IDs, seeds, ordering, and Latin arm balance are deterministic", () => {
   const experiment = frozenExperiment("exp-matrix", 3);

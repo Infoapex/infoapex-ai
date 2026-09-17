@@ -4,7 +4,7 @@ import { writeFileSync } from "node:fs";
 import type { AgentExecutionResult } from "./fake-engine.js";
 import { createEngineEvent, validateEngineEventStream, type EngineEvent, type EngineUsage } from "./engine-event.js";
 import { type BufferedProcessResult } from "./spawn-buffered.js";
-import { needsShellWrapper } from "./spawn-shell.js";
+import { needsShellWrapper, resolveCommandShim } from "./spawn-shell.js";
 import { localEngineProcessRunner, type EngineProcessRunner } from "./process-runner.js";
 import { versionMatchesAny } from "./version-match.js";
 import { SchemaRegistry } from "../schema/json-schema.js";
@@ -124,7 +124,7 @@ export class ClaudeCliAdapter {
     private readonly config: ClaudeCliAdapterConfig,
     private readonly registry = SchemaRegistry.load()
   ) {
-    this.executable = config.executable ?? discoverEngineExecutable("claude");
+    this.executable = resolveCommandShim(config.executable ?? discoverEngineExecutable("claude"), process.env);
     this.baseArgs = config.baseArgs ?? [];
     this.permissionMode = config.permissionMode ?? "dontAsk";
     this.allowedTools = config.allowedTools ?? DEFAULT_ALLOWED_TOOLS;

@@ -1,13 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createClaudeAdapter } from '../../src/engine/claude-adapter.js';
 import { writeFakeClaudeCli } from '../helpers/fake-claude-cli.js';
 
 function makeTempDir(): string {
-  return mkdtempSync(join(tmpdir(), 'claude-adapter-test-'));
+  // Node 24 reports macOS temporary directories through their canonical
+  // /private/var path, while tmpdir() may still expose the /var alias.
+  return realpathSync.native(mkdtempSync(join(tmpdir(), 'claude-adapter-test-')));
 }
 
 test('ask() returns ok:true with text matching configured responseText', () => {

@@ -88,6 +88,23 @@ describe("explicit trusted-host environment", () => {
     }
   });
 
+  it("keeps allowlisted host PATH for gates with an explicit empty environment", () => {
+    const p = profile();
+    const calls: EngineProcessOptions[] = [];
+    const stub: EngineProcessRunner = {
+      runSync(_exe, _args, opts) { calls.push(opts); return { status: 0, stdout: "", stderr: "", pid: 1, signal: null, output: [null, "", ""] }; },
+      async runAsync() { throw new Error("Unexpected async call"); }
+    };
+    const environment = new TrustedHostExecutionEnvironment(undefined, stub);
+    environment.runWithProfileSync(p, { ...options(), executable: "node", args: ["--version"], env: {} });
+    const hostPath = process.env.Path ?? process.env.PATH;
+    assert.ok(hostPath);
+    assert.equal(calls[0].env?.Path ?? calls[0].env?.PATH, hostPath);
+    p.environment.allowedVariables = p.environment.allowedVariables.filter((name: string) => name.toUpperCase() !== "PATH");
+    environment.runWithProfileSync(p, { ...options(), executable: "node", args: ["--version"], env: {} });
+    assert.equal(calls[1].env?.Path ?? calls[1].env?.PATH, undefined);
+  });
+
   it("terminates a bounded asynchronous local process", async () => {
     const p = profile();
     const runner = resolveExecutionEnvironment(p).providerProcessRunner!(p, "codex")!;

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/infoapex-ai-splash-architecture.png"
+  <img src="docs/assets/infoapex-ai-current-architecture-illustrated-ro-control-flow.png"
        alt="Infoapex AI — control plane local pentru agenți de programare: obiectiv, planner, worker, review, docs și țintă verificată"
        width="100%">
 </p>
@@ -76,15 +76,6 @@ Modulele sunt CLI-uri care comunică prin JSON și fișiere, nu servicii permane
 Săgețile continue arată comenzi sau rezultate; cele punctate arată context și
 feedback. Albastru = coordonare, verde = execuție, mov = context/evaluare,
 portocaliu = verificare, roșu = limită de încredere.
-
-<p align="center">
-  <img src="docs/assets/infoapex-ai-current-architecture-illustrated-ro-control-flow.png"
-       alt="Ilustrație în română a arhitecturii curente Infoapex AI trusted-host, cu progresul modulelor către ai-code-control"
-       width="100%">
-</p>
-
-Imaginea este o vedere ilustrată; diagrama Mermaid de mai jos rămâne reprezentarea
-exactă și editabilă a relațiilor dintre componente.
 
 ```mermaid
 %%{init: {'theme':'default','flowchart':{'curve':'basis','nodeSpacing':24,'rankSpacing':36}}}%%
@@ -659,16 +650,17 @@ infoapex-ai/
 ## Identitate vizuală
 
 Infograficul de mai sus și assets-urile de logo sunt în [`docs/assets/`](docs/assets/),
-cu [nota lor tehnică](docs/assets/README.md). Se regenerează cu:
+cu [nota lor tehnică](docs/assets/README.md). Splash screen-ul curent este imaginea
+ilustrată în română, cu modulele etichetate. Generatorul variantei vectoriale
+anterioare și al logo-urilor rămâne disponibil:
 
 ```bash
 npm run generate:splash
 ```
 
 Generatorul este **doar design-time** — nimic din bundle-ul livrat nu depinde de el.
-Textul din SVG este convertit în contururi, deci imaginile nu depind de fonturi
-instalate; Chromium și Edge le randează identic, iar PNG-urile sunt rasterizate din
-exact aceleași SVG-uri.
+Textul variantei SVG este convertit în contururi. Comanda nu regenerează și nu
+suprascrie splash screen-ul ilustrat curent.
 
 ## Securitate și contribuții
 

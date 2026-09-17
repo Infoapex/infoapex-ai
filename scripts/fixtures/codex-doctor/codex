@@ -1,0 +1,10 @@
+#!/bin/sh
+# Metadata-only test double: never invokes a model or executes a prompt.
+if [ "$#" = 1 ] && [ "$1" = "--version" ]; then
+  echo 'codex-cli 0.104.0'
+elif [ "$#" = 2 ] && [ "$1" = "exec" ] && [ "$2" = "--help" ]; then
+  echo 'fixture capabilities: --json --cd --sandbox'
+else
+  echo 'Doctor fixture refuses execution' >&2
+  exit 2
+fi
