@@ -1,5 +1,5 @@
 {
-  "task": "Fix README splash display on GitHub",
+  "task": "Display architecture splash inline using Markdown image syntax",
   "status": "active",
   "allowedFiles": [
     "README.md",
