@@ -1,8 +1,10 @@
 <p align="center">
   <img src="docs/assets/infoapex-ai-current-architecture-illustrated-ro-control-flow.png"
        alt="Infoapex AI — control plane local pentru agenți de programare: obiectiv, planner, worker, review, docs și țintă verificată"
-       width="100%">
+       width="1672">
 </p>
+
+[Deschide imaginea arhitecturii curente la rezoluție completă](docs/assets/infoapex-ai-current-architecture-illustrated-ro-control-flow.png)
 
 <h1 align="center">Infoapex AI</h1>
 

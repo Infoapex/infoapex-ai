@@ -1,0 +1,42 @@
+{
+  "task": "Fix README splash display on GitHub",
+  "status": "active",
+  "allowedFiles": [
+    "README.md",
+    ".ai-code-control/reports/refactor/readme-splash-display-20260918.json",
+    ".ai-code-control/memory/tasks/2026-09-18-readme-splash-display.md",
+    "docs/P5-UI.md",
+    ".ai-code-control/reports/refactor/current-plan.json",
+    ".ai-code-control/memory/tasks/2026-09-18-p5-ui-mockup-spec.md",
+    ".ai-code-control/reports/refactor/p5-ui-mockup-spec-20260918.json",
+    "docs/P5-UI-MOCKUP-SPEC.md"
+  ],
+  "allowedUntrackedPatterns": [
+    ".ai-code-control/memory/tasks/2026-09-18-p5-ui-mockup-spec.md",
+    ".ai-code-control/reports/refactor/p5-ui-mockup-spec-20260918.json",
+    ".claude/",
+    ".codex/",
+    ".mcp.json",
+    "docs/P5-UI-MOCKUP-SPEC.md",
+    "docs/assets/infoapex-ai-current-architecture-illustrated-ro.png",
+    "docs/assets/infoapex-ai-current-architecture-illustrated.png",
+    "docs/assets/infoapex-ai-docker-architecture-illustrated-ro.png",
+    "docs/assets/infoapex-ai-docker-architecture-illustrated.png",
+    "validation/benchmark/eurocarscan/csharp-v2/.local/",
+    "validation/benchmark/eurocarscan/csharp/.local/authorization-stabilization-20260905.json",
+    "validation/benchmark/eurocarscan/csharp/.local/experiment-stabilization-20260905.json",
+    ".ai-code-control/memory/tasks/2026-09-18-p5-ui-mockup-spec.md"
+  ],
+  "forbiddenPaths": [
+    "src/",
+    "modules/",
+    "scripts/"
+  ],
+  "requiredValidation": [
+    "run-validation",
+    "git diff --check",
+    "remote PNG HTTP and integrity check"
+  ],
+  "riskLevel": "low",
+  "notes": "docs/P5-UI.md and pre-existing untracked files are baseline changes, excluded from this commit."
+}
