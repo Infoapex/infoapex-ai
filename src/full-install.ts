@@ -407,7 +407,7 @@ export function verifyFilesystemPermissions(repositoryRoot: string, bundleRoot: 
     "modules/ai-code-docs/dist/src/cli.js",
     "modules/ai-code-benchmark/dist/src/cli.js",
     "modules/ai-code-control/tools/ai-code-control/mcp-server/dist/server.js",
-    "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.Cli/bin/Debug/net9.0/AiCodeControl.Cli.dll"
+    "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.Cli/bin/Debug/net10.0/AiCodeControl.Cli.dll"
   ];
   const unreadable = runtime.filter((path) => !existsSync(join(bundle, path)) || !hasAccess(join(bundle, path), constants.R_OK));
   checks.push({
@@ -480,7 +480,7 @@ function modulePaths(bundleRoot: string) {
     docsCli: join(bundleRoot, "modules", "ai-code-docs", "dist", "src", "cli.js"),
     benchmarkCli: join(bundleRoot, "modules", "ai-code-benchmark", "dist", "src", "cli.js"),
     controlProject: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "src", "AiCodeControl.Cli"),
-    controlDll: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "src", "AiCodeControl.Cli", "bin", "Debug", "net9.0", "AiCodeControl.Cli.dll"),
+    controlDll: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "src", "AiCodeControl.Cli", "bin", "Debug", "net10.0", "AiCodeControl.Cli.dll"),
     controlModuleRoot: join(bundleRoot, "modules", "ai-code-control"),
     controlMcp: join(bundleRoot, "modules", "ai-code-control", "tools", "ai-code-control", "mcp-server", "dist", "server.js")
   };
