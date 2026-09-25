@@ -14,13 +14,19 @@ public sealed record RustReference(
     string? ReferencedFromSymbol,
     int Line,
     int Column,
-    string ReferenceKind);
+    string ReferenceKind,
+    string EdgeType = "calls");
+
+public sealed record RustImport(string Path, string LocalName, string ModuleName);
 
 public sealed record RustFileIndex(
     string RelativePath,
     string Hash,
     List<RustSymbol> Symbols,
-    List<RustReference> References);
+    List<RustReference> References,
+    string CrateName,
+    string ModuleName,
+    List<RustImport> Imports);
 
 public sealed record RustIndexResult(
     int CratesIndexed,

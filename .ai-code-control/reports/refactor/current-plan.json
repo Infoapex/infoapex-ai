@@ -1,10 +1,25 @@
 {
-  "task": "none",
-  "language": "",
-  "affectedSymbol": "",
-  "allowedFiles": [],
-  "forbiddenPaths": [".ai-code-control/db/"],
-  "allowedUntrackedPatterns": [".ai-code-control/memory/"],
-  "requiredValidation": ["run-validation"],
-  "riskLevel": "low"
+  "taskId": "IA-RUST-01",
+  "task": "Syntax-aware Rust impact indexing",
+  "status": "completed",
+  "language": "rust",
+  "affectedSymbol": "RustIndexerService",
+  "allowedPatterns": [
+    "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.RustIndexer/**",
+    "modules/ai-code-control/tools/ai-code-control/tests/AiCodeControl.Tests/**",
+    ".ai-code-control/memory/tasks/**"
+  ],
+  "forbiddenPaths": [
+    "modules/ai-code-worker/"
+  ],
+  "requiredValidation": [
+    "dotnet test AiCodeControl.sln",
+    "npm test"
+  ],
+  "riskLevel": "medium",
+  "branch": "ia-rust-01",
+  "allowedFiles": [
+    ".ai-code-control/reports/refactor/current-plan.json",
+    "modules/ai-code-control/tools/ai-code-control/README.md"
+  ]
 }

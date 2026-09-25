@@ -32,7 +32,7 @@ dotnet run --project src/AiCodeControl.Cli -- current <adr-or-rule>
 dotnet run --project src/AiCodeControl.Cli -- evidence-for <criterion-or-task>
 dotnet run --project src/AiCodeControl.Cli -- graph-drift --scope . --format json [--sources <manifest>] [--expected-graph <fixture>] [--projection-manifest <manifest>] [--minimum-coverage <0-100>] [--fail-on-review]
 dotnet run --project src/AiCodeControl.Cli -- memory-add-task-summary --title "<title>" --from-current-git-diff
-dotnet run --project src/AiCodeControl.Cli -- refresh [--path .] [--full]
+dotnet run --project src/AiCodeControl.Cli -- refresh [--path .] [--full] [--language-scope rust=crates] [--language-scope python=python]
 ```
 
 Exit codes: `0` = pass, `1` = usage/config error, `2` = check failed.
@@ -130,3 +130,48 @@ timeouts. Failed commands include their captured output so the agent can see why
 dotnet build AiCodeControl.sln
 dotnet test AiCodeControl.sln
 ```
+
+## Rust impact indexing
+
+`refresh` ingests memory and indexes C#, TypeScript, JavaScript, and SQL under
+`--path` (default `.`). Configure additional language scopes in
+`.ai-code-control/config/code-control.json`:
+
+```json
+{"indexing":{"database":".ai-code-control/db/codegraph.sqlite","languages":{"rust":["crates"],"python":["python"]}}}
+```
+
+The `--language-scope language=path` option adds a scope for one invocation,
+without changing repository configuration. Supported languages are `rust` and
+`python`; existing configurations without `languages` retain their previous
+behavior. Ordinary `refresh` checks content hashes and prunes deleted files;
+when a Rust or Python scope changes, its files are reparsed together to update
+cross-file references. Unchanged scopes keep their existing rows.
+`refresh --full` reparses every file in every scope. Both modes update the
+graph for changed files. `health-check.lastIndexRun` reports the last
+successful unified run, including UTC completion time, Git commit when
+available, indexers, and scopes. These records live in rebuildable SQLite;
+versioned source and configuration remain canonical.
+
+Impact output includes `provenance.analysisMode`,
+`provenance.semanticCompleteness`, `provenance.unresolvedReferenceCount`,
+`provenance.riskScope`, and `provenance.language`. Rust uses `syntax-aware`,
+`partial`, and `observed_graph`; `riskLevel` describes only observed graph
+edges and does not prove complete program impact.
+
+`index-rust --path .` parses Rust source with TreeSitter.DotNet and rebuilds its
+file-scoped rows in the SQLite code graph. It indexes workspace crates, imports
+and aliases, field and function types (including nested generics), trait bounds,
+impl relationships, and calls. `impact-analysis` traverses incoming `imports`,
+`uses_type`, `trait_bound`, `implements`, `implemented_by`, `member_of`, and
+`calls` edges. Its legacy `directCallers` and `transitiveCallers` counts include
+all of these relationships for Rust, not just function callers.
+
+Resolution uses declared paths, imports, and the containing module or impl.
+References that cannot be resolved uniquely remain in `references_map` as
+`unresolved::<token>` with their original `reference_token`; they produce no
+edge to a guessed symbol. This is syntax-aware indexing, not compiler or
+rust-analyzer semantic resolution. It does not infer receiver types for
+`value.method()`, expand glob imports or macros, or resolve re-exports and
+conditional compilation. Use a fully qualified symbol when a simple name is
+ambiguous. The SQLite graph is a cache and can be rebuilt with `index-rust`.

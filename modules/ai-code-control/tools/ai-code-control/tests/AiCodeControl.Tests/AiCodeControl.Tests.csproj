@@ -12,6 +12,7 @@
     <ProjectReference Include="..\..\src\AiCodeControl.CodeIndexer\AiCodeControl.CodeIndexer.csproj" />
     <ProjectReference Include="..\..\src\AiCodeControl.Memory\AiCodeControl.Memory.csproj" />
     <ProjectReference Include="..\..\src\AiCodeControl.RefactorGuard\AiCodeControl.RefactorGuard.csproj" />
+    <ProjectReference Include="..\..\src\AiCodeControl.RustIndexer\AiCodeControl.RustIndexer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

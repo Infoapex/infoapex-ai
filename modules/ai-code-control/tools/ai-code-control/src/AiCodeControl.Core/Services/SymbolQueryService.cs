@@ -76,6 +76,25 @@ LIMIT $limit;";
             };
 
         var target = candidates[0];
+        using var provenanceQuery = connection.CreateCommand();
+        provenanceQuery.CommandText = "SELECT language FROM symbols WHERE full_name = $target LIMIT 1";
+        provenanceQuery.Parameters.AddWithValue("$target", target);
+        var language = provenanceQuery.ExecuteScalar() as string ?? "unknown";
+        int? unresolvedReferences = null;
+        if (language == "rust")
+        {
+            using var unresolved = connection.CreateCommand();
+            unresolved.CommandText = "SELECT COUNT(*) FROM references_map r JOIN files f ON f.id = r.file_id WHERE f.language = 'rust' AND r.symbol_full_name LIKE 'unresolved::%'";
+            unresolvedReferences = Convert.ToInt32(unresolved.ExecuteScalar());
+        }
+        var provenance = new
+        {
+            analysisMode = language == "rust" ? "syntax-aware" : language == "python" ? "heuristic" : "structural",
+            semanticCompleteness = "partial",
+            unresolvedReferenceCount = unresolvedReferences,
+            riskScope = "observed_graph",
+            language
+        };
         var queue = new Queue<(string Symbol, int Depth)>();
         var visited = new HashSet<string>(StringComparer.Ordinal) { target };
         var impacts = new List<ImpactItem>();
@@ -123,6 +142,7 @@ LIMIT $limit;";
             affectedSymbols = ordered.Select(i => i.From).Distinct(StringComparer.Ordinal).Count(),
             affectedFiles = files.Count,
             riskLevel = risk,
+            provenance,
             impacts = ordered.Select(i => new
             {
                 from = i.From,

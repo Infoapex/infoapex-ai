@@ -1,7 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using AiCodeControl.RustIndexer.Models;
 using Microsoft.Data.Sqlite;
 
@@ -9,222 +5,184 @@ namespace AiCodeControl.RustIndexer.Services;
 
 public sealed class RustIndexerService
 {
-    private static readonly Regex FnRegex = new("^(?<indent>\\s*)(?<vis>pub\\s+)?fn\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex StructRegex = new("^(?<indent>\\s*)(?<vis>pub\\s+)?struct\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex EnumRegex = new("^(?<indent>\\s*)(?<vis>pub\\s+)?enum\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex TraitRegex = new("^(?<indent>\\s*)(?<vis>pub\\s+)?trait\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
-    private static readonly Regex ImplRegex = new("^(?<indent>\\s*)impl(\\s*<[^>]+>)?\\s+(?<name>[A-Za-z_][A-Za-z0-9_:<>]*)", RegexOptions.Compiled);
-    private static readonly Regex CallRegex = new("\\b(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(", RegexOptions.Compiled);
-
     private static readonly HashSet<string> ExcludedDirs = new(StringComparer.OrdinalIgnoreCase)
     {
         "target", ".git", "node_modules", "bin", "obj"
     };
 
-    private static readonly HashSet<string> CallExcludes = new(StringComparer.Ordinal)
-    {
-        "if", "for", "while", "loop", "match", "println", "format", "vec", "Some", "Ok", "Err"
-    };
-
-    public RustIndexResult Index(string repoRoot, string indexPath, string dbPath)
+    public RustIndexResult Index(string repoRoot, string indexPath, string dbPath, bool fullRebuild = false)
     {
         var root = Path.GetFullPath(Path.Combine(repoRoot, indexPath));
         var cargoTomls = Directory.EnumerateFiles(root, "Cargo.toml", SearchOption.AllDirectories)
-            .Where(p => !IsExcludedPath(root, p))
-            .ToList();
-
+            .Where(p => !IsExcludedPath(root, p)).Order(StringComparer.Ordinal).ToList();
+        var crates = cargoTomls.Select(p => (Path: p, Root: Path.GetDirectoryName(p)!, Metadata: ReadCargoMetadataFallback(p)))
+            .Where(c => !string.IsNullOrWhiteSpace(c.Metadata.Name)).ToList();
         var rsFiles = Directory.EnumerateFiles(root, "*.rs", SearchOption.AllDirectories)
-            .Where(p => !IsExcludedPath(root, p))
-            .ToList();
-
-        var parsed = rsFiles.Select(f => ParseFile(repoRoot, f)).ToList();
+            .Where(p => !IsExcludedPath(root, p)).Order(StringComparer.Ordinal).ToList();
+        var parsed = rsFiles.Select(file =>
+        {
+            var owner = crates.Where(c => file.StartsWith(c.Root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                .OrderByDescending(c => c.Root.Length).FirstOrDefault();
+            var crateName = owner.Metadata.Name?.Replace('-', '_') ?? Path.GetFileName(root).Replace('-', '_');
+            return RustSyntaxParser.Parse(repoRoot, file, crateName, owner.Root ?? root);
+        }).ToList();
+        var resolver = new RustReferenceResolver(parsed);
 
         using var conn = new SqliteConnection($"Data Source={dbPath}");
         conn.Open();
+        if (!fullRebuild && IsCurrent(conn, repoRoot, root, parsed) && CratesCurrent(conn, repoRoot, root, cargoTomls))
+            return new RustIndexResult(crates.Count, 0, 0, 0, 0, 0);
         using var tx = conn.BeginTransaction();
-
-        var symbolsBySimpleName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-        foreach (var f in parsed)
-        {
-            foreach (var s in f.Symbols)
-            {
-                if (!symbolsBySimpleName.TryGetValue(s.Name, out var list))
-                {
-                    list = new List<string>();
-                    symbolsBySimpleName[s.Name] = list;
-                }
-
-                list.Add(s.FullName);
-            }
-        }
-
-        var cratesIndexed = 0;
+        PruneMissingCrates(conn, tx, repoRoot, root,
+            crates.Select(crate => Path.GetRelativePath(repoRoot, crate.Path).Replace('\\', '/')).ToHashSet(StringComparer.Ordinal));
         var dependenciesIndexed = 0;
-        foreach (var cargo in cargoTomls)
+        foreach (var crate in crates)
         {
-            var (crateName, deps) = ReadCargoMetadataFallback(cargo);
-            if (string.IsNullOrWhiteSpace(crateName))
-            {
-                continue;
-            }
-
-            var crateId = UpsertRustCrate(conn, tx, crateName!, Path.GetRelativePath(repoRoot, cargo).Replace('\\', '/'));
+            var crateId = UpsertRustCrate(conn, tx, crate.Metadata.Name!, Path.GetRelativePath(repoRoot, crate.Path).Replace('\\', '/'));
             DeleteRustDependencies(conn, tx, crateId);
-            foreach (var dep in deps)
+            foreach (var dep in crate.Metadata.Dependencies)
             {
                 InsertRustDependency(conn, tx, crateId, dep, "normal", null);
                 dependenciesIndexed++;
             }
-
-            cratesIndexed++;
         }
 
-        var filesIndexed = 0;
+        var discovered = parsed.Select(f => f.RelativePath).ToHashSet(StringComparer.Ordinal);
+        PruneMissingRustFiles(conn, tx, repoRoot, root, discovered);
         var symbolsIndexed = 0;
         var refsIndexed = 0;
         var edgesIndexed = 0;
-
-        foreach (var f in parsed)
+        foreach (var file in parsed)
         {
-            var fileId = UpsertFile(conn, tx, f.RelativePath, f.Hash);
+            var fileId = UpsertFile(conn, tx, file.RelativePath, file.Hash);
             DeleteFileScopedRows(conn, tx, fileId);
-
-            foreach (var s in f.Symbols)
+            foreach (var symbol in file.Symbols)
             {
-                InsertSymbol(conn, tx, fileId, s);
+                InsertSymbol(conn, tx, fileId, symbol);
                 symbolsIndexed++;
-            }
-
-            foreach (var r in f.References)
-            {
-                var resolved = ResolveReference(r.SymbolToken, symbolsBySimpleName);
-                InsertReference(conn, tx, fileId, resolved, r);
-                refsIndexed++;
-
-                if (!string.IsNullOrWhiteSpace(r.ReferencedFromSymbol))
+                if (symbol.ParentSymbol is not null && resolver.HasSymbol(symbol.ParentSymbol))
                 {
-                    InsertEdge(conn, tx, fileId, r.ReferencedFromSymbol!, resolved, "calls");
+                    InsertEdge(conn, tx, fileId, symbol.FullName, symbol.ParentSymbol, "member_of");
                     edgesIndexed++;
                 }
             }
-
-            filesIndexed++;
+            foreach (var reference in file.References)
+            {
+                var resolved = resolver.Resolve(file, reference.SymbolToken, reference.ReferencedFromSymbol);
+                InsertReference(conn, tx, fileId, resolved ?? "unresolved::" + reference.SymbolToken, reference);
+                refsIndexed++;
+                if (resolved is not null && reference.ReferencedFromSymbol is not null && reference.ReferencedFromSymbol != resolved)
+                {
+                    InsertEdge(conn, tx, fileId, reference.ReferencedFromSymbol, resolved, reference.EdgeType);
+                    edgesIndexed++;
+                }
+            }
         }
-
         tx.Commit();
-        return new RustIndexResult(cratesIndexed, dependenciesIndexed, filesIndexed, symbolsIndexed, refsIndexed, edgesIndexed);
+        return new RustIndexResult(crates.Count, dependenciesIndexed, parsed.Count, symbolsIndexed, refsIndexed, edgesIndexed);
     }
 
-    private static RustFileIndex ParseFile(string repoRoot, string file)
+    private static bool IsCurrent(SqliteConnection conn, string repoRoot, string root, List<RustFileIndex> parsed)
     {
-        var lines = File.ReadAllLines(file);
-        var symbols = new List<RustSymbol>();
-        var references = new List<RustReference>();
-        var moduleName = ToRustModuleName(repoRoot, file);
-
-        var scopeStack = new Stack<(int BraceDepth, string FullName, string Kind)>();
-        var braceDepth = 0;
-
-        for (var i = 0; i < lines.Length; i++)
+        var expected = parsed.ToDictionary(file => file.RelativePath, file => file.Hash, StringComparer.Ordinal);
+        using var query = conn.CreateCommand();
+        query.CommandText = "SELECT path, hash FROM files WHERE language = 'rust'";
+        using var reader = query.ExecuteReader();
+        var seen = 0;
+        while (reader.Read())
         {
-            var line = lines[i];
-            var trimmed = line.TrimStart();
+            var path = reader.GetString(0);
+            var absolute = Path.GetFullPath(Path.Combine(repoRoot, path));
+            if (absolute != root && !absolute.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
+            if (!expected.TryGetValue(path, out var hash) || hash != reader.GetString(1)) return false;
+            seen++;
+        }
+        return seen == expected.Count && expected.Count > 0;
+    }
 
-            while (scopeStack.Count > 0 && braceDepth < scopeStack.Peek().BraceDepth)
-            {
-                scopeStack.Pop();
-            }
+    private static bool CratesCurrent(SqliteConnection conn, string repoRoot, string root, List<string> manifests)
+    {
+        var expected = manifests.ToDictionary(path => Path.GetRelativePath(repoRoot, path).Replace('\\', '/'),
+            ReadCargoMetadataFallback, StringComparer.Ordinal);
+        using var query = conn.CreateCommand();
+        query.CommandText = "SELECT id, manifest_path, name FROM rust_crates";
+        var rows = new List<(long Id, string Path, string Name)>();
+        using (var reader = query.ExecuteReader())
+            while (reader.Read()) rows.Add((reader.GetInt64(0), reader.GetString(1), reader.GetString(2)));
+        var seen = 0;
+        foreach (var row in rows)
+        {
+            var absolute = Path.GetFullPath(Path.Combine(repoRoot, row.Path));
+            if (absolute != root && !absolute.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
+            if (!expected.TryGetValue(row.Path, out var metadata) || metadata.Name != row.Name) return false;
+            using var dependencies = conn.CreateCommand();
+            dependencies.CommandText = "SELECT dependency_name FROM rust_dependencies WHERE crate_id = $id ORDER BY dependency_name";
+            dependencies.Parameters.AddWithValue("$id", row.Id);
+            var actual = new List<string>();
+            using (var reader = dependencies.ExecuteReader())
+                while (reader.Read()) actual.Add(reader.GetString(0));
+            if (!actual.SequenceEqual(metadata.Dependencies.Order(StringComparer.Ordinal))) return false;
+            seen++;
+        }
+        return seen == expected.Count;
+    }
 
-            if (TryMatch(line, StructRegex, out var structName, out var structVis))
+    private static void PruneMissingCrates(SqliteConnection conn, SqliteTransaction tx, string repoRoot,
+        string root, HashSet<string> discovered)
+    {
+        using var query = conn.CreateCommand();
+        query.Transaction = tx;
+        query.CommandText = "SELECT id, manifest_path FROM rust_crates";
+        var stale = new List<long>();
+        using (var reader = query.ExecuteReader())
+            while (reader.Read())
             {
-                AddSymbol(symbols, scopeStack, moduleName, structName, "struct", i + 1, structVis);
+                var path = reader.GetString(1);
+                var absolute = Path.GetFullPath(Path.Combine(repoRoot, path));
+                if ((absolute == root || absolute.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                    && !discovered.Contains(path)) stale.Add(reader.GetInt64(0));
             }
-            else if (TryMatch(line, EnumRegex, out var enumName, out var enumVis))
-            {
-                AddSymbol(symbols, scopeStack, moduleName, enumName, "enum", i + 1, enumVis);
-            }
-            else if (TryMatch(line, TraitRegex, out var traitName, out var traitVis))
-            {
-                AddSymbol(symbols, scopeStack, moduleName, traitName, "trait", i + 1, traitVis);
-            }
-            else if (TryMatch(line, FnRegex, out var fnName, out var fnVis))
-            {
-                var kind = scopeStack.Count > 0 && scopeStack.Peek().Kind == "impl" ? "method" : "function";
-                AddSymbol(symbols, scopeStack, moduleName, fnName, kind, i + 1, fnVis);
-            }
-            else
-            {
-                var implMatch = ImplRegex.Match(line);
-                if (implMatch.Success)
-                {
-                    var implName = implMatch.Groups["name"].Value;
-                    var parent = scopeStack.Count > 0 ? scopeStack.Peek().FullName : moduleName;
-                    var full = parent + "::impl(" + implName + ")";
-                    symbols.Add(new RustSymbol("impl", full, "impl", i + 1, i + 1, parent));
-                    scopeStack.Push((braceDepth + 1, full, "impl"));
-                }
-            }
+        foreach (var id in stale)
+        {
+            using var delete = conn.CreateCommand();
+            delete.Transaction = tx;
+            delete.CommandText = "DELETE FROM rust_dependencies WHERE crate_id = $id; DELETE FROM rust_crates WHERE id = $id";
+            delete.Parameters.AddWithValue("$id", id);
+            delete.ExecuteNonQuery();
+        }
+    }
 
-            foreach (Match m in CallRegex.Matches(line))
+    private static void PruneMissingRustFiles(SqliteConnection conn, SqliteTransaction tx, string repoRoot, string indexedRoot, HashSet<string> discovered)
+    {
+        using var query = conn.CreateCommand();
+        query.Transaction = tx;
+        query.CommandText = "SELECT id, path FROM files WHERE language = 'rust'";
+        var stale = new List<long>();
+        using (var reader = query.ExecuteReader())
+        {
+            while (reader.Read())
             {
-                var token = m.Groups["name"].Value;
-                if (CallExcludes.Contains(token))
-                {
-                    continue;
-                }
-
-                var from = scopeStack.Count > 0 ? scopeStack.Peek().FullName : moduleName;
-                references.Add(new RustReference(token, from, i + 1, m.Groups["name"].Index + 1, "call"));
-            }
-
-            braceDepth += CountChar(trimmed, '{');
-            braceDepth -= CountChar(trimmed, '}');
-            if (braceDepth < 0)
-            {
-                braceDepth = 0;
+                var path = reader.GetString(1);
+                var absolute = Path.GetFullPath(Path.Combine(repoRoot, path));
+                if ((absolute.StartsWith(indexedRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal) || absolute == indexedRoot)
+                    && !discovered.Contains(path)) stale.Add(reader.GetInt64(0));
             }
         }
-
-        var hash = Sha256Hex(File.ReadAllText(file));
-        var relativePath = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
-        return new RustFileIndex(relativePath, hash, symbols, references);
-    }
-
-    private static void AddSymbol(List<RustSymbol> symbols, Stack<(int BraceDepth, string FullName, string Kind)> stack, string moduleName, string name, string kind, int line, string? visibility)
-    {
-        var parent = stack.Count > 0 ? stack.Peek().FullName : moduleName;
-        var full = parent + "::" + name;
-        symbols.Add(new RustSymbol(name, full, kind, line, line, parent, visibility));
-        stack.Push((stack.Count > 0 ? stack.Peek().BraceDepth + 1 : 1, full, kind == "method" ? "function" : kind));
-    }
-
-    private static bool TryMatch(string line, Regex regex, out string name, out string? visibility)
-    {
-        var match = regex.Match(line);
-        if (match.Success)
+        foreach (var id in stale)
         {
-            name = match.Groups["name"].Value;
-            visibility = string.IsNullOrWhiteSpace(match.Groups["vis"].Value) ? null : "public";
-            return true;
+            DeleteFileScopedRows(conn, tx, id);
+            using var delete = conn.CreateCommand();
+            delete.Transaction = tx;
+            delete.CommandText = "DELETE FROM files WHERE id = $id";
+            delete.Parameters.AddWithValue("$id", id);
+            delete.ExecuteNonQuery();
         }
-
-        name = string.Empty;
-        visibility = null;
-        return false;
     }
 
     private static bool IsExcludedPath(string root, string path)
     {
         var rel = Path.GetRelativePath(root, path);
         return rel.Split(Path.DirectorySeparatorChar).Any(seg => ExcludedDirs.Contains(seg));
-    }
-
-    private static string ToRustModuleName(string repoRoot, string file)
-    {
-        var rel = Path.GetRelativePath(repoRoot, file).Replace('\\', '/');
-        if (rel.EndsWith(".rs", StringComparison.OrdinalIgnoreCase)) rel = rel[..^3];
-        rel = rel.Replace("/mod", "");
-        return rel.Replace('/', ':').Replace("::", ":");
     }
 
     private static (string? Name, List<string> Dependencies) ReadCargoMetadataFallback(string cargoTomlPath)
@@ -265,22 +223,6 @@ public sealed class RustIndexerService
         }
 
         return (name, deps.Distinct(StringComparer.Ordinal).ToList());
-    }
-
-    private static int CountChar(string s, char c)
-    {
-        var n = 0;
-        foreach (var ch in s)
-        {
-            if (ch == c) n++;
-        }
-        return n;
-    }
-
-    private static string Sha256Hex(string content)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
-        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     private static long UpsertFile(SqliteConnection conn, SqliteTransaction tx, string path, string hash)
@@ -392,8 +334,8 @@ VALUES($fileId, $name, $fullName, $kind, 'rust', $start, $end, $access, $parent)
         using var cmd = conn.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = @"
-INSERT INTO references_map(symbol_full_name, referenced_from_symbol, file_id, line, column, reference_kind)
-VALUES($symbol, $from, $fileId, $line, $column, $kind);
+INSERT INTO references_map(symbol_full_name, referenced_from_symbol, file_id, line, column, reference_kind, reference_token)
+VALUES($symbol, $from, $fileId, $line, $column, $kind, $token);
 ";
         cmd.Parameters.AddWithValue("$symbol", symbolFullName);
         cmd.Parameters.AddWithValue("$from", (object?)reference.ReferencedFromSymbol ?? DBNull.Value);
@@ -401,6 +343,7 @@ VALUES($symbol, $from, $fileId, $line, $column, $kind);
         cmd.Parameters.AddWithValue("$line", reference.Line);
         cmd.Parameters.AddWithValue("$column", reference.Column);
         cmd.Parameters.AddWithValue("$kind", reference.ReferenceKind);
+        cmd.Parameters.AddWithValue("$token", reference.SymbolToken);
         cmd.ExecuteNonQuery();
     }
 
@@ -419,14 +362,4 @@ VALUES($from, $to, $edgeType, $fileId);
         cmd.ExecuteNonQuery();
     }
 
-    private static string ResolveReference(string token, Dictionary<string, List<string>> symbolsBySimpleName)
-    {
-        if (symbolsBySimpleName.TryGetValue(token, out var names) && names.Count == 1)
-        {
-            return names[0];
-        }
-
-        return token;
-    }
 }
-

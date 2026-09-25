@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AiCodeControl.Core\AiCodeControl.Core.csproj" />
+    <PackageReference Include="TreeSitter.DotNet" Version="1.3.0" />
   </ItemGroup>
 
   <PropertyGroup>

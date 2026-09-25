@@ -1,0 +1,28 @@
+{
+  "taskId": "IA-CONTROL-02",
+  "task": "Unified code graph refresh and provenance",
+  "status": "completed",
+  "language": "csharp",
+  "affectedSymbol": "AiCodeControl.CodeIndexer.Services.CodeIndexerService",
+  "allowedPatterns": [
+    "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.Cli/**",
+    "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.CodeIndexer/**",
+    "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.Core/**",
+    "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.PythonIndexer/**",
+    "modules/ai-code-control/tools/ai-code-control/src/AiCodeControl.RustIndexer/**",
+    "modules/ai-code-control/tools/ai-code-control/tests/AiCodeControl.Tests/**",
+    "modules/ai-code-control/tools/ai-code-control/README.md",
+    ".ai-code-control/memory/tasks/**",
+    ".ai-code-control/reports/refactor/current-plan.json",
+    ".ai-code-control/tasks/ia-control-02.json"
+  ],
+  "forbiddenPaths": ["modules/ai-code-worker/"],
+  "requiredValidation": [
+    "dotnet restore AiCodeControl.sln",
+    "dotnet build AiCodeControl.sln",
+    "dotnet test AiCodeControl.sln",
+    "npm test",
+    "dotnet list AiCodeControl.sln package --vulnerable --include-transitive"
+  ],
+  "riskLevel": "medium"
+}

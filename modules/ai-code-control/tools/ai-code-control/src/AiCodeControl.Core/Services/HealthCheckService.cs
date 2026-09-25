@@ -51,6 +51,25 @@ public sealed class HealthCheckService
             while (reader.Read()) result.FilesByLanguage[reader.GetString(0)] = reader.GetInt64(1);
         }
 
+        using var unifiedTable = connection.CreateCommand();
+        unifiedTable.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='unified_refresh_runs'";
+        if (Convert.ToInt32(unifiedTable.ExecuteScalar()) > 0)
+        {
+            using var unified = connection.CreateCommand();
+            unified.CommandText = "SELECT completed_at, mode, git_commit, indexers_json, scopes_json FROM unified_refresh_runs ORDER BY id DESC LIMIT 1";
+            using var run = unified.ExecuteReader();
+            if (run.Read())
+            {
+                result.LastRun = new
+                {
+                    completedAt = run.GetString(0), mode = run.GetString(1),
+                    commit = run.IsDBNull(2) ? null : run.GetString(2),
+                    indexers = System.Text.Json.JsonSerializer.Deserialize<string[]>(run.GetString(3)),
+                    scopes = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, List<string>>>(run.GetString(4))
+                };
+                return result;
+            }
+        }
         using var table = connection.CreateCommand();
         table.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='code_index_runs'";
         if (Convert.ToInt32(table.ExecuteScalar()) == 0)

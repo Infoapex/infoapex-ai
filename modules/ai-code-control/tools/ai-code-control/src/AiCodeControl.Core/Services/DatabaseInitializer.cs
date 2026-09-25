@@ -112,6 +112,15 @@ CREATE TABLE IF NOT EXISTS code_index_runs (
     files_pruned INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS unified_refresh_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    completed_at TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    git_commit TEXT NULL,
+    indexers_json TEXT NOT NULL CHECK(json_valid(indexers_json)),
+    scopes_json TEXT NOT NULL CHECK(json_valid(scopes_json))
+);
+
 CREATE TABLE IF NOT EXISTS trace_nodes (
     version_id INTEGER PRIMARY KEY AUTOINCREMENT,
     node_id TEXT NOT NULL,

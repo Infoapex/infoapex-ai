@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.Data.Sqlite;
 using AiCodeControl.Cli;
 using AiCodeControl.CodeIndexer.Services;
 using AiCodeControl.Core.Models;
@@ -260,6 +261,8 @@ async Task<int> RunCommandAsync()
                             ? targetElement.GetString()
                             : null,
                         affectedFiles = ok ? affectedFiles : null,
+                        provenance = ok && element.TryGetProperty("provenance", out var provenanceElement)
+                            ? (JsonElement?)provenanceElement : null,
                         riskNotes = ok && !string.IsNullOrWhiteSpace(risk)
                             ? new[] { $"riskLevel:{risk}" }
                             : Array.Empty<string>()
@@ -552,6 +555,36 @@ async Task<int> RunCommandAsync()
         case "refresh":
             {
                 var config = configLoader.LoadCodeControl(repoRoot);
+                var full = args.Contains("--full", StringComparer.OrdinalIgnoreCase);
+                var scopes = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["code"] = [GetOptionValue(args, "--path") ?? "."]
+                };
+                foreach (var (language, paths) in config?.Indexing?.Languages ?? new Dictionary<string, List<string>>())
+                {
+                    if (language is not ("rust" or "python"))
+                        throw new InvalidOperationException($"Unsupported configured indexer: {language}");
+                    scopes[language] = paths;
+                }
+                for (var i = 0; i < args.Length; i++)
+                {
+                    if (args[i] != "--language-scope") continue;
+                    if (++i >= args.Length || !args[i].Contains('='))
+                        throw new InvalidOperationException("Use --language-scope rust=path or python=path.");
+                    var pair = args[i].Split('=', 2);
+                    if (pair[0] is not ("rust" or "python"))
+                        throw new InvalidOperationException($"Unsupported indexer: {pair[0]}");
+                    if (!scopes.TryGetValue(pair[0], out var paths)) scopes[pair[0]] = paths = [];
+                    paths.Add(pair[1]);
+                }
+                foreach (var (_, paths) in scopes)
+                foreach (var path in paths)
+                {
+                    var absolute = Path.GetFullPath(Path.Combine(repoRoot, path));
+                    if (!Directory.Exists(absolute) ||
+                        !(absolute == repoRoot || absolute.StartsWith(repoRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal)))
+                        throw new InvalidOperationException($"Index scope must be an existing repository directory: {path}");
+                }
                 var memoryConfig = LoadMemoryConfig();
                 if (memoryConfig?.Memory == null)
                 {
@@ -563,12 +596,27 @@ async Task<int> RunCommandAsync()
                 var memoryDb = initializer.InitializeMemory(repoRoot, ResolveMemoryDbPath(memoryConfig.Memory));
                 var codeDb = initializer.InitializeCodegraph(repoRoot, ResolveCodegraphDbPath(config));
                 var memory = new MemoryIngestService().Ingest(repoRoot, memoryConfig.Memory);
-                var code = new CodeIndexerService().Index(
-                    repoRoot,
-                    GetOptionValue(args, "--path") ?? ".",
-                    codeDb,
-                    config?.Indexing?.Exclude,
-                    args.Contains("--full", StringComparer.OrdinalIgnoreCase));
+                var code = new CodeIndexerService().Index(repoRoot, scopes["code"][0], codeDb,
+                    config?.Indexing?.Exclude, full);
+                var rust = new List<object>();
+                var python = new List<object>();
+                foreach (var path in scopes.GetValueOrDefault("rust") ?? [])
+                    rust.Add(new { path, result = new RustIndexerService().Index(repoRoot, path, codeDb, full) });
+                foreach (var path in scopes.GetValueOrDefault("python") ?? [])
+                    python.Add(new { path, result = new PythonIndexerService().Index(repoRoot, path, codeDb, full) });
+                if (memory.Errors.Count == 0)
+                {
+                    using var connection = new SqliteConnection($"Data Source={codeDb}");
+                    connection.Open();
+                    using var insert = connection.CreateCommand();
+                    insert.CommandText = "INSERT INTO unified_refresh_runs(completed_at, mode, git_commit, indexers_json, scopes_json) VALUES($at, $mode, $commit, $indexers, $scopes)";
+                    insert.Parameters.AddWithValue("$at", DateTimeOffset.UtcNow.ToString("O"));
+                    insert.Parameters.AddWithValue("$mode", full ? "full" : "incremental");
+                    insert.Parameters.AddWithValue("$commit", (object?)code.Commit ?? DBNull.Value);
+                    insert.Parameters.AddWithValue("$indexers", JsonSerializer.Serialize(scopes.Keys.Order(StringComparer.Ordinal).ToArray()));
+                    insert.Parameters.AddWithValue("$scopes", JsonSerializer.Serialize(scopes));
+                    insert.ExecuteNonQuery();
+                }
                 if (args.Contains("--json", StringComparer.OrdinalIgnoreCase))
                 {
                     var refreshed = memory.Errors.Count == 0;
@@ -578,8 +626,11 @@ async Task<int> RunCommandAsync()
                         status = refreshed ? "ok" : "error",
                         error = refreshed ? null : string.Join("; ", memory.Errors),
                         refreshed,
+                        mode = full ? "full" : "incremental",
+                        indexers = scopes.Keys.Order(StringComparer.Ordinal).ToArray(),
+                        scopes,
                         detail = refreshed
-                            ? $"Memory ingested {memory.Ingested}; code indexed {code.FilesIndexed}."
+                            ? $"Memory ingested {memory.Ingested}; refreshed {scopes.Count} code indexers."
                             : "Refresh completed with memory errors."
                     });
                     return refreshed ? 0 : 2;
@@ -591,7 +642,7 @@ async Task<int> RunCommandAsync()
                     memoryDatabase = memoryDb,
                     codegraphDatabase = codeDb,
                     memory,
-                    code
+                    code, rust, python
                 });
                 return memory.Errors.Count == 0 ? 0 : 1;
             }

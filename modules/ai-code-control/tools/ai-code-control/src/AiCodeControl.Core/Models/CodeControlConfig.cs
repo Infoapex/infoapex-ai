@@ -29,6 +29,7 @@ public sealed class IndexingConfig
 {
     public string? Database { get; set; }
     public List<string>? Exclude { get; set; }
+    public Dictionary<string, List<string>>? Languages { get; set; }
 }
 
 public sealed class GitConfig

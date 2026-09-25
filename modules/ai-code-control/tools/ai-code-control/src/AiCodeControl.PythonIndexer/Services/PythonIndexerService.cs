@@ -24,7 +24,7 @@ public sealed class PythonIndexerService
         "if", "for", "while", "return", "print", "len", "range", "dict", "list", "set", "tuple", "str", "int", "float"
     };
 
-    public PythonIndexResult Index(string repoRoot, string indexPath, string dbPath)
+    public PythonIndexResult Index(string repoRoot, string indexPath, string dbPath, bool fullRebuild = false)
     {
         var fullIndexPath = Path.GetFullPath(Path.Combine(repoRoot, indexPath));
         var files = EnumeratePythonFiles(fullIndexPath).ToList();
@@ -37,8 +37,12 @@ public sealed class PythonIndexerService
 
         using var connection = new SqliteConnection($"Data Source={dbPath}");
         connection.Open();
+        if (!fullRebuild && IsCurrent(connection, repoRoot, fullIndexPath, parsed))
+            return new PythonIndexResult(0, 0, 0, 0, 0);
 
         using var tx = connection.BeginTransaction();
+        PruneMissingFiles(connection, tx, repoRoot, fullIndexPath,
+            parsed.Select(file => file.RelativePath).ToHashSet(StringComparer.Ordinal));
 
         var symbolsBySimpleName = new Dictionary<string, List<string>>(StringComparer.Ordinal);
         foreach (var f in parsed)
@@ -96,6 +100,50 @@ public sealed class PythonIndexerService
 
         tx.Commit();
         return new PythonIndexResult(filesIndexed, symbolsIndexed, refsIndexed, edgesIndexed, importsIndexed);
+    }
+
+    private static bool IsCurrent(SqliteConnection conn, string repoRoot, string root, List<PythonFileIndex> parsed)
+    {
+        var expected = parsed.ToDictionary(file => file.RelativePath, file => file.Hash, StringComparer.Ordinal);
+        using var query = conn.CreateCommand();
+        query.CommandText = "SELECT path, hash FROM files WHERE language = 'python'";
+        using var reader = query.ExecuteReader();
+        var seen = 0;
+        while (reader.Read())
+        {
+            var path = reader.GetString(0);
+            var absolute = Path.GetFullPath(Path.Combine(repoRoot, path));
+            if (absolute != root && !absolute.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
+            if (!expected.TryGetValue(path, out var hash) || hash != reader.GetString(1)) return false;
+            seen++;
+        }
+        return seen == expected.Count && expected.Count > 0;
+    }
+
+    private static void PruneMissingFiles(SqliteConnection conn, SqliteTransaction tx, string repoRoot,
+        string root, HashSet<string> discovered)
+    {
+        using var query = conn.CreateCommand();
+        query.Transaction = tx;
+        query.CommandText = "SELECT id, path FROM files WHERE language = 'python'";
+        var stale = new List<long>();
+        using (var reader = query.ExecuteReader())
+            while (reader.Read())
+            {
+                var path = reader.GetString(1);
+                var absolute = Path.GetFullPath(Path.Combine(repoRoot, path));
+                if ((absolute == root || absolute.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                    && !discovered.Contains(path)) stale.Add(reader.GetInt64(0));
+            }
+        foreach (var id in stale)
+        {
+            DeleteFileScopedRows(conn, tx, id);
+            using var delete = conn.CreateCommand();
+            delete.Transaction = tx;
+            delete.CommandText = "DELETE FROM files WHERE id = $id";
+            delete.Parameters.AddWithValue("$id", id);
+            delete.ExecuteNonQuery();
+        }
     }
 
     private static IEnumerable<string> EnumeratePythonFiles(string root)

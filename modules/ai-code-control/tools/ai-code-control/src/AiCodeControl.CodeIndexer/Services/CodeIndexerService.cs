@@ -322,7 +322,7 @@ VALUES($token, $token, $from, $fileId, $line, $column, $kind);";
     {
         using var reset = connection.CreateCommand();
         reset.Transaction = tx;
-        reset.CommandText = "UPDATE references_map SET symbol_full_name = reference_token WHERE reference_token IS NOT NULL";
+        reset.CommandText = "UPDATE references_map SET symbol_full_name = reference_token WHERE reference_token IS NOT NULL AND file_id IN (SELECT id FROM files WHERE language IN ('csharp','typescript','javascript','sql'))";
         reset.ExecuteNonQuery();
 
         using var resolve = connection.CreateCommand();
@@ -335,6 +335,7 @@ SET symbol_full_name = (
     WHERE s.name = references_map.reference_token OR s.full_name = references_map.reference_token
 )
 WHERE reference_token IS NOT NULL
+  AND file_id IN (SELECT id FROM files WHERE language IN ('csharp','typescript','javascript','sql'))
   AND (SELECT COUNT(DISTINCT s.full_name) FROM symbols s
        WHERE s.name = references_map.reference_token OR s.full_name = references_map.reference_token) = 1;";
         resolve.ExecuteNonQuery();
@@ -344,7 +345,7 @@ WHERE reference_token IS NOT NULL
     {
         using var delete = connection.CreateCommand();
         delete.Transaction = tx;
-        delete.CommandText = "DELETE FROM edges WHERE edge_type IN ('calls','imports','references','from','join','update','into','call')";
+        delete.CommandText = "DELETE FROM edges WHERE file_id IN (SELECT id FROM files WHERE language IN ('csharp','typescript','javascript','sql'))";
         delete.ExecuteNonQuery();
 
         using var insert = connection.CreateCommand();
@@ -353,7 +354,8 @@ WHERE reference_token IS NOT NULL
 INSERT INTO edges(from_symbol, to_symbol, edge_type, file_id)
 SELECT referenced_from_symbol, symbol_full_name, reference_kind, file_id
 FROM references_map
-WHERE referenced_from_symbol IS NOT NULL AND symbol_full_name IS NOT NULL;";
+WHERE referenced_from_symbol IS NOT NULL AND symbol_full_name IS NOT NULL
+  AND file_id IN (SELECT id FROM files WHERE language IN ('csharp','typescript','javascript','sql'));";
         return insert.ExecuteNonQuery();
     }
 
